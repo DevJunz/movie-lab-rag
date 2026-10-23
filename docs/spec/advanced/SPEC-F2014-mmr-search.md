@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2014** MMR 검색 적용 (검색 · 심화) |
 | 구분 | 심화 |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/rag/retriever.py`, `scripts/compare_retrieval.py` |
 | 선행 SPEC | SPEC-F2006 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #20 |
 
 ## 1. 요구사항 원문
 
@@ -25,7 +25,10 @@
 - `settings.retrieval.search_type == "mmr"`이면 외부 청크 검색을 `max_marginal_relevance_search(query, k=top_k, fetch_k=mmr_fetch_k, lambda_mult=mmr_lambda, filter={"movie_id": …})`로 바꾼다.
 - 메타 청크 고정 포함 · 병합 · 중복 제거 · 번호 부여(SPEC-F2006)는 그대로다.
 - 기본값 `search_type = "similarity"`(MVP 동작 유지). MMR은 설정으로 켠다. 검증 후 기본값을 바꾸려면 이 SPEC과 00-product-overview §7을 고친다.
-- MMR 결과의 `score`는 관련도 점수를 따로 계산해 채운다(표시 · 비교용).
+- MMR 결과의 `score`는 관련도 점수를 따로 계산해 채운다(표시 · 비교용). 같은 필터로 `similarity_search_with_score(query, k=fetch_k)`를 한 번 더 불러 청크 ID별 점수를 찾는다. MMR 후보는 이 `fetch_k`개 안에서만 고르므로 보통 모두 점수가 있고, 없거나 컬렉션이 코사인이 아니면 `None`이다(SPEC-F2006과 같은 규칙).
+- 중복 제거로 외부 근거가 `top_k`보다 적어지면 SPEC-F2006처럼 `k`를 두 배로 늘려 다시 고른다. 이때 `fetch_k`는 `max(fetch_k, k)`로 맞춘다.
+- 설정 검증: `retrieval.search_type ∈ {"similarity", "mmr"}`, `mmr_fetch_k`는 1 이상 정수, `mmr_lambda`는 0 이상 1 이하 수. 그 밖의 값은 `SettingsError`.
+- `Services.retriever(search_type=…)`로 이번 검색만 방식을 바꿀 수 있다(비교 도구용).
 
 ### 2.2 비교 도구
 
@@ -33,12 +36,12 @@
 python -m scripts.compare_retrieval --movie-id 157336 --question "<Q1>" [--top-k 4 --fetch-k 20 --lambda 0.5]
 ```
 
-출력(그리고 `docs/verification/retrieval_compare/<movie_id>.md` 저장):
+출력(그리고 `docs/verification/retrieval_compare/<movie_id>.md` 저장, `--out-dir`로 바꿀 수 있음). 같은 영화의 질문은 한 파일에 덧붙인다:
 
 | 순위 | 유사도: 문서 제목 · 청크 순번 · 점수 | MMR: 문서 제목 · 청크 순번 · 점수 |
 |---|---|---|
 
-+ 요약 지표: 서로 다른 문서 수, 근거 쌍 평균 코사인 유사도(낮을수록 다양), 두 목록의 겹침 수.
++ 요약 지표: 서로 다른 문서 수, 근거 쌍 평균 코사인 유사도(낮을수록 다양), 두 목록의 겹침 수. 메타 근거(`[근거 1]`)는 두 방식에 같으므로 표 · 지표에서 뺀 외부 근거만 비교한다. 코사인 유사도는 설정된 임베딩으로 외부 근거 본문을 다시 임베딩해 계산한다.
 
 ## 3. 가정
 
