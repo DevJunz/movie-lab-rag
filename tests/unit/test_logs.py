@@ -26,8 +26,9 @@ def clean_root():
 
 def test_tc_nf2004_07_single_handler_and_masked_secrets(tmp_path, clean_root):
     options = {"max_bytes": 10_000, "backup_count": 1, "level": "INFO", "secrets": [FAKE_KEY]}
-    configure_logging(tmp_path, **options)
-    configure_logging(tmp_path, **options)
+    log_file = tmp_path / "logs" / "movielab.log"
+    configure_logging(log_file, **options)
+    configure_logging(log_file, **options)
     ours = [h for h in clean_root.handlers if getattr(h, "movielab", False)]
     assert len(ours) == 1
     logger = logging.getLogger("movielab.test")
@@ -38,6 +39,6 @@ def test_tc_nf2004_07_single_handler_and_masked_secrets(tmp_path, clean_root):
         logger.exception("실패")
     for handler in ours:
         handler.flush()
-    text = (tmp_path / "movielab.log").read_text(encoding="utf-8")
+    text = log_file.read_text(encoding="utf-8")
     assert FAKE_KEY not in text
     assert "***" in text and "Traceback" in text  # traceback은 파일에 남는다
