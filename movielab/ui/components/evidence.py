@@ -26,7 +26,10 @@ def evidence_line(evidence: Evidence, profile: DomainProfile) -> str:
     """`[근거 n] 출처 유형 · 제목 · 링크 ↗ (· 라이선스)` 한 줄 (마크다운)."""
     parts = [f"**[근거 {evidence.n}]** {evidence.source_type}", evidence.title]
     if evidence.url:
-        parts.append(f"[{_link_label(evidence, profile)} ↗]({evidence.url})")
+        url = evidence.url.replace("(", "%28").replace(
+            ")", "%29"
+        )  # 마크다운 링크가 괄호에서 끊기지 않게
+        parts.append(f"[{_link_label(evidence, profile)} ↗]({url})")
     if evidence.license:
         parts.append(evidence.license)
     return " · ".join(parts)
