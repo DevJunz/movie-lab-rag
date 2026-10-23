@@ -25,7 +25,7 @@ from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttle
 from movielab.data.wiki_bundle import WikiBundleSource
-from movielab.index.doc_indexer import ITEM_KEY, DocIndexer
+from movielab.index.doc_indexer import DocIndexer
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -124,9 +124,6 @@ class Services:
         """위키 문서 색인기 (F2005). 인자를 주면 청크 값을 이번 실행만 덮어쓴다."""
         return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
 
-    def _has_chunks(self, item_id: str) -> bool:
-        return self.store.has_where(self.settings.collections.docs, {ITEM_KEY: str(item_id)})
-
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
 
@@ -145,7 +142,7 @@ class Services:
             settings=settings,
             manifest=None if dry_run else self.manifest,
             indexer=None if dry_run else self.doc_indexer().index_document,
-            has_chunks=None if dry_run else self._has_chunks,
+            has_chunks=None if dry_run else self.doc_indexer().has_pages,
         )
 
     @property

@@ -39,6 +39,10 @@ class VectorStore:
             self._embeddings = self._factory()
         return self._embeddings
 
+    def ensure_embeddings(self) -> None:
+        """임베딩(키)을 지금 준비한다 — 키가 없으면 여기서 안내 오류 (색인 전 확인용)."""
+        _ = self.embeddings
+
     def collection(self, name: str) -> Chroma:
         """LangChain Chroma 래퍼. 없으면 코사인 거리로 만든다."""
         if name not in self._collections:

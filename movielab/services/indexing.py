@@ -46,7 +46,7 @@ def index_catalog(
     items = catalog.items()
     if not items:
         raise DataEmptyError(f"불러온 항목이 0건이다 (건너뜀 {catalog.skipped}건)")
-    _ = store.embeddings  # 키가 없으면 여기서 안내 오류
+    store.ensure_embeddings()  # 키가 없으면 여기서 안내 오류
 
     target = f"{collection}{REBUILD_SUFFIX}" if rebuild else collection
     if rebuild:
@@ -100,6 +100,7 @@ def reindex_documents(
     *,
     movie_id: str | None = None,
     manifest: Any = None,
+    unreadable: set[tuple[str, str]] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> ReindexReport:
     """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3).
@@ -113,7 +114,7 @@ def reindex_documents(
       청크를 지운 영화는 수집 매니페스트(`manifest`)도 초기화해 다음 질문에서 다시 수집되게 한다.
     """
     if documents:
-        _ = indexer.store.embeddings  # 키가 없으면 여기서 안내 오류
+        indexer.store.ensure_embeddings()  # 키가 없으면 여기서 안내 오류
     indexing = indexer.store.settings.indexing
     succeeded = chunks = failed = 0
     for doc in documents:
@@ -147,7 +148,10 @@ def reindex_documents(
         if not done:
             failed += 1
 
-    keep = {(str(doc.movie_id), str(doc.page_id)) for doc in documents}
+    # 읽지 못한 원문의 문서는 실패로 세고 청크는 지우지 않는다
+    unreadable = unreadable or set()
+    failed += len(unreadable)
+    keep = {(str(doc.movie_id), str(doc.page_id)) for doc in documents} | unreadable
     orphans = indexer.prune(keep, movie_id)
     if manifest is not None:
         for orphan_item in sorted({item for item, _ in orphans}):

@@ -86,10 +86,6 @@ class DocIndexer:
             return self.store.count(self.collection) > 0
         return self.store.has_where(self.collection, {ITEM_KEY: str(item_id)})
 
-    def indexed_pages(self, item_id: str | None = None) -> set[tuple[str, str]]:
-        """색인된 `(항목 ID, 문서 ID)` 쌍. `item_id`를 주면 그 항목 범위만."""
-        return {page for _, page in self._pages(item_id)}
-
     def prune(self, keep: set[tuple[str, str]], item_id: str | None = None) -> set[tuple[str, str]]:
         """`keep`에 없는 문서의 청크를 한 번에 지운다. 반환: 지운 `(항목 ID, 문서 ID)` 쌍."""
         stale = [(chunk_id, page) for chunk_id, page in self._pages(item_id) if page not in keep]
@@ -113,7 +109,10 @@ class DocIndexer:
             for index, chunk in enumerate(chunks)
         ]
         try:
-            self.store.upsert(self.collection, documents)  # 실패하면 옛 청크는 그대로 남는다
+            size = self.store.settings.indexing.batch_size  # Chroma 한 번 호출 한도를 넘지 않게
+            for start in range(0, len(documents), size):
+                # 실패하면 옛 청크는 그대로 남는다
+                self.store.upsert(self.collection, documents[start : start + size])
         except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
             raise InvalidApiKeyError(str(exc)) from exc
         new_ids = {d.id for d in documents}

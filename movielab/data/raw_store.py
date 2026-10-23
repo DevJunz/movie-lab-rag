@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 from pathlib import Path
 
 from movielab.core.types import SourceDocument
+
+logger = logging.getLogger(__name__)
 
 
 class RawStore:
@@ -37,16 +40,28 @@ class RawStore:
         fields = {f.name for f in dataclasses.fields(SourceDocument)}
         return SourceDocument(**{k: v for k, v in data.items() if k in fields})
 
+    def scan(
+        self, kind: str = "wiki", movie_id: str | None = None
+    ) -> tuple[list[SourceDocument], set[tuple[str, str]]]:
+        """저장된 원문과 읽지 못한 파일의 `(movie_id, page_id)`. `movie_id`를 주면 그 영화만."""
+        folder = self.raw_dir / kind
+        pattern = f"{movie_id}_*.json" if movie_id else "*.json"
+        docs: list[SourceDocument] = []
+        broken: set[tuple[str, str]] = set()
+        for path in sorted(folder.glob(pattern)):
+            file_movie, _, file_page = path.stem.partition("_")
+            try:
+                doc = self.load(file_movie, file_page, kind)
+            except (OSError, ValueError, TypeError) as exc:
+                logger.warning("저장 원문을 읽지 못해 건너뛴다: %s (%s)", path.name, exc)
+                broken.add((file_movie, file_page))
+                continue
+            if doc is not None:
+                docs.append(doc)
+        return docs, broken
+
     def iter_documents(
         self, kind: str = "wiki", movie_id: str | None = None
     ) -> list[SourceDocument]:
-        """저장된 원문. `movie_id`를 주면 그 영화의 파일만 읽는다."""
-        folder = self.raw_dir / kind
-        pattern = f"{movie_id}_*.json" if movie_id else "*.json"
-        docs = []
-        for path in sorted(folder.glob(pattern)):
-            movie_id, _, page_id = path.stem.partition("_")
-            doc = self.load(movie_id, page_id, kind)
-            if doc is not None:
-                docs.append(doc)
-        return docs
+        """읽을 수 있는 저장 원문만. `movie_id`를 주면 그 영화의 파일만 읽는다."""
+        return self.scan(kind, movie_id)[0]
