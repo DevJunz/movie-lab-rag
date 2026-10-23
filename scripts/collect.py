@@ -67,6 +67,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not args.reset_cache and not (args.movie_id and args.question):
         parser.error("--movie-id와 --question이 필요합니다 (또는 --reset-cache)")
+    if args.top_k is not None and not args.show_evidence:
+        parser.error("--top-k는 --show-evidence와 함께 씁니다")
+    if args.dry_run and args.show_evidence:
+        parser.error("--dry-run은 색인하지 않으므로 --show-evidence와 함께 쓸 수 없습니다")
     configure_stdout()
 
     labels = None

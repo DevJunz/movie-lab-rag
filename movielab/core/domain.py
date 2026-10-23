@@ -36,6 +36,7 @@ class DomainProfile:
     load_items: Callable[..., Any] | None = None  # (settings) -> LoadResult
     to_index_text: Callable[..., str] | None = None
     item_card: Callable[..., str] | None = None
+    meta_title: Callable[..., str] | None = None  # 메타 근거 제목 (F2006)
     item_doc_queries: Callable[..., list[str]] | None = None
     pick_item_doc: Callable[..., Any] | None = None
     explore_filter_spec: str = ""

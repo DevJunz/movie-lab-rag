@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+from collections.abc import Callable
 from typing import Any
 
 from langchain_core.documents import Document
@@ -39,10 +40,14 @@ def merge_evidences(meta: list[Evidence], external: list[Evidence]) -> list[Evid
     return merged
 
 
-def _meta_evidence(doc: Document) -> Evidence:
+def default_meta_title(metadata: dict[str, Any]) -> str:
+    """프로필이 제목 형식을 주지 않을 때 — 메타데이터의 `title` 그대로."""
+    return str(metadata.get("title", ""))
+
+
+def _meta_evidence(doc: Document, meta_title: Callable[[dict[str, Any]], str]) -> Evidence:
     meta = doc.metadata
-    year = meta.get("year")
-    title = f"{meta.get('title', '')} ({year})" if year else str(meta.get("title", ""))
+    title = meta_title(meta)
     return Evidence(
         n=0,
         chunk_id=str(doc.id),
@@ -72,13 +77,25 @@ def _external_evidence(doc: Document, distance: float) -> Evidence:
 
 
 class Retriever:
-    def __init__(self, store: Any, *, top_k: int | None = None) -> None:
-        """`store`: VectorStore(F2002) — rag는 index를 import 하지 않으므로 구조로만 쓴다."""
+    def __init__(
+        self,
+        store: Any,
+        *,
+        top_k: int | None = None,
+        meta_title: Callable[[dict[str, Any]], str] | None = None,
+    ) -> None:
+        """`store`: VectorStore(F2002) — rag는 index를 import 하지 않으므로 구조로만 쓴다.
+
+        `meta_title`은 DomainProfile의 메타 근거 제목 형식 (없으면 메타데이터 `title`).
+        """
         settings = store.settings
         self.store = store
         self.meta_collection = settings.collections.meta
         self.docs_collection = settings.collections.docs
         self.top_k = settings.retrieval.top_k if top_k is None else top_k
+        if not isinstance(self.top_k, int) or self.top_k < 1:
+            raise ValueError(f"top_k는 1 이상이어야 한다: {self.top_k!r}")
+        self.meta_title = meta_title or default_meta_title
 
     def _meta(self, item_id: str) -> list[Evidence]:
         docs = self.store.get_by_ids(self.meta_collection, [item_id])
@@ -86,10 +103,10 @@ class Retriever:
             if self.store.count(self.meta_collection) == 0:
                 raise IndexEmptyError("메타 색인이 비어 있다")
             raise ItemNotIndexedError(f"항목 {item_id}의 메타 청크가 없다")
-        return [_meta_evidence(docs[0])]
+        return [_meta_evidence(docs[0], self.meta_title)]
 
     def _external(self, item_id: str, query: str) -> list[Evidence]:
-        if self.top_k < 1 or self.store.count_where(self.docs_collection, {ITEM_KEY: item_id}) == 0:
+        if not self.store.has_where(self.docs_collection, {ITEM_KEY: item_id}):
             return []
         results = self.store.collection(self.docs_collection).similarity_search_with_score(
             query, k=self.top_k, filter={ITEM_KEY: item_id}
@@ -98,5 +115,6 @@ class Retriever:
 
     def retrieve(self, item_id: str, query: str) -> RetrievalResult:
         meta = self._meta(item_id)
-        external = self._external(item_id, query)
-        return RetrievalResult(evidences=merge_evidences(meta, external), no_external=not external)
+        evidences = merge_evidences(meta, self._external(item_id, query))
+        # 중복 제거 뒤 남은 외부 근거로 판단한다 (메타와 같은 본문뿐이면 '없음')
+        return RetrievalResult(evidences=evidences, no_external=len(evidences) == len(meta))
