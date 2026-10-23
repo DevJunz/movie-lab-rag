@@ -43,7 +43,7 @@ def safe_run(fn):
 
 - `logs/movielab.log` (회전, `.gitignore`). 키는 가린다(NF2003).
 - `movielab/core/logs.configure_logging(log_path, level)` 한 곳에서 설정한다. 앱(`streamlit_app`)과 스크립트(`scripts/*`)가 시작할 때 부른다.
-  여러 번 불러도 핸들러가 겹치지 않는다. 로그 경로는 `settings.paths.logs_dir`, 회전 크기 · 개수 · 기본 레벨은 `settings.logging`(A-25).
+  여러 번 불러도 핸들러가 겹치지 않는다. 로그 파일은 `settings.paths.log_file`(01-architecture §6.2), 회전 크기 · 개수 · 기본 레벨은 `settings.logging`(A-25).
 - 로그 기록 전에 비밀 값(`.env`의 키 · 주소)을 `***`로 바꾸는 필터를 붙인다 — 예외 메시지에 키가 섞여도 파일에 남지 않는다.
 - `INFO`: 단계 · 소요 시간 · 수집 문서 제목. `DEBUG`: 프롬프트 · LLM 원문 출력. 기본 레벨은 `INFO`.
 
