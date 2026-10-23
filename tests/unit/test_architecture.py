@@ -52,3 +52,24 @@ def test_tc_nf2005_04_checker_detects_violations():
     assert not check_domain_literals('LABEL = "영화 메타데이터"\n', "movielab/data/domain_movie.py")
     assert not check_domain_literals('"""영화 설명 docstring"""\n', "movielab/rag/graph.py")
     assert not check_domain_literals('FILTER_KEY = "movie_id"\n', "movielab/rag/retriever.py")
+
+
+def test_tc_nf2005_11_source_files_not_git_ignored():
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if shutil.which("git") is None or not (ROOT / ".git").exists():
+        pytest.skip("Git 저장소가 아니다")
+    files = [p.relative_to(ROOT).as_posix() for p in archcheck.python_files()]
+    files += [p.relative_to(ROOT).as_posix() for p in (ROOT / "tests").rglob("*.py")]
+    result = subprocess.run(
+        ["git", "check-ignore", "--no-index", *files],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    ignored = result.stdout.split()
+    assert ignored == [], f".gitignore에 걸린 소스 파일: {ignored}"
