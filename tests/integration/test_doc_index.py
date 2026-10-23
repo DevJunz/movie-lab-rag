@@ -175,7 +175,7 @@ def test_tc_f2005_14_reindex_isolates_failures(tmp_settings):
     bad = dataclasses.replace(_doc(page_id="2"), text="[깨짐] 임베딩이 실패하는 문서")
     other = _doc(page_id="3")
     report = reindex_documents([good, bad, other], _indexer(services.store))
-    assert report.documents == 3 and report.failed == 1
+    assert report.documents == 2 and report.failed == 1  # 성공한 문서만 센다
     assert report.chunks == services.store.count("wiki_docs") == report.total_chunks
     assert services.store.count_where("wiki_docs", {"page_id": "3"}) > 0
 
@@ -225,3 +225,59 @@ def test_tc_f2005_17_source_type_is_required(tmp_settings):
     services = _services(tmp_settings)
     with pytest.raises(TypeError):
         DocIndexer(services.store)  # type: ignore[call-arg]
+
+
+# --- PR #32 재리뷰: 키 확인 · 빈 본문 · 문자열 ID · 재시도 ---
+
+
+def test_tc_f2005_18_reindex_without_key_stops_with_key_notice(tmp_settings):
+    from movielab.core.errors import MissingApiKeyError
+    from movielab.services.indexing import reindex_documents
+
+    services = build_services(tmp_settings)  # 키 없음
+    with pytest.raises(MissingApiKeyError):
+        reindex_documents([_doc(page_id="1")], _indexer(services.store))
+
+
+def test_tc_f2005_21_int_movie_id_stored_as_string(tmp_settings):
+    services = _services(tmp_settings)
+    doc = dataclasses.replace(_doc(), movie_id=157336, page_id=20671)
+    indexer = _indexer(services.store)
+    first = indexer.index_document(doc)
+    meta = services.store.get_by_ids("wiki_docs", ["157336:20671:0"])[0].metadata
+    assert meta["movie_id"] == "157336" and meta["page_id"] == "20671"
+    assert services.store.has_where("wiki_docs", {"movie_id": "157336"})
+    assert indexer.index_document(doc) == first
+    assert services.store.count("wiki_docs") == first  # 다시 색인해도 쌓이지 않는다
+
+
+def test_tc_f2005_22_empty_body_fails_and_keeps_old_chunks(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    services = _services(tmp_settings)
+    indexer = _indexer(services.store)
+    before = indexer.index_document(_doc())
+    empty = dataclasses.replace(_doc(), text="  \n\n ")
+    with pytest.raises(ValueError):
+        indexer.index_document(empty)
+    assert services.store.count("wiki_docs") == before
+
+    report = reindex_documents([empty, _doc(page_id="2")], indexer)
+    assert report.failed == 1 and report.documents == 1
+    assert services.store.count_where("wiki_docs", {"page_id": "20671"}) == before
+
+
+def test_tc_f2005_23_transient_error_retried(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    state = {"fail": 1}
+
+    def fail_once(texts):
+        state["fail"] -= 1
+        return state["fail"] >= 0
+
+    emb = FakeEmbeddings(fail_when=fail_once)
+    services = _services(tmp_settings, emb)
+    report = reindex_documents([_doc()], _indexer(services.store), sleep=lambda s: None)
+    assert report.failed == 0 and report.documents == 1
+    assert emb.calls == 2

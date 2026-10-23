@@ -252,3 +252,24 @@ def test_tc_f2005_13_reindex_docs_rejects_bad_chunking(tmp_settings, monkeypatch
     assert "청크 중복" in captured.err
     assert "chunk overlap" not in captured.err + captured.out  # 라이브러리 영어 원문 없음
     assert emb.calls == 0 and services.store.count("wiki_docs") == 0
+
+
+def test_tc_f2005_20_reindex_docs_cleans_when_no_raw(tmp_settings, monkeypatch, capsys):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    doc = dataclasses.replace(make_doc("1", "문서1"), movie_id="157336")
+    services.doc_indexer().index_document(doc)  # 원문 저장 없이 색인만 남은 상태
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    assert reindex_docs.main([]) == 0
+    assert "지웠습니다" in capsys.readouterr().out
+    assert services.store.count("wiki_docs") == 0
+    assert reindex_docs.main([]) == 1  # 원문도 색인도 없으면 안내
+    assert "저장 원문이 없습니다" in capsys.readouterr().out
