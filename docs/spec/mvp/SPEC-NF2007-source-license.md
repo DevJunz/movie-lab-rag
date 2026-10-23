@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2007** 출처와 이용 조건 (법 · 윤리) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `README.md`(데이터 출처 절), `movielab/data/domain_movie.py`(고지 문구), `movielab/index/doc_indexer.py` · `movielab/rag/retriever.py`(라이선스 메타데이터), `tests/unit/test_license_docs.py`, `tests/integration/test_source_license.py`. 화면 표시는 SPEC-F2008 · F2009가 담당 |
 | 선행 SPEC | SPEC-F2008 |
 | 관련 ISSUE | #19 |
