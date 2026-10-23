@@ -9,6 +9,7 @@ from movielab.core.types import AnswerResult, CitedResult, CollectReport, Eviden
 from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.services.catalog import Catalog
+from movielab.services.health import HealthStatus
 
 
 def _evidence(n: int) -> Evidence:
@@ -40,8 +41,8 @@ class FakeServices:
         self.profile = MOVIE_PROFILE
         self.settings = settings
 
-    def index_counts(self):
-        return 12, 34
+    def health(self):
+        return HealthStatus(api_key_ok=True, meta_count=12, docs_count=34)
 
 
 def _app(services):

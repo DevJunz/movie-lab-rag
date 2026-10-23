@@ -163,6 +163,7 @@ class AnswerResult:
     uncited: bool
     not_found: bool
     collect: CollectReport
+    no_external: bool = False  # 외부 근거가 하나도 없음 (F2012 안내)
     notices: list[str] = field(default_factory=list)
     timings: dict[str, float] = field(default_factory=dict)
 

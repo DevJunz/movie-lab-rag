@@ -28,6 +28,30 @@ INDEX_COUNTS = "색인: {item_label} {items}건 / 문서 {chunks}청크"
 CLEAR_HISTORY = "이 {item_label} 대화 지우기"
 ANSWERING = "답변을 준비하고 있습니다…"
 
+# 진행 상태 (SPEC-F2012 §3.1) — 단계 키 → 문구. 모르는 단계는 표시하지 않는다
+PROGRESS = {
+    "cache_hit": "이미 수집한 질문입니다. 저장된 문서로 답합니다.",
+    "extract_queries": "검색어를 고르는 중…",
+    "extract_queries_done": "검색어: {queries}",
+    "resolve_item_doc": "{item_label} 문서를 찾는 중…",
+    "search": "{doc_source_label}에서 후보 문서를 찾는 중… ({current}/{total} 검색어)",
+    "filter": "후보 문서를 정리하는 중…",
+    "select": "읽을 문서를 고르는 중…",
+    "fetch": "문서 본문을 가져오는 중… ({current}/{total})",
+    "index": "문서를 색인하는 중…",
+    "retrieve": "근거를 찾는 중…",
+    "generate": "답변을 작성하는 중…",
+    "done": "완료 — 수집한 문서: {titles} (버린 문서 {rejected}건)",
+    "done_none": "완료 — 새로 수집한 문서 없음 (버린 문서 {rejected}건)",
+}
+STATUS_RUNNING = "문서를 확인하고 답변을 준비하는 중…"
+STATUS_DONE = "완료 ({seconds:.1f}초)"
+STATUS_FAILED = "처리하지 못했습니다"
+COLLECT_DETAIL_QUERIES = "검색어: {queries}"
+COLLECT_DETAIL_INDEXED = "색인한 문서: {titles}"
+COLLECT_DETAIL_REJECTED = "버린 문서: {items}"
+NONE_MARK = "없음"
+
 # 근거 목록 (SPEC-F2008 §3.3)
 EVIDENCE_HEADER = "근거"
 EVIDENCE_SOURCE_LINK = "원문"
@@ -67,6 +91,12 @@ TEMPLATES: dict[str, str] = {
     "ITEM_NOT_INDEXED": (
         "이 {item_label}은(는) 아직 색인되지 않았습니다. "
         "python -m scripts.index_meta를 다시 실행하세요."
+    ),
+    "NO_EXTERNAL_DOCS": (
+        "관련 {doc_source_label} 문서를 찾지 못했습니다. {meta_source_label}만으로 답합니다."
+    ),
+    "SOURCE_FALLBACK": (
+        "{doc_source_label}에 연결할 수 없어 미리 수집된 문서 묶음을 사용했습니다."
     ),
     # 스크립트 인자 오류
     "ARG_NOT_INTEGER": "정수가 아닙니다: {value}",
