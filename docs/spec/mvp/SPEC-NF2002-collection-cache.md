@@ -55,7 +55,9 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
   - **수집기는 수집 한 번의 결과를 끝에서 한 번에 기록한다**: `record_collection(item_id, pages, item_doc_page_id, keywords, question)`.
     잠금 한 번 · 쓰기 한 번이고, 전부 기록되거나 하나도 기록되지 않는다 — 문서는 기록됐는데 검색어 · 질문만 빠지거나,
     문서만 기록되고 항목 자체 문서 표시가 빠지는 상태가 생기지 않는다. 검색어 · 질문은 §3.2 규칙(완전히 성공)일 때만 넣는다.
-    수집 도중 프로세스가 끝나면 그 수집은 기록되지 않는다 — 다음 질문에서 다시 받을 뿐이다.
+    수집 도중 프로세스가 끝나거나 예외로 수집이 중단되면 그 수집은 기록되지 않는다 — 다음 질문에서 다시 받을 뿐이다
+    (부분 기록보다 '전부 또는 없음'을 택했다: 부분 기록은 문서 · 검색어 · 질문 사이의 불일치를 만든다).
+    기록할 것(문서 · 검색어 · 질문)이 하나도 없으면 파일을 쓰지 않는다 (빈 항목을 만들지 않는다).
   - `record_*` · `record_collection` · `reset()`은 기록에 성공했는지 돌려준다. 기록 함수 안의 예외(내용 변경 중 오류)도 수집을 실패시키지 않는다:
     경고 로그를 남기고 메모리를 무효로 표시한 뒤 `False`.
   - `reset()`은 초기화에 성공했는지 돌려준다. `--reset-cache`가 실패하면 성공 문구 대신 `CACHE_RESET_FAILED`를 출력하고 종료 코드 1.
@@ -80,7 +82,10 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
     생성자에 기본값을 두지 않는다. 시각(`clock`) · 대기(`sleep`)는 생성자로 주입하고, 테스트는 `FakeClock`을 쓴다.
   - 조회 서명은 리눅스에서 파일 ID가 곧바로 재사용되면 드물게 겹칠 수 있다. 기록은 잠금 안에서 항상 다시 읽으므로 손실은 없고,
     조회가 다음 변경 전까지 옛 내용을 볼 수 있는 정도이다 (캐시 판단용이라 허용).
-- 구조가 틀린 내용(최상위가 객체가 아님, 항목 값이 객체가 아님, 목록 필드가 목록이 아님)도 깨진 파일과 같게 처리한다(백업 후 새로 시작).
+- 구조가 틀린 내용(최상위가 객체가 아님, 항목 값이 객체가 아님, 목록 필드가 목록이 아님, `chunks`가 정수가 아님,
+  `item_doc_page_id` · `collected_at`이 문자열 · null이 아님)도 깨진 파일과 같게 처리한다(백업 후 새로 시작).
+- 백업(`os.replace`)도 쓰기와 같이 `PermissionError`면 `io_retries`번 다시 시도한다.
+- 서명을 알 수 없을 때(stat 실패) 조회마다 다시 읽되, 이때는 재시도 · 대기 없이 한 번만 읽는다(조회 비용 상한).
 - 날짜(`collected_at`) · 백업 시각은 주입된 함수로 정한다. 백업 파일 이름은 겹치지 않게 만든다.
 
 - 쓰기는 임시 파일에 쓴 뒤 `os.replace`로 바꾼다(중간에 끊겨도 깨진 JSON이 남지 않음).
@@ -95,19 +100,33 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
 
 ```python
 class Manifest:
-    def __init__(self, path: Path): ...
+    def __init__(self, path: Path, *, lock_timeout_sec, lock_poll_sec, io_retries, io_retry_wait_sec,
+                 today=date.today, now=datetime.now, clock=time.monotonic, sleep=time.sleep): ...
+    # 조회
     def cached_queries(self, movie_id, question) -> list[str] | None: ...
     def has_keyword(self, movie_id, query) -> bool: ...
     def has_page(self, movie_id, page_id) -> bool: ...
-    def record_question(self, movie_id, question, queries) -> None: ...
-    def record_keyword(self, movie_id, query) -> None: ...
-    def record_page(self, movie_id, page_id, title, chunks, rejected=False) -> None: ...
-    def reset(self, movie_id=None) -> None: ...
+    def has_any(self, movie_id) -> bool: ...
+    def item_doc_page_id(self, movie_id) -> str | None: ...
+    # 기록 — 모두 성공 여부를 돌려준다. 수집기는 record_collection만 쓴다
+    def record_collection(self, movie_id, *, pages=(), item_doc_page_id=None, keywords=(), question=None) -> bool: ...
+    def record_question(self, movie_id, question, queries) -> bool: ...      # 아래 넷은 record_collection의 얇은 래퍼
+    def record_keyword(self, movie_id, query) -> bool: ...
+    def record_item_doc(self, movie_id, page_id) -> bool: ...
+    def record_page(self, movie_id, page_id, title, chunks, rejected=False) -> bool: ...
+    def reset(self, movie_id=None) -> bool: ...
+
+class FileLock:  # OS 파일 잠금 (§3.3)
+    def __init__(self, path, *, poll_sec, clock=time.monotonic, sleep=time.sleep): ...
+    def acquire(self, timeout_sec=0.0) -> bool: ...
+    def release(self) -> None: ...
 ```
 
 ## 4. 가정
 
-없음.
+| ID | 내용 |
+|---|---|
+| A-24 | 매니페스트 잠금 · 재시도 수치 (`settings.cache`) |
 
 ## 5. 인수 조건
 
@@ -150,6 +169,7 @@ class Manifest:
 | TC-NF2002-24 | 통합 | 수집 끝의 기록이 실패(잠금을 못 잡음) | 문서 · 검색어 · 질문 · 항목 자체 문서 모두 기록 안 됨 | 01, 04 | `tests/integration/test_cache_rules.py` |
 | TC-NF2002-25 | 단위 | 기록 함수 안에서 예외 / `stat`이 계속 실패하는 동안 다른 인스턴스가 초기화 | `False` · 예외 없음 · 다음 조회는 파일에서 / 초기화를 본다 | 05, 08 | `tests/unit/test_manifest_safety.py` |
 | TC-NF2002-26 | 통합 | 문서 2건 · 검색어 2개를 수집 | 매니페스트 파일 쓰기 1번, 항목 자체 문서 표시 포함 | 01 | `tests/integration/test_cache_rules.py` |
+| TC-NF2002-27 | 단위 | 기록할 것이 없는 `record_collection` / `chunks: "x"`인 파일 / 백업이 `PermissionError` 한 번 | 파일을 만들지 않음 · `has_any` 거짓 / 백업 후 새로 시작 / 다시 시도해 백업 성공 | 05 | `tests/unit/test_manifest_safety.py` |
 | TC-NF2002-19 | 단위 | UTF-8이 아닌 매니페스트 / 조회가 깨짐을 본 뒤 잠금 전에 다른 프로세스가 정상 파일을 씀 | 예외 없이 백업 후 새로 시작 / 정상 파일은 옮기지 않음 | 05 | 〃 |
 | TC-NF2002-10 | 수동 | Q1을 두 번 질문 | 두 번째에 "이미 수집한 질문입니다" 상태와 짧은 처리 시간 캡처 | 01 | 스크린샷 |
 
