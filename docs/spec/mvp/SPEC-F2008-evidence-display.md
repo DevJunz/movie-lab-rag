@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2008** 근거 표시 (생성 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/rag/citations.py`, `movielab/core/types.py`(`CitedResult`), `movielab/ui/components/evidence.py` |
 | 선행 SPEC | SPEC-F2007 |
 | 관련 ISSUE | #12 |
