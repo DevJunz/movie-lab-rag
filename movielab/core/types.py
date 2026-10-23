@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+# 청크 메타데이터의 항목 ID 키 — 검색 필터 · 청크 ID · 고아 판별에 쓴다
+ITEM_KEY = "movie_id"
+
 
 @dataclass(frozen=True)
 class ItemRecord:
@@ -118,3 +121,28 @@ class CollectReport:
     source_used: str = ""
     notices: list[str] = field(default_factory=list)
     timings: dict[str, float] = field(default_factory=dict)
+
+
+# --- 근거 (SPEC-F2006 ~ F2008) ---
+
+
+@dataclass(frozen=True)
+class Evidence:
+    """답변 생성에 넣는 근거 1개. `n`은 `[근거 n]` 번호다."""
+
+    n: int
+    chunk_id: str
+    source_kind: str  # meta · wiki · pdf
+    source_type: str  # 화면 · 프롬프트에 보일 출처 유형 라벨
+    title: str
+    url: str
+    license: str | None
+    text: str
+    score: float | None = None  # 외부 근거: 코사인 유사도 (클수록 가깝다)
+    page: int | None = None  # PDF 쪽 번호 (F2016)
+
+
+@dataclass(frozen=True)
+class RetrievalResult:
+    evidences: list[Evidence]
+    no_external: bool = False

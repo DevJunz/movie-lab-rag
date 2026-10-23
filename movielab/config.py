@@ -148,6 +148,10 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("io_retries", _int_at_least(0)),
         ("io_retry_wait_sec", _number_at_least(0)),
     ],
+    "retrieval": [  # SPEC-F2006 (MMR은 F2014에서 허용 값에 더한다)
+        ("top_k", _int_at_least(1)),
+        ("search_type", lambda v: v == "similarity"),
+    ],
     "collect": [  # SPEC-F2003 · F2004
         ("source", lambda v: v in ("api", "bundle", "auto")),
         ("card_overview_chars", _int_at_least(1)),

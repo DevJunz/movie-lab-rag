@@ -10,6 +10,11 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+# 스크립트 근거 목록 (SPEC-F2006 V4.3-1)
+EVIDENCE_LIST_HEADER = "근거:"
+EVIDENCE_LIST_LINE = "[근거 {n}] {source_type} · {title}{score}"
+EVIDENCE_LIST_SCORE = " · 점수 {score:.3f}"
+
 TEMPLATES: dict[str, str] = {
     "API_KEY_MISSING": (
         "GMS API 키가 설정되지 않았습니다. .env 파일에 GMS_API_KEY와 GMS_BASE_URL을 "
@@ -37,6 +42,14 @@ TEMPLATES: dict[str, str] = {
     "SOURCE_UNAVAILABLE": "외부 문서 출처에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
     "ITEM_NOT_FOUND": "ID {item_id}인 {item_label}을(를) 찾을 수 없습니다.",
     "GENERIC_ERROR": "처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
+    # 색인 안내 (SPEC-F2006 AC-07 · 08, 화면 표시는 SPEC-F2012)
+    "INDEX_EMPTY": (
+        "{item_label} 색인이 비어 있습니다. 터미널에서 python -m scripts.index_meta를 실행하세요."
+    ),
+    "ITEM_NOT_INDEXED": (
+        "이 {item_label}은(는) 아직 색인되지 않았습니다. "
+        "python -m scripts.index_meta를 다시 실행하세요."
+    ),
     # 스크립트 인자 오류
     "ARG_NOT_INTEGER": "정수가 아닙니다: {value}",
     "ARG_NOT_POSITIVE": "1 이상이어야 합니다: {value}",

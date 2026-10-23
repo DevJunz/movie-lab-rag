@@ -23,6 +23,12 @@ def item_card(item: ItemRecord, overview_chars: int) -> str:
     return " / ".join(parts)
 
 
+def meta_title(metadata: dict) -> str:
+    """메타 근거 제목 `제목 (연도)` — 동명 영화 구분 (SPEC-F2006 §3.1)."""
+    title, year = metadata.get("title", ""), metadata.get("year")
+    return f"{title} ({year})" if year else str(title)
+
+
 def item_doc_queries(item: ItemRecord) -> list[str]:
     """영화 자체를 다룬 위키백과 문서의 제목 후보. 동명 작품 표제 형식이 먼저 (SPEC-F2003 §3.2)."""
     return [f"{item.title} ({item.year}년 영화)", f"{item.title} (영화)", item.title]
@@ -72,6 +78,7 @@ MOVIE_PROFILE = DomainProfile(
     load_items=movies.load_items_for,
     to_index_text=movies.to_index_text,
     item_card=item_card,
+    meta_title=meta_title,
     item_doc_queries=item_doc_queries,
     pick_item_doc=pick_item_doc,
 )
