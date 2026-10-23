@@ -8,7 +8,7 @@ from tests.fakes import FakeChatModel, FakeEmbeddings, pick_titles
 QUESTION = "블랙홀 묘사는 실제 물리와 얼마나 다른가?"
 
 
-def test_tc_f2005_collector_indexes_chunks_and_cache_checks(tmp_settings):
+def test_tc_f2005_10_collector_indexes_chunks_and_cache_checks(tmp_settings):
     tmp_settings.raw["collect"]["source"] = "bundle"
     llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
     services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())

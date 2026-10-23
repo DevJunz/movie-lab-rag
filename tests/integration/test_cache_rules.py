@@ -22,7 +22,7 @@ def item(movies_small_path):
     return next(i for i in load_items(movies_small_path).items if i.item_id == "157336")
 
 
-def _setup(settings, *, indexer="default", chunk_counter=None):
+def _setup(settings, *, indexer="default", has_chunks=None):
     source = FakeSource()
     source.add(make_doc("1", "인터스텔라"), title_intro=ITEM_INTRO)
     source.add(make_doc("2", "블랙홀"), queries=["블랙홀"])
@@ -41,7 +41,7 @@ def _setup(settings, *, indexer="default", chunk_counter=None):
         settings=settings,
         manifest=manifest,
         indexer=(lambda doc: 1) if indexer == "default" else indexer,
-        chunk_counter=chunk_counter,
+        has_chunks=has_chunks,
     )
     return collector, source, manifest
 
@@ -80,7 +80,7 @@ def test_tc_nf2002_11_no_indexer_records_nothing(tmp_settings, item):
 
 def test_tc_nf2002_12_empty_index_resets_movie_cache_for_new_question(tmp_settings, item):
     counts = {"157336": 1}
-    collector, source, manifest = _setup(tmp_settings, chunk_counter=lambda i: counts[i])
+    collector, source, manifest = _setup(tmp_settings, has_chunks=lambda i: counts[i] > 0)
     collector.collect(item, "블랙홀은?")
     assert manifest.has_page("157336", "1")
     counts["157336"] = 0  # data/chroma를 지운 상황

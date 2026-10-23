@@ -227,3 +227,28 @@ def test_tc_f2005_09_reindex_docs_reports_counts(tmp_settings, monkeypatch, caps
         return int(text.split("청크 ")[1].split("개")[0])
 
     assert chunks(second) > chunks(first)
+
+
+@pytest.mark.parametrize(
+    "argv", [["--chunk-size", "500", "--chunk-overlap", "500"], ["--chunk-size", "100"]]
+)
+def test_tc_f2005_13_reindex_docs_rejects_bad_chunking(tmp_settings, monkeypatch, capsys, argv):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    services.raw_store.save(dataclasses.replace(make_doc("1", "문서1"), movie_id="157336"))
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    with pytest.raises(SystemExit) as exc:
+        reindex_docs.main(argv)
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert "청크 중복" in captured.err
+    assert "chunk overlap" not in captured.err + captured.out  # 라이브러리 영어 원문 없음
+    assert emb.calls == 0 and services.store.count("wiki_docs") == 0

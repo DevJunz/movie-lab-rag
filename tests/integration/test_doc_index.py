@@ -29,8 +29,12 @@ def _doc(movie_id="157336", page_id="20671", length=3000, title="블랙홀"):
     )  # fmt: skip
 
 
-def _services(settings):
-    return build_services(settings, embeddings=FakeEmbeddings())
+def _services(settings, embeddings=None):
+    return build_services(settings, embeddings=embeddings or FakeEmbeddings())
+
+
+def _indexer(store, **chunking):
+    return DocIndexer(store, source_type="위키백과", **chunking)
 
 
 def _settings_with(tmp_settings, tmp_path, **chunking):
@@ -43,18 +47,18 @@ def _settings_with(tmp_settings, tmp_path, **chunking):
 
 def test_tc_f2005_01_chunks_respect_size_and_ids(tmp_settings):
     services = _services(tmp_settings)
-    count = DocIndexer(services.store).index_document(_doc())
+    count = _indexer(services.store).index_document(_doc())
     store = services.store
     ids = sorted(store.ids("wiki_docs"), key=lambda i: int(i.rsplit(":", 1)[1]))
-    assert count == len(ids) >= 4
-    assert ids == [f"157336:20671:{n}" for n in range(count)]
+    assert count == len(ids) == 4
+    assert ids == [f"157336:20671:{n}" for n in range(4)]
     docs = store.get_by_ids("wiki_docs", ids)
     assert all(len(d.page_content) <= 1000 for d in docs)
 
 
 def test_tc_f2005_02_separate_collection_from_meta(tmp_settings):
     services = _services(tmp_settings)
-    DocIndexer(services.store).index_document(_doc())
+    _indexer(services.store).index_document(_doc())
     assert services.store.count("wiki_docs") > 0
     assert services.store.count("movie_meta") == 0
     assert services.store.distance("wiki_docs") == "cosine"
@@ -62,7 +66,7 @@ def test_tc_f2005_02_separate_collection_from_meta(tmp_settings):
 
 def test_tc_f2005_03_metadata_fields(tmp_settings):
     services = _services(tmp_settings)
-    DocIndexer(services.store).index_document(dataclasses.replace(_doc(), is_item_doc=True))
+    _indexer(services.store).index_document(dataclasses.replace(_doc(), is_item_doc=True))
     for doc in services.store.get_by_ids("wiki_docs", services.store.ids("wiki_docs")):
         meta = doc.metadata
         assert REQUIRED <= set(meta)
@@ -76,7 +80,7 @@ def test_tc_f2005_03_metadata_fields(tmp_settings):
 
 def test_tc_f2005_04_shared_document_not_overwritten(tmp_settings):
     services = _services(tmp_settings)
-    indexer = DocIndexer(services.store)
+    indexer = _indexer(services.store)
     a = indexer.index_document(_doc(movie_id="157336"))
     b = indexer.index_document(_doc(movie_id="27205"))
     store = services.store
@@ -87,10 +91,10 @@ def test_tc_f2005_04_shared_document_not_overwritten(tmp_settings):
 
 def test_tc_f2005_05_settings_change_chunk_count(tmp_settings, tmp_path):
     big = _services(tmp_settings)
-    count_big = DocIndexer(big.store).index_document(_doc())
+    count_big = _indexer(big.store).index_document(_doc())
     small_settings = _settings_with(tmp_settings, tmp_path, chunk_size=500, chunk_overlap=100)
     small = _services(small_settings)
-    count_small = DocIndexer(small.store).index_document(_doc())
+    count_small = _indexer(small.store).index_document(_doc())
     assert count_small > count_big
     meta = small.store.get_by_ids("wiki_docs", ["157336:20671:0"])[0].metadata
     assert (meta["chunk_size"], meta["chunk_overlap"]) == (500, 100)
@@ -99,9 +103,9 @@ def test_tc_f2005_05_settings_change_chunk_count(tmp_settings, tmp_path):
 def test_tc_f2005_06_reindex_with_bigger_chunks_leaves_no_stale(tmp_settings, tmp_path):
     small_settings = _settings_with(tmp_settings, tmp_path, chunk_size=500, chunk_overlap=100)
     small = _services(small_settings)
-    many = DocIndexer(small.store).index_document(_doc())
+    many = _indexer(small.store).index_document(_doc())
     big = _services(tmp_settings)  # 같은 Chroma 폴더, 1000/200
-    few = DocIndexer(big.store).index_document(_doc())
+    few = _indexer(big.store).index_document(_doc())
     assert few < many
     assert big.store.count("wiki_docs") == few
     assert f"157336:20671:{many - 1}" not in big.store.ids("wiki_docs")
@@ -124,10 +128,100 @@ def test_tc_f2005_07_invalid_chunking_rejected(tmp_settings, tmp_path, chunking)
         _settings_with(tmp_settings, tmp_path, **chunking)
 
 
-def test_tc_f2005_04_delete_document(tmp_settings):
+def test_tc_f2005_11_delete_document_only_that_movie(tmp_settings):
     services = _services(tmp_settings)
-    indexer = DocIndexer(services.store)
+    indexer = _indexer(services.store)
     indexer.index_document(_doc(movie_id="157336"))
     keep = indexer.index_document(_doc(movie_id="27205"))
     removed = indexer.delete_document("157336", "20671")
     assert removed > 0 and services.store.count("wiki_docs") == keep
+
+
+# --- PR #32 리뷰: 기존 색인을 잃지 않는다 · 재색인 실패 격리 · 고아 청크 정리 ---
+
+
+def _auth_error():
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "https://gms.example.invalid/v1/embeddings")
+    return openai.AuthenticationError(
+        "bad key", response=httpx.Response(401, request=request), body=None
+    )
+
+
+def test_tc_f2005_12_failed_reindex_keeps_old_chunks(tmp_settings, tmp_path):
+    state = {"fail": False}
+    emb = FakeEmbeddings(fail_when=lambda texts: state["fail"])
+    services = _services(tmp_settings, emb)
+    before = _indexer(services.store).index_document(_doc())
+    ids_before = sorted(services.store.ids("wiki_docs"))
+    state["fail"] = True
+    small = _services(
+        _settings_with(tmp_settings, tmp_path, chunk_size=500, chunk_overlap=100), emb
+    )
+    with pytest.raises(RuntimeError):
+        _indexer(small.store).index_document(_doc())
+    assert sorted(services.store.ids("wiki_docs")) == ids_before
+    assert services.store.count("wiki_docs") == before
+
+
+def test_tc_f2005_14_reindex_isolates_failures(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    emb = FakeEmbeddings(fail_when=lambda texts: any("[깨짐]" in t for t in texts))
+    services = _services(tmp_settings, emb)
+    good = _doc(page_id="1")
+    bad = dataclasses.replace(_doc(page_id="2"), text="[깨짐] 임베딩이 실패하는 문서")
+    other = _doc(page_id="3")
+    report = reindex_documents([good, bad, other], _indexer(services.store))
+    assert report.documents == 3 and report.failed == 1
+    assert report.chunks == services.store.count("wiki_docs") == report.total_chunks
+    assert services.store.count_where("wiki_docs", {"page_id": "3"}) > 0
+
+
+def test_tc_f2005_14_reindex_bad_key_raises_invalid_key(tmp_settings):
+    from movielab.core.errors import InvalidApiKeyError
+    from movielab.services.indexing import reindex_documents
+
+    emb = FakeEmbeddings(fail_when=lambda texts: True, error=_auth_error)
+    services = _services(tmp_settings, emb)
+    with pytest.raises(InvalidApiKeyError):
+        reindex_documents([_doc(page_id="1"), _doc(page_id="2")], _indexer(services.store))
+    assert emb.calls == 1  # 키 오류는 다음 문서로 넘어가지 않고 바로 중단
+
+
+def test_tc_f2005_15_full_reindex_removes_chunks_without_raw(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    services = _services(tmp_settings)
+    indexer = _indexer(services.store)
+    kept, dropped = _doc(page_id="1"), _doc(page_id="2")
+    other_movie = _doc(movie_id="27205", page_id="9")
+    for doc in (kept, dropped, other_movie):
+        indexer.index_document(doc)
+
+    scoped = reindex_documents([kept], indexer, movie_id="157336")
+    assert scoped.removed == 1
+    assert services.store.count_where("wiki_docs", {"page_id": "2"}) == 0
+    assert services.store.count_where("wiki_docs", {"movie_id": "27205"}) > 0  # 범위 밖은 유지
+
+    full = reindex_documents([kept], indexer)
+    assert full.removed == 1
+    assert services.store.count_where("wiki_docs", {"movie_id": "27205"}) == 0
+    assert full.total_chunks == services.store.count("wiki_docs") == full.chunks
+
+
+def test_tc_f2005_16_has_where(tmp_settings):
+    services = _services(tmp_settings)
+    store = services.store
+    assert store.has_where("wiki_docs", {"movie_id": "157336"}) is False  # 컬렉션 없음
+    _indexer(store).index_document(_doc())
+    assert store.has_where("wiki_docs", {"movie_id": "157336"}) is True
+    assert store.has_where("wiki_docs", {"movie_id": "27205"}) is False
+
+
+def test_tc_f2005_17_source_type_is_required(tmp_settings):
+    services = _services(tmp_settings)
+    with pytest.raises(TypeError):
+        DocIndexer(services.store)  # type: ignore[call-arg]
