@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2007** 근거 기반 답변 생성(프롬프트3) (생성 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/rag/graph.py`, `movielab/prompts.py`(P3), `movielab/providers.py` |
 | 선행 SPEC | SPEC-F2006 |
 | 관련 ISSUE | #11 |
