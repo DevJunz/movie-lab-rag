@@ -36,7 +36,10 @@ def test_tc_nf2003_04_env_example_has_no_values():
             continue
         name, _, value = line.partition("=")
         assert value.strip() in ("", "false"), f".env.example의 {name}에 값이 있다"
-    names = {line.split("=")[0] for line in (ROOT / ".env.example").read_text().splitlines()}
+    names = {
+        line.split("=")[0]
+        for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines()
+    }
     assert {"GMS_API_KEY", "GMS_BASE_URL", "WIKI_CONTACT"} <= names
 
 
