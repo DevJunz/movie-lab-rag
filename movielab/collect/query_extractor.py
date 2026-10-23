@@ -27,7 +27,11 @@ class QueryPlan:
 
     @property
     def all(self) -> list[str]:
-        """항목 자체 검색어 + P1 검색어 (중복 없음, 순서 유지)."""
+        """항목 자체 검색어 + P1 검색어 (중복 없음, 순서 유지).
+
+        `_clean`이 이미 정리하지만, 매니페스트(NF2002)에서 되읽은 계획처럼 외부에서 만든
+        `QueryPlan`도 안전하게 합치도록 여기서 한 번 더 중복을 없앤다.
+        """
         seen: set[str] = set()
         merged: list[str] = []
         for query in self.item_queries + self.llm_queries:
@@ -59,10 +63,15 @@ class QueryExtractor:
         return cleaned[: int(self.settings.collect.max_queries)]
 
     def extract(self, item: ItemRecord, question: str) -> QueryPlan:
-        item_queries = self.profile.item_doc_queries(item)
+        profile = self.profile
+        item_queries = profile.item_doc_queries(item) if profile.item_doc_queries else []
+        if profile.item_card is not None:
+            card = profile.item_card(item, self.settings.collect.card_overview_chars)
+        else:
+            card = item.display_name
         prompt = build_query_prompt(
-            self.profile,
-            item_card=self.profile.item_card(item),
+            profile,
+            item_card=card,
             question=question,
             min_queries=self.settings.collect.min_queries,
             max_queries=self.settings.collect.max_queries,

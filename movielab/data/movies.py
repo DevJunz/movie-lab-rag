@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_FIELDS = ("movie_id", "title", "year", "overview")
 UNKNOWN = "정보 없음"
+OVERVIEW_LABEL = "줄거리"  # 색인 텍스트의 마지막 줄 — 여러 문단일 수 있다
 META_SOURCE_TYPE = "영화 메타데이터"
 KOREAN = "ko"
 
@@ -59,9 +60,19 @@ def to_index_text(movie: dict[str, Any]) -> str:
         ("출연", _join(movie.get("cast"))),
         ("제작 국가", _join(movie.get("production_countries"))),
         ("원어", _language_line(_language(movie))),
-        ("줄거리", _clean(movie["overview"])),
+        (OVERVIEW_LABEL, _clean(movie["overview"])),
     ]
     return "\n".join(f"{label}: {value}" for label, value in lines)
+
+
+def overview_of(index_text: str) -> str:
+    """색인 텍스트에서 줄거리 부분(라벨 뒤부터 끝까지, 여러 문단 포함)을 꺼낸다."""
+    prefix = f"{OVERVIEW_LABEL}: "
+    if index_text.startswith(prefix):
+        return index_text[len(prefix) :]
+    marker = chr(10) + prefix
+    position = index_text.find(marker)
+    return index_text[position + len(marker) :] if position >= 0 else ""
 
 
 def to_item_record(movie: dict[str, Any]) -> ItemRecord:

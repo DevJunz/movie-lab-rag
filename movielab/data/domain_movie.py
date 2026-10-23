@@ -6,23 +6,13 @@ from movielab.core.domain import DomainProfile
 from movielab.core.types import ItemRecord
 from movielab.data import movies
 
-OVERVIEW_PREVIEW_CHARS = 300  # P1 · E2에 넣는 줄거리 앞부분 길이
 
-
-def _index_line(item: ItemRecord, label: str) -> str:
-    prefix = f"{label}: "
-    for line in item.index_text.splitlines():
-        if line.startswith(prefix):
-            return line[len(prefix) :]
-    return ""
-
-
-def item_card(item: ItemRecord) -> str:
-    """프롬프트에 넣는 한 줄 영화 요약 (SPEC-F2003 §3.1)."""
+def item_card(item: ItemRecord, overview_chars: int) -> str:
+    """프롬프트에 넣는 한 줄 영화 요약 (SPEC-F2003 §3.1). 줄거리는 앞 `overview_chars`자."""
     meta = item.metadata
-    overview = _index_line(item, "줄거리")
-    if len(overview) > OVERVIEW_PREVIEW_CHARS:
-        overview = overview[:OVERVIEW_PREVIEW_CHARS] + "…"
+    overview = " ".join(movies.overview_of(item.index_text).split())
+    if len(overview) > overview_chars:
+        overview = overview[:overview_chars] + "…"
     parts = [
         item.display_name,
         f"원제: {meta.get('original_title') or movies.UNKNOWN}",
