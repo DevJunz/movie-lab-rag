@@ -33,7 +33,8 @@ class FakeHttpSession:
     같은 조건의 응답은 차례로 쓰고 마지막 것을 반복한다.
     """
 
-    def __init__(self, clock: Any = None) -> None:
+    def __init__(self, clock: Any = None, on_get: Callable[[dict[str, Any]], None] | None = None):
+        self.on_get = on_get  # 요청이 나가는 순간 부를 함수 (예: 잠금 상태 확인)
         self.routes: list[tuple[Matcher, list[Any]]] = []
         self.requests: list[dict[str, Any]] = []
         self.clock = clock
@@ -51,6 +52,8 @@ class FakeHttpSession:
 
     def get(self, url: str, params: dict[str, Any] | None = None, **kwargs: Any) -> FakeResponse:
         params = dict(params or {})
+        if self.on_get is not None:
+            self.on_get(params)
         headers = {**self.headers, **(kwargs.get("headers") or {})}
         self.requests.append(
             {
