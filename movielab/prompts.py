@@ -139,6 +139,9 @@ def build_explore_parse_prompt(profile: DomainProfile, condition: str) -> str:
 EXPLORE_SELECT = """[작업: 조건 선별]
 너는 {expert_role}이다. 아래 후보 중 조건에 **모두** 맞는 {item_label}만 고른다.
 애매하면 고르지 않는다.
+조건의 요소(배경 · 장르 · 대상 등)를 하나씩 후보 정보와 대조하고,
+하나라도 후보 정보로 확인되지 않으면 고르지 않는다.
+선정 이유는 후보 줄에 실제로 있는 정보만 쓴다.
 조건: {condition}
 후보:
 {candidate_lines}
