@@ -106,17 +106,22 @@ class Manifest(NullManifest):
         self.today = today
         self.now = now
         self._lock = threading.Lock()
-        self._mtime: int | None = None
+        self._signature: tuple[int, int, int] | None = None
         self._data: dict[str, dict[str, Any]] = {}
         self._refresh()
 
     # --- 파일 ---
 
-    def _stat(self) -> int | None:
+    def _stat(self) -> tuple[int, int, int] | None:
+        """파일 서명 — 수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 (#33).
+
+        쓰기는 늘 새 임시 파일을 바꿔 넣으므로 파일 ID(`st_ino`)가 매번 달라진다.
+        """
         try:
-            return self.path.stat().st_mtime_ns
+            stat = self.path.stat()
         except FileNotFoundError:
             return None
+        return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
     def _backup(self, reason: str) -> None:
         stamp = f"{self.now():%Y%m%d%H%M%S%f}-{next(self._backup_counter)}"
@@ -126,30 +131,30 @@ class Manifest(NullManifest):
 
     def _refresh(self) -> None:
         """파일이 바뀌었으면 다시 읽는다 (다른 인스턴스 · 프로세스가 쓴 내용 반영)."""
-        mtime = self._stat()
-        if mtime == self._mtime:
+        signature = self._stat()
+        if signature == self._signature:
             return
-        if mtime is None:
-            self._data, self._mtime = {}, None
+        if signature is None:
+            self._data, self._signature = {}, None
             return
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             self._backup(f"읽기 실패: {exc}")
-            self._data, self._mtime = {}, None
+            self._data, self._signature = {}, None
             return
         if not _valid(data):
             self._backup("구조가 맞지 않음")
-            self._data, self._mtime = {}, None
+            self._data, self._signature = {}, None
             return
-        self._data, self._mtime = data, mtime
+        self._data, self._signature = data, signature
 
     def _write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(f"{self.path.name}.{uuid.uuid4().hex}.tmp")
         tmp.write_text(json.dumps(self._data, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
-        self._mtime = self._stat()
+        self._signature = self._stat()
 
     def _entry(self, item_id: str) -> dict[str, Any]:
         entry = self._data.setdefault(str(item_id), _empty_entry())
