@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         services = build_services(settings)
         labels = services.profile.labels()
         if args.reset_cache:
-            services.collector.manifest.reset(args.movie_id)
+            services.manifest.reset(args.movie_id)
             print(messages.render("CACHE_RESET", labels, target=args.movie_id or "전체"))
             return 0
         item = services.catalog.get(args.movie_id)

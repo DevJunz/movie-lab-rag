@@ -109,6 +109,11 @@ class Services:
                 )
         return self._bundle_source
 
+    @property
+    def manifest(self) -> Manifest:
+        """수집 캐시 (NF2002). LLM · 키 없이도 쓸 수 있다 (예: 캐시 초기화)."""
+        return Manifest(self.settings.path("manifest"))
+
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
 
@@ -125,7 +130,7 @@ class Services:
             raw_store=RawStore(settings.path("raw_dir")),
             profile=self.profile,
             settings=settings,
-            manifest=None if dry_run else Manifest(settings.path("manifest")),
+            manifest=None if dry_run else self.manifest,
         )
 
     @property
