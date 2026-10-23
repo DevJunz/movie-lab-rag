@@ -151,6 +151,23 @@ class CitedResult:
 
 
 @dataclass(frozen=True)
+class AnswerResult:
+    """질문 하나의 결과 (F2009 `QAService.ask`).
+
+    `evidences`는 검색된 근거 전체, `cited`는 인용된 것만.
+    """
+
+    answer: str
+    evidences: list[Evidence]
+    cited: list[Evidence]
+    uncited: bool
+    not_found: bool
+    collect: CollectReport
+    notices: list[str] = field(default_factory=list)
+    timings: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class RetrievalResult:
     evidences: list[Evidence]
     no_external: bool = False

@@ -37,6 +37,7 @@ class DomainProfile:
     to_index_text: Callable[..., str] | None = None
     item_card: Callable[..., str] | None = None
     meta_title: Callable[..., str] | None = None  # 메타 근거 제목 (F2006)
+    item_caption: Callable[..., str] | None = None  # 화면 사이드바의 한 줄 요약 (F2009)
     item_doc_queries: Callable[..., list[str]] | None = None
     pick_item_doc: Callable[..., Any] | None = None
     explore_filter_spec: str = ""

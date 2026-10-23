@@ -51,6 +51,12 @@ class IndexEmptyError(MovieLabUserError):
     code = "INDEX_EMPTY"
 
 
+class ItemNotFoundError(MovieLabUserError):
+    """요청한 항목 ID가 데이터에 없다 (F2009)."""
+
+    code = "ITEM_NOT_FOUND"
+
+
 class ItemNotIndexedError(MovieLabUserError):
     """선택한 항목의 메타 청크가 색인에 없다."""
 

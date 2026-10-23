@@ -30,6 +30,7 @@ from movielab.index.store import VectorStore
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
 from movielab.services.catalog import Catalog
+from movielab.services.qa import QAService
 
 
 class Services:
@@ -53,6 +54,7 @@ class Services:
         self._lock = threading.Lock()
         self._bundle_source: WikiBundleSource | None = None
         self._collector: Collector | None = None
+        self._qa: QAService | None = None
 
     def _load_items(self) -> Any:
         if self.profile.load_items is None:
@@ -167,6 +169,21 @@ class Services:
             indexer=None if indexer is None else indexer.index_document,
             indexed_pages=None if indexer is None else indexer.page_ids,
         )
+
+    @property
+    def qa(self) -> QAService:
+        """질의응답 서비스 (F2009) — 앱이 한 번 만들어 쓴다."""
+        if self._qa is None:
+            self._qa = QAService(self.catalog, self.collector, self.rag_graph())
+        return self._qa
+
+    def index_counts(self) -> tuple[int, int] | None:
+        """(항목 메타 청크 수, 외부 문서 청크 수). 색인을 읽을 수 없으면 None (키 없이 동작)."""
+        try:
+            collections = self.settings.collections
+            return self.store.count(collections.meta), self.store.count(collections.docs)
+        except Exception:
+            return None
 
     @property
     def collector(self) -> Collector:

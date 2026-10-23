@@ -18,6 +18,16 @@ EVIDENCE_LIST_SCORE = " · 점수 {score:.3f}"
 # 근거로 답할 수 없을 때 답변이 그대로 써야 하는 문장 (SPEC-F2007 §3.3)
 NOT_FOUND = "제공된 문서에서 확인되지 않습니다."
 
+# 질의응답 화면 (SPEC-F2009)
+APP_TITLE = "Movie Lab"
+MENU_ASK = "질문하기"
+SELECT_ITEM_LABEL = "{item_label} 선택"
+SELECT_ITEM_FIRST = "{item_label}를 먼저 선택하세요."
+ASK_PLACEHOLDER = "{item_name}에 대해 질문하세요"
+INDEX_COUNTS = "색인: {item_label} {items}건 / 문서 {chunks}청크"
+CLEAR_HISTORY = "이 {item_label} 대화 지우기"
+ANSWERING = "답변을 준비하고 있습니다…"
+
 # 근거 목록 (SPEC-F2008 §3.3)
 EVIDENCE_HEADER = "근거"
 EVIDENCE_SOURCE_LINK = "원문"
