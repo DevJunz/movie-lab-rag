@@ -40,7 +40,7 @@
 | `POST /api/ask/stream` | `{movie_id, question}` | NDJSON 스트림: `{"type":"stage","stage":"search","message":"…"}` … 마지막 `{"type":"result","data":AnswerResponse}` | F2012 진행 상태 |
 | `POST /api/guide` | `{movie_id}` | `GuideResponse` | F2010 |
 | `POST /api/factcheck` | `{movie_id, claim}` | `FactCheckResponse` | F2010 |
-| `POST /api/explore` | `{condition}` | `{items: [{movie_id, title, year, genres, director, reason}]}` | F2011 |
+| `POST /api/explore` | `{condition}` | `ExploreResponse` | F2011 |
 
 ```jsonc
 // AnswerResponse
@@ -64,10 +64,11 @@
 // FactCheckResponse
 {"claim": "…", "verdict": "사실" | "거짓" | "확인 불가", "reason": "…", "citations": [...], "notices": [...]}
 // ExploreResponse
-{"items": [...], "candidates": 20, "message": "조건에 맞는 영화를 찾지 못했습니다 …" | null}
+{"items": [{"movie_id", "title", "year", "genres", "caption", "reason"}], "candidates": 20, "message": "조건에 맞는 영화를 찾지 못했습니다 …" | null}
 ```
 
 - `citations`는 답변에 실제로 인용된 근거만(F2008). `notices`는 수집 안내(`SOURCE_FALLBACK`)와 외부 근거 없음(`NO_EXTERNAL_DOCS`)을 `messages`의 문구로 담는다.
+- 조건 탐색 결과의 감독 등 부가 정보는 `caption`(도메인 프로필 `item_caption`의 한 줄 요약)으로 보낸다. `api`에 영화 도메인 필드 이름(`director` 등)을 쓰지 않기 위해서다(NF2005 규칙 7).
 - 스트림: 시작 전 검사(키 · 색인 · 입력)에 걸리면 스트림 없이 아래 오류 응답을 준다. 스트림 도중 실패하면 마지막 줄로 `{"type":"error","error":{code,message}}`를 보낸다.
 
 **오류 응답** (NF2004): HTTP 상태 + `{"error": {"code": "API_KEY_MISSING" | "INDEX_EMPTY" | "ITEM_NOT_INDEXED" | "BAD_REQUEST" | "INTERNAL", "message": "<사용자용 문구>"}}`.
