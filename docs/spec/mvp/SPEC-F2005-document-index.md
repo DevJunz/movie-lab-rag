@@ -58,12 +58,16 @@
   - `services.indexing.reindex_documents`는 시작 전에 임베딩(키)을 준비한다 — 키가 없으면 `MissingApiKeyError`로 바로 끝난다.
     문서별로 실패를 격리한다: 안내 오류(`MovieLabUserError`, 잘못된 키 포함)는 즉시 중단하고, 그 밖의 오류는
     `settings.indexing.retries`번까지 `retry_wait_sec` 간격으로 다시 시도한 뒤(A-21) 실패 문서 수로 집계하고 다음 문서로 넘어간다 (AC-11, AC-15).
+    다시 해도 같은 결과인 `ValueError`(빈 본문 등)는 재시도하지 않는다.
   - 저장 원문이 없는 `(movie_id, page_id)`의 청크를 지운다. `--movie-id`를 주면 그 영화 범위에서만 지운다.
     원문이 0건이어도 범위 안에 색인된 문서가 있으면 정리를 수행한다. 원문도 색인도 없을 때만 `REINDEX_EMPTY` (AC-12).
+    지울 청크 ID를 모아 한 번에 지운다. 청크를 지운 영화는 수집 매니페스트(NF2002)도 그 영화만 초기화한다 —
+    지운 문서가 '수집됨'으로 남아 다시 수집되지 않는 일을 막는다 (AC-16).
+  - `--movie-id`와 원문의 `movie_id`는 문자열로 비교한다 (원문 JSON에 정수로 저장된 경우에도 같은 영화로 본다).
   - 출력: 사용한 값, 색인에 성공한 문서 수, 이번에 색인한 청크 수, 지운 문서 수, 실패 문서 수, 재색인 후 컬렉션 전체 청크 수 (V4.2-5).
   - 예외 원문은 화면에 내보내지 않는다 — 안내 문구만 출력하고 원문은 로그로 (NF2004).
-- 매니페스트(NF2002)의 `chunks`는 **수집 당시 색인한 청크 수의 기록**이다. 재색인은 매니페스트를 갱신하지 않는다
-  (캐시 판단은 `chunks` 값이 아니라 `wiki_docs`에 그 영화 청크가 있는지로 한다).
+- 매니페스트(NF2002)의 `chunks`는 **수집 당시 색인한 청크 수의 기록**이다. 재색인은 청크 수를 갱신하지 않는다
+  (캐시 판단은 `chunks` 값이 아니라 `wiki_docs`에 그 영화 청크가 있는지로 한다). 위의 고아 정리 때만 그 영화 매니페스트를 초기화한다.
 
 ### 3.4 연결
 
@@ -82,8 +86,10 @@ class DocIndexer:
     def index_document(self, doc: SourceDocument) -> int: ...      # 반환: 색인한 청크 수
     def delete_document(self, movie_id: str, page_id: str) -> int: ...
     def indexed_pages(self, movie_id: str | None = None) -> set[tuple[str, str]]: ...
+    def prune(self, keep: set[tuple[str, str]], movie_id: str | None = None) -> set[tuple[str, str]]: ...
+        # keep에 없는 (movie_id, page_id)의 청크를 한 번에 지우고, 지운 쌍을 돌려준다
 
-def reindex_documents(documents, indexer, *, movie_id: str | None = None) -> ReindexReport: ...
+def reindex_documents(documents, indexer, *, movie_id=None, manifest=None, sleep=time.sleep) -> ReindexReport: ...
     # ReindexReport(documents=성공 문서 수, chunks, failed, removed, total_chunks)
 ```
 
@@ -117,7 +123,8 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | AC-F2005-12 | 전체 재색인 후 저장 원문이 없는 문서의 청크는 남지 않는다 (원문이 0건이어도) | V4.2-5 |
 | AC-F2005-13 | 키가 없거나 잘못되면 수집 · 재색인 모두 키 안내 문구를 보여 주고, 문서마다 임베딩을 반복 호출하지 않는다 | — |
 | AC-F2005-14 | 본문이 빈 문서는 실패로 처리되고 그 문서의 옛 청크는 남는다 | — |
-| AC-F2005-15 | 재색인에서 일시 오류는 설정 횟수만큼 다시 시도한다 | — |
+| AC-F2005-15 | 재색인에서 일시 오류는 설정 횟수만큼 다시 시도한다 (빈 본문 같은 확정 오류는 제외) | — |
+| AC-F2005-16 | 재색인으로 청크를 지운 영화는 다음 질문에서 문서를 다시 수집할 수 있다 (매니페스트 초기화) | — |
 
 ## 6. 테스트 케이스
 
@@ -145,7 +152,10 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-20 | 통합 | 원문 0건 · 색인된 청크가 있는 상태에서 `reindex_docs` | 종료 코드 0, 청크 모두 정리, "지웠습니다" 출력 | 12 | `tests/integration/test_scripts.py` |
 | TC-F2005-21 | 통합 | 정수 `movie_id` 문서 색인 | 메타데이터 `movie_id`가 문자열, `has_where`로 찾힘, 재색인해도 청크가 쌓이지 않음 | 03 | `tests/integration/test_doc_index.py` |
 | TC-F2005-22 | 통합 | 색인된 문서를 빈 본문으로 재색인 / `reindex_documents`에 빈 본문 포함 | `ValueError`, 옛 청크 유지 / `failed == 1`, `documents`는 성공 수 | 14 | 〃 |
-| TC-F2005-23 | 통합 | 첫 시도만 일시 오류인 문서 재색인 (`retries=1`, 대기 0) | 성공, `failed == 0`, 임베딩 호출 2회 | 15 | 〃 |
+| TC-F2005-23 | 통합 | 첫 시도만 일시 오류인 문서 재색인 (`retries=1`, 대기 0) / 빈 본문 | 성공, `failed == 0`, 임베딩 호출 2회 / 대기 호출 0회 | 15 | 〃 |
+| TC-F2005-24 | 통합 | 원문을 지운 문서가 있는 영화를 매니페스트와 함께 재색인 | 그 영화 매니페스트 초기화, 다른 영화 매니페스트는 유지 | 16 | 〃 |
+| TC-F2005-25 | 통합 | 원문 JSON의 `movie_id`가 정수인 상태에서 `reindex_docs --movie-id 157336` | 그 문서를 재색인, 청크 삭제 없음 | 12 | `tests/integration/test_scripts.py` |
+| TC-F2005-26 | 통합 | 문서가 하나도 색인되지 않은 영화(P2가 아무것도 안 고름)에 같은 질문 2회 | 두 번째는 캐시 적중 (청크가 없어도 '색인된 문서' 기록이 없으면 캐시를 비우지 않음) | 08 | `tests/integration/test_collect_index.py` |
 
 ## 7. 증빙
 
