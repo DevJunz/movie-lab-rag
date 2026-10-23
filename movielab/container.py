@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import chromadb
+from chromadb.config import Settings as ChromaSettings
+
 from movielab import providers
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
+from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
 
@@ -32,6 +36,7 @@ class Services:
         self._llm = llm
         self._embeddings = embeddings
         self.catalog = Catalog(lambda: self._load_items())
+        self._store: VectorStore | None = None
 
     def _load_items(self) -> Any:
         if self.profile.load_items is None:
@@ -49,6 +54,17 @@ class Services:
         if self._embeddings is None:
             self._embeddings = providers.make_embeddings(self.settings)
         return self._embeddings
+
+    @property
+    def store(self) -> VectorStore:
+        """Chroma 저장소. 임베딩은 처음 색인 · 검색할 때 만든다 (건수 조회는 키 없이 가능)."""
+        if self._store is None:
+            client = chromadb.PersistentClient(
+                path=str(self.settings.path("chroma_dir")),
+                settings=ChromaSettings(anonymized_telemetry=False),
+            )
+            self._store = VectorStore(client, lambda: self.embeddings, self.settings)
+        return self._store
 
 
 def build_services(

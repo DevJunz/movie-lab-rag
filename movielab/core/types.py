@@ -26,3 +26,17 @@ class ItemRecord:
 class LoadResult:
     items: list[ItemRecord] = field(default_factory=list)
     skipped: int = 0
+
+
+@dataclass(frozen=True)
+class IndexReport:
+    """메타 색인 결과 (F2002). `loaded`는 로드한 원소 수(항목 + 건너뜀)다."""
+
+    loaded: int
+    skipped: int
+    indexed: int
+    failed_batches: list[int] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return self.loaded - self.skipped == self.indexed and not self.failed_batches

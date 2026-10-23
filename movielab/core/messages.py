@@ -29,6 +29,10 @@ TEMPLATES: dict[str, str] = {
     "SOURCE_UNAVAILABLE": "외부 문서 출처에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
     "ITEM_NOT_FOUND": "ID {item_id}인 {item_label}을(를) 찾을 수 없습니다.",
     "GENERIC_ERROR": "처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
+    # 색인 스크립트 출력 (F2002)
+    "INDEX_REPORT": "로드 {loaded}건 / 색인 {indexed}건 / 건너뜀 {skipped}건",
+    "INDEX_FAILED_BATCHES": "실패한 배치: {batches} — 다시 실행하면 빠진 항목만 채워집니다.",
+    "INDEX_MISMATCH": "로드한 항목 수와 색인 건수가 맞지 않습니다. 로그(logs/)를 확인하세요.",
 }
 
 DEFAULT_LABELS = {"item_label": "항목"}

@@ -1,8 +1,10 @@
 """영화 메타데이터 색인 스크립트 (RAG 1).
 
+    python -m scripts.index_meta                 # 색인 (재실행해도 중복 없음, SPEC-F2002)
+    python -m scripts.index_meta --rebuild       # 컬렉션을 지우고 다시 색인
+    python -m scripts.index_meta --count         # 현재 색인 건수 (키 없이 가능)
     python -m scripts.index_meta --show 157336   # 영화 1편의 색인 텍스트 출력 (SPEC-F2001)
 
-색인 · 건수 · 재색인 옵션은 SPEC-F2002에서 더한다.
 사용자 문구는 core/messages에서 가져오고, 예상하지 못한 오류도 traceback 없이 안내한다(NF2004).
 """
 
@@ -16,6 +18,7 @@ from movielab.config import load_settings
 from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
+from movielab.services.indexing import index_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +42,39 @@ def _show(services, item_id: str) -> int:
     return 0
 
 
+def _count(services) -> int:
+    collections = services.settings.collections
+    for name in (collections.meta, collections.docs):
+        print(f"{name}: {services.store.count(name)}")
+    return 0
+
+
+def _index(services, rebuild: bool, batch_size: int) -> int:
+    report = index_catalog(
+        services.catalog, services.store, services.settings, rebuild=rebuild, batch_size=batch_size
+    )
+    print(
+        messages.render(
+            "INDEX_REPORT",
+            loaded=report.loaded,
+            indexed=report.indexed,
+            skipped=report.skipped,
+        )
+    )
+    if report.failed_batches:
+        print(messages.render("INDEX_FAILED_BATCHES", batches=report.failed_batches))
+    if not report.ok:
+        print(messages.render("INDEX_MISMATCH"))
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="영화 메타데이터 색인")
     parser.add_argument("--show", metavar="ITEM_ID", help="색인 텍스트를 출력할 항목 ID")
+    parser.add_argument("--count", action="store_true", help="현재 색인 건수만 출력")
+    parser.add_argument("--rebuild", action="store_true", help="컬렉션을 지우고 다시 색인")
+    parser.add_argument("--batch-size", type=int, default=100, help="임베딩 배치 크기")
     args = parser.parse_args(argv)
     configure_stdout()
 
@@ -51,8 +84,9 @@ def main(argv: list[str] | None = None) -> int:
         labels = services.profile.labels()
         if args.show:
             return _show(services, args.show)
-        parser.print_help()
-        return 0
+        if args.count:
+            return _count(services)
+        return _index(services, args.rebuild, args.batch_size)
     except MovieLabUserError as error:
         logger.warning("안내 오류: %s", error)
         print(messages.render(error.code, labels))
