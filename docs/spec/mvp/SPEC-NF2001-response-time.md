@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2001** 응답 시간 (성능) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/services/qa.py` · `movielab/services/pipeline.py`(단계별 시간 측정), `scripts/measure_latency.py`, `docs/verification/questions.json` |
 | 선행 SPEC | SPEC-F2009, SPEC-NF2002 |
 | 관련 ISSUE | #18 |
