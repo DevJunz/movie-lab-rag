@@ -142,7 +142,8 @@ EXPLORE_SELECT = """[작업: 조건 선별]
 조건: {condition}
 후보:
 {candidate_lines}
-출력은 JSON 배열 하나만: [{"movie_id": "후보의 id", "reason": "후보 정보에 근거한 한 문장"}]
+출력은 JSON 배열 하나만:
+[{"movie_id": "후보 줄의 id= 뒤 값", "reason": "후보 정보에 근거한 한 문장"}]
 맞는 것이 없으면 []."""
 
 

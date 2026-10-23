@@ -83,9 +83,8 @@ class ExploreService:
         """E2. 깨지면 아무것도 고르지 않는다."""
         chars = self.settings.collect.card_overview_chars
         card = self.profile.item_card or (lambda item, _: item.display_name)
-        lines = "\n".join(
-            f"[{n}] id={item.item_id} | {card(item, chars)}" for n, item in enumerate(candidates)
-        )
+        # 순번을 붙이지 않는다 — 모델이 순번을 id로 돌려주지 않게 (SPEC-F2011 §3.1-4)
+        lines = "\n".join(f"- id={item.item_id} | {card(item, chars)}" for item in candidates)
         raw = self.llm.invoke(build_explore_select_prompt(self.profile, condition, lines)).content
         picked = parse_json_array(raw, default=[]) or []
         result = []
