@@ -127,11 +127,35 @@ def test_tc_nf2002_20_reset_cache_script_reports_failure(
     assert collect.main(["--reset-cache"]) == 0
 
 
-def test_tc_nf2002_24_failed_page_record_skips_keywords_and_question(
-    tmp_settings, item, monkeypatch
-):
+def test_tc_nf2002_24_failed_record_leaves_nothing(tmp_settings, item):
+    from movielab.collect.manifest import FileLock
+
     collector, _, manifest = _setup(tmp_settings)
-    monkeypatch.setattr(manifest, "record_page", lambda *args, **kwargs: False)
-    collector.collect(item, "블랙홀은?")
+    holder = FileLock(manifest.lock_path, poll_sec=0.01)
+    assert holder.acquire()  # 끝의 기록이 잠금을 못 잡는다
+    try:
+        report = collector.collect(item, "블랙홀은?")
+    finally:
+        holder.release()
+    assert report.indexed_titles  # 수집 · 색인 자체는 성공
     assert manifest.cached_queries("157336", "블랙홀은?") is None
     assert not manifest.has_keyword("157336", "블랙홀")
+    assert not manifest.has_page("157336", "2")
+    assert manifest.item_doc_page_id("157336") is None
+
+
+def test_tc_nf2002_26_one_write_per_collection(tmp_settings, item, monkeypatch):
+    collector, _, manifest = _setup(tmp_settings)
+    writes = []
+    original = manifest._write
+
+    def counting_write():
+        writes.append(1)
+        return original()
+
+    monkeypatch.setattr(manifest, "_write", counting_write)
+    report = collector.collect(item, "블랙홀은?")
+    assert len(report.indexed_titles) >= 2
+    assert len(writes) == 1
+    assert manifest.item_doc_page_id("157336") == "1"
+    assert manifest.has_page("157336", "2") and manifest.has_keyword("157336", "블랙홀")

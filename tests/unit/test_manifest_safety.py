@@ -377,3 +377,52 @@ def test_tc_nf2002_23_failed_write_then_failed_read_no_phantom_hit(tmp_path, mon
 
     monkeypatch.setattr(pathlib.Path, "read_text", always_fail)
     assert not manifest.has_keyword("1", "웜홀")  # 저장 안 된 기록으로 적중하지 않는다
+
+
+# --- 다섯 번째 리뷰: 기록 중 예외 · stat '알 수 없음' · 한 번에 기록 ---
+
+
+def test_tc_nf2002_25_exception_inside_record_returns_false(tmp_path):
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest(path)
+    manifest.record_keyword("1", "블랙홀")
+    assert manifest.record_page("1", "2", "웜홀", chunks="여러 개") is False  # int 변환 실패
+    assert manifest.has_keyword("1", "블랙홀")
+    assert not manifest.has_page("1", "2")
+
+
+def test_tc_nf2002_25_unknown_stat_rereads(tmp_path, monkeypatch):
+    import pathlib
+
+    path = tmp_path / "manifest.json"
+    app = make_manifest(path)
+    app.record_keyword("1", "블랙홀")
+    assert app.has_keyword("1", "블랙홀")
+    original = pathlib.Path.stat
+
+    def deny(self, *args, **kwargs):
+        if self == path:
+            raise PermissionError("접근 거부")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "stat", deny)
+    assert make_manifest(path).reset() is True  # 다른 인스턴스의 초기화
+    assert not app.has_keyword("1", "블랙홀")
+
+
+def test_tc_nf2002_26_record_collection_all_or_nothing(tmp_path):
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest(path)
+    ok = manifest.record_collection(
+        "1",
+        pages=[("2", "블랙홀", 3), ("3", "웜홀", 2)],
+        item_doc_page_id="2",
+        keywords=["블랙홀"],
+        question=("블랙홀은?", ["블랙홀"]),
+    )
+    assert ok is True
+    fresh = make_manifest(path)
+    assert fresh.has_page("1", "2") and fresh.has_page("1", "3")
+    assert fresh.item_doc_page_id("1") == "2"
+    assert fresh.has_keyword("1", "블랙홀")
+    assert fresh.cached_queries("1", "블랙홀은?") == ["블랙홀"]

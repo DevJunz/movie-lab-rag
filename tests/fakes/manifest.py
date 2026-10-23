@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -35,14 +36,28 @@ class RecordingManifest(NullManifest):
         self.questions.append(question)
         return True
 
+    def record_collection(
+        self, item_id, *, pages=(), item_doc_page_id=None, keywords=(), question=None
+    ) -> bool:
+        self.pages.extend((str(page_id), chunks) for page_id, _, chunks in pages)
+        self.keywords.extend(keywords)
+        if question is not None:
+            self.questions.append(question[0])
+        return True
+
 
 _CACHE_KEYS = ("lock_timeout_sec", "lock_poll_sec", "io_retries", "io_retry_wait_sec")
 
 
-def cache_settings() -> dict[str, Any]:
-    """기본 설정 파일의 `cache` 묶음 — `load_settings`로 읽어 설정 검증을 거친다."""
+@lru_cache(maxsize=1)
+def _cache_values() -> tuple[tuple[str, Any], ...]:
     cache = load_settings(_SETTINGS).cache
-    return {key: getattr(cache, key) for key in _CACHE_KEYS}
+    return tuple((key, getattr(cache, key)) for key in _CACHE_KEYS)
+
+
+def cache_settings() -> dict[str, Any]:
+    """기본 설정 파일의 `cache` 묶음 — `load_settings`로 검증해 한 번만 읽는다."""
+    return dict(_cache_values())
 
 
 def make_manifest(path: Path, **overrides: Any) -> Manifest:
