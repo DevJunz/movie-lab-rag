@@ -118,3 +118,24 @@ def test_tc_nf2002_06_cache_survives_new_collector(tmp_settings, item):
     fresh = Setup(tmp_settings)  # 앱 재시작
     report = fresh.collector.collect(item, "질문1")
     assert "CACHE_HIT" in report.notices and fresh.source.calls == []
+
+
+def test_tc_nf2002_06_container_collector_uses_file_manifest(tmp_settings):
+    from movielab.container import build_services
+
+    collector = build_services(tmp_settings, llm=FakeChatModel()).collector
+    assert isinstance(collector.manifest, Manifest)
+    assert collector.manifest.path == tmp_settings.path("manifest")
+
+
+def test_tc_nf2002_reset_cache_option(tmp_settings, monkeypatch, capsys):
+    from scripts import collect
+
+    manifest = Manifest(tmp_settings.path("manifest"))
+    manifest.record_keyword("157336", "블랙홀")
+    manifest.record_keyword("27205", "자각몽")
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert collect.main(["--reset-cache", "--movie-id", "157336"]) == 0
+    reloaded = Manifest(tmp_settings.path("manifest"))
+    assert not reloaded.has_keyword("157336", "블랙홀") and reloaded.has_keyword("27205", "자각몽")
+    assert "캐시" in capsys.readouterr().out
