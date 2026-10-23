@@ -64,3 +64,53 @@ def test_tc_f2001_12_bad_settings_file_no_traceback(tmp_path, monkeypatch, capsy
     assert index_meta.main(["--show", "157336"]) == 1
     out = capsys.readouterr().out
     assert "설정" in out and "Traceback" not in out
+
+
+# --- SPEC-F2002 색인 · 건수 · 재색인 ---
+
+
+def _use_fake_embeddings(monkeypatch, tmp_settings, embeddings=None):
+    from movielab.container import build_services
+    from tests.fakes import FakeEmbeddings
+
+    emb = embeddings or FakeEmbeddings()
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(
+        index_meta, "build_services", lambda settings: build_services(settings, embeddings=emb)
+    )
+    return emb
+
+
+def test_tc_f2002_05_index_count_and_rebuild(tmp_settings, monkeypatch, capsys):
+    _use_fake_embeddings(monkeypatch, tmp_settings)
+    assert index_meta.main([]) == 0
+    assert "로드 12건 / 색인 12건 / 건너뜀 0건" in capsys.readouterr().out
+    assert index_meta.main([]) == 0  # 재실행 안전
+    assert "색인 12건" in capsys.readouterr().out
+    assert index_meta.main(["--count"]) == 0
+    assert "movie_meta: 12" in capsys.readouterr().out
+    assert index_meta.main(["--rebuild"]) == 0
+    assert "색인 12건" in capsys.readouterr().out
+
+
+def test_tc_f2002_06_failed_batch_exit_code(tmp_settings, monkeypatch, capsys):
+    from tests.fakes import FakeEmbeddings
+
+    class Broken(FakeEmbeddings):
+        def embed_documents(self, texts):
+            if any("인셉션" in t for t in texts):
+                raise RuntimeError("임베딩 서버 오류")
+            return super().embed_documents(texts)
+
+    _use_fake_embeddings(monkeypatch, tmp_settings, Broken())
+    assert index_meta.main(["--batch-size", "5"]) == 1
+    out = capsys.readouterr().out
+    assert "실패한 배치" in out and "Traceback" not in out
+
+
+def test_tc_f2002_05_index_without_key_shows_hint(tmp_settings, monkeypatch, capsys):
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert index_meta.main([]) == 1
+    out = capsys.readouterr().out
+    assert "GMS_API_KEY" in out and "Traceback" not in out
+    assert index_meta.main(["--count"]) == 0  # 건수 확인은 키 없이 가능
