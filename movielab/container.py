@@ -15,10 +15,15 @@ import requests
 from chromadb.config import Settings as ChromaSettings
 
 from movielab import providers
+from movielab.collect.collector import Collector
+from movielab.collect.query_extractor import QueryExtractor
+from movielab.collect.selector import CandidateSelector
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
-from movielab.data.wiki_api import WikiHttpClient, shared_throttle
+from movielab.data.raw_store import RawStore
+from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttle
+from movielab.data.wiki_bundle import WikiBundleSource
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -42,6 +47,8 @@ class Services:
         self._store: VectorStore | None = None
         self._wiki_client: WikiHttpClient | None = None
         self._lock = threading.Lock()
+        self._bundle_source: WikiBundleSource | None = None
+        self._collector: Collector | None = None
 
     def _load_items(self) -> Any:
         if self.profile.load_items is None:
@@ -86,6 +93,45 @@ class Services:
                     throttle=shared_throttle(wiki.api_url, wiki.min_interval_sec),
                 )
         return self._wiki_client
+
+    @property
+    def bundle_source(self) -> WikiBundleSource:
+        """제공 문서 묶음 소스 — 묶음(약 3,700 파일)은 프로세스에서 한 번만 읽는다."""
+        with self._lock:
+            if self._bundle_source is None:
+                collect = self.settings.collect
+                self._bundle_source = WikiBundleSource(
+                    self.settings.path("wiki_bundle"),
+                    body_chars=collect.bundle_body_chars,
+                    snippet_radius=collect.bundle_snippet_radius,
+                    intro_chars=collect.intro_chars,
+                )
+        return self._bundle_source
+
+    def make_collector(self, *, dry_run: bool = False) -> Collector:
+        """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
+
+        `dry_run`이면 색인 · 캐시 기록을 하지 않는다(원문 저장까지만).
+        수집 캐시(NF2002)와 청크 색인기(F2005)는 해당 SPEC에서 연결한다.
+        """
+        settings = self.settings
+        api_source = WikiApiSource(self.wiki_client) if settings.secrets.wiki_contact else None
+        return Collector(
+            api_source=api_source,
+            bundle_source=self.bundle_source,
+            extractor=QueryExtractor(self.llm, self.profile, settings),
+            selector=CandidateSelector(self.llm, self.profile, settings),
+            raw_store=RawStore(settings.path("raw_dir")),
+            profile=self.profile,
+            settings=settings,
+        )
+
+    @property
+    def collector(self) -> Collector:
+        """앱 · 스크립트가 쓰는 수집기 — 한 번만 만든다."""
+        if self._collector is None:
+            self._collector = self.make_collector()
+        return self._collector
 
 
 def build_services(

@@ -45,3 +45,62 @@ def test_tc_f2003_11_multi_paragraph_overview_kept(movies_small_path):
     text = item.index_text.replace("줄거리: ", "줄거리: 첫 문단.\n\n둘째 문단에 웜홀이 나온다. ")
     card = MOVIE_PROFILE.item_card(dataclasses.replace(item, index_text=text), 300)
     assert "둘째 문단에 웜홀" in card and "\n" not in card
+
+
+# --- SPEC-F2004 §3.4 항목 자체 문서 판별 ---
+
+
+def _cand(title, requested, intro, disambiguation=False, page_id="1"):
+    from movielab.core.types import Candidate
+
+    return Candidate(
+        page_id=page_id, title=title, snippet=intro, matched_title=requested,
+        disambiguation=disambiguation,
+    )  # fmt: skip
+
+
+def test_tc_f2004_05_year_variant_preferred_over_plain_title(movies_small_path):
+    item = _items(movies_small_path)["321612"]
+    resolved = [
+        _cand(
+            "미녀와 야수 (2017년 영화)",
+            "미녀와 야수 (2017년 영화)",
+            "2017년 영화이다.",
+            page_id="11",
+        ),
+        _cand(
+            "미녀와 야수", "미녀와 야수", "18세기 프랑스 동화이다. 영화로 각색되었다.", page_id="10"
+        ),
+    ]
+    assert MOVIE_PROFILE.pick_item_doc(item, resolved).page_id == "11"
+
+
+def test_tc_f2004_05_plain_title_rejected_when_variant_exists_elsewhere(movies_small_path):
+    item = _items(movies_small_path)[
+        "10020"
+    ]  # 1991년 — 1991 표제가 없고 2017 표제만 있는 상황 가정
+    resolved = [_cand("미녀와 야수", "미녀와 야수", "18세기 프랑스의 동화이다.")]
+    assert MOVIE_PROFILE.pick_item_doc(item, resolved) is None
+
+
+def test_tc_f2004_06_plain_title_needs_film_evidence(movies_small_path):
+    item = _items(movies_small_path)["157336"]
+    ok = _cand("인터스텔라", "인터스텔라", "인터스텔라는 2014년 개봉한 SF 영화이다.")
+    by_director = _cand("인터스텔라", "인터스텔라", "크리스토퍼 놀란이 만든 영화이다.")
+    no_film = _cand("인터스텔라", "인터스텔라", "인터스텔라는 2014년의 음반이다.")
+    assert MOVIE_PROFILE.pick_item_doc(item, [ok]) is not None
+    assert MOVIE_PROFILE.pick_item_doc(item, [by_director]) is not None
+    assert MOVIE_PROFILE.pick_item_doc(item, [no_film]) is None
+
+
+def test_tc_f2004_06_redirected_variant_accepted(movies_small_path):
+    item = _items(movies_small_path)["157336"]
+    # 「인터스텔라 (영화)」가 「인터스텔라」로 넘겨주기됨 — 영화 전용 표제로 찾았으므로 채택
+    redirected = _cand("인터스텔라", "인터스텔라 (영화)", "아무 도입부")
+    assert MOVIE_PROFILE.pick_item_doc(item, [redirected]).title == "인터스텔라"
+
+
+def test_tc_f2004_06_disambiguation_never_item_doc(movies_small_path):
+    item = _items(movies_small_path)["1255"]
+    dis = _cand("괴물 (동음이의)", "괴물 (영화)", "다음을 가리킨다", disambiguation=True)
+    assert MOVIE_PROFILE.pick_item_doc(item, [dis]) is None

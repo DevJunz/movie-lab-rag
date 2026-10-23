@@ -145,6 +145,10 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
     "collect": [  # SPEC-F2003 · F2004
         ("source", lambda v: v in ("api", "bundle", "auto")),
         ("card_overview_chars", _int_at_least(1)),
+        ("snippet_chars", _int_at_least(1)),
+        ("intro_chars", _int_at_least(1)),
+        ("bundle_snippet_radius", _int_at_least(1)),
+        ("bundle_body_chars", _int_at_least(1)),
         ("min_queries", _int_at_least(0)),
         ("max_queries", _int_at_least(1)),
         ("search_limit", _int_at_least(1)),

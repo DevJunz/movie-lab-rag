@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2004** 외부 문서 수집(프롬프트2) (수집 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | Done |
 | 담당 모듈 | `movielab/collect/selector.py`, `movielab/collect/collector.py`, `movielab/data/wiki_api.py`, `movielab/data/wiki_bundle.py`, `movielab/data/raw_store.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-F2003, SPEC-NF2006 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #7 |
 
 ## 1. 요구사항 원문
 
@@ -46,12 +46,12 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 | `WikiApiSource` | `data/wiki_api.py` | MediaWiki API. 호출 규칙은 SPEC-NF2006 |
 | `WikiBundleSource` | `data/wiki_bundle.py` | `movielab_wiki/wikipedia/*.json`을 읽어 메모리 색인(제목 · 본문). 외부 호출 없음 |
 
-**WikiApiSource 요청** (모두 `format=json`, `formatversion=2`, `maxlag=5`):
+**WikiApiSource 요청** (모두 `WikiHttpClient`(NF2006)를 거친다 — `format=json`, `formatversion=2`, `maxlag=5` 자동):
 
 | 기능 | 파라미터 |
 |---|---|
-| 검색 | `action=query&list=search&srsearch={q}&srlimit={search_limit}&srnamespace=0&srprop=snippet\|size` |
-| 제목 조회 | `action=query&titles={t1}\|{t2}\|{t3}&redirects=1&prop=info\|pageprops&ppprop=disambiguation&inprop=url` |
+| 검색 | `action=query&list=search&srsearch={q}&srlimit={search_limit}&srnamespace=0&srprop=snippet\|size` **+ 같은 요청에** `generator=search&gsrsearch={q}&gsrlimit={search_limit}&gsrnamespace=0&prop=pageprops&ppprop=disambiguation` — 요약(snippet)과 동음이의 표시(`pageprops`)를 한 번에 받는다 |
+| 제목 조회 | `action=query&titles={t1}\|{t2}\|{t3}&redirects=1&prop=info\|pageprops\|extracts&ppprop=disambiguation&inprop=url&exintro=1&explaintext=1&exchars=300` — 도입부 300자를 함께 받아 §3.4의 '괄호 없는 제목' 판별에 쓴다 |
 | 본문 | `action=query&pageids={id}&prop=extracts\|info&explaintext=1&inprop=url` |
 
 - 검색 요약(snippet)의 HTML 태그(`<span class="searchmatch">` 등)는 지우고 HTML 엔티티를 푼다.
@@ -59,7 +59,8 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 
 **WikiBundleSource 규칙**:
 - `search(q)`: 묶음 전체에서 정규화한 `q`가 제목에 들어 있거나 본문 앞 2,000자에 나오는 문서를 찾는다. 점수는 제목 일치 > 제목 포함 > 본문 등장 횟수 순이고, **현재 영화의 문서에 가산점**을 준다. 같은 `page_id`는 하나로 합친다. snippet은 `q`가 처음 나온 곳 앞뒤 150자다.
-- `resolve_titles`: 제목이 정확히 같은 문서.
+  순위는 **단계(제목 일치 > 제목 포함 > 본문만 일치)가 먼저**이고, 같은 단계 안에서 현재 영화 가산점 → 본문 등장 횟수 순이다(본문 횟수가 많아도 제목이 맞은 문서를 앞지르지 못한다). snippet은 **원문에서** 검색어가 나온 위치(공백 차이 무시) 앞뒤 `bundle_snippet_radius`자다.
+- `resolve_titles`: 제목이 정확히 같은 문서. 도입부는 앞 `intro_chars`자.
 - `fetch`: 저장된 본문과 URL을 돌려준다. `movie_id` · `related_movie` · `search_query`는 **현재 수집 맥락의 값으로 바꿔** 반환한다.
 
 ### 3.2 소스 선택 (`collect.source`)
@@ -79,13 +80,19 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 | 3 | `search` | 캐시에 없는 검색어만 검색한다(NF2002). 후보를 `page_id`로 합치고, 이 영화로 이미 수집한 `page_id`는 뺀다 |
 | 4 | `filter` | §3.5 제외 규칙 적용 (항목 자체 문서는 면제) |
 | 5 | `select` | §3.6 프롬프트 2로 선별 |
-| 6 | `fetch` | 항목 자체 문서 → 선별 문서 순으로 본문 수집. 본문 길이 규칙 재적용(항목 자체 문서 면제). `data/raw/wiki/{movie_id}_{안전한 제목}.json`에 저장 |
+| 6 | `fetch` | 항목 자체 문서 → 선별 문서 순으로 본문 수집. 본문 길이 규칙 재적용(항목 자체 문서 면제). `data/raw/wiki/{movie_id}_{page_id}.json`에 저장(§3.7) |
 | 7 | `index` | SPEC-F2005로 청킹 · 색인 |
 | 8 | `done` | 매니페스트 갱신(NF2002), `CollectReport` 반환 |
 
 - `on_progress(stage: str, info: dict)` 콜백은 UI에 독립적이다. UI는 이를 진행 상태 영역에 표시한다(F2012).
-- `CollectReport`에는 **색인된 문서와 버려진 문서를 사유와 함께** 남긴다. 사유: `p2_not_selected`, `too_short`, `disambiguation`, `already_collected`, `fetch_failed` (V4.2-2).
+- `CollectReport`에는 **색인된 문서와 버려진 문서를 사유와 함께** 남긴다. 사유: `p2_not_selected`, `over_limit`(P2가 상한보다 많이 고름), `too_short`, `disambiguation`, `already_collected`, `fetch_failed`, `index_failed` (V4.2-2).
 - 수집 실패(본문 조회 실패 등)는 해당 문서만 건너뛰고 계속한다. 문서가 하나도 없어도 예외로 끝내지 않는다 → 답변은 메타 근거만으로 진행(F2006, F2012의 "검색 결과 없음" 안내).
+  - 본문 조회에서 나는 **모든 오류**(대체 후에도 실패한 외부 출처 오류 포함)는 그 문서만 `fetch_failed`로 남긴다.
+  - 색인기에서 나는 오류는 그 문서만 `index_failed`로 남긴다(원문은 저장된 상태). 단 사용자 안내 오류(`MovieLabUserError`, 예: 키 없음)는 모든 문서에 같으므로 그대로 알린다.
+- **캐시 기록 시점(NF2002)**: 검색어는 **설정된 소스로** 검색을 마쳤을 때만 기록한다 — `auto`에서 묶음으로 대체해 검색한 검색어는 기록하지 않아 다음에 API로 다시 시도한다. 문서는 색인기가 있으면 **청크가 1개 이상** 색인됐을 때만 기록한다.
+- 프로필에 `item_doc_queries` · `pick_item_doc`이 없으면 항목 자체 문서 단계를 건너뛰고 `ITEM_DOC_NOT_FOUND`를 남긴다(NF2005).
+- 시간 측정(`timings`)과 수집일(`collected_at`)은 주입된 시계 · 날짜 함수로 정한다.
+- 요약 · 도입부 · 묶음 검색 길이는 설정에서 읽는다: `collect.snippet_chars`(P2 후보 요약, 200), `collect.intro_chars`(제목 조회 도입부, 300 — API · 묶음 · §3.4 판별이 같은 값), `collect.bundle_snippet_radius`(150), `collect.bundle_body_chars`(2,000) (가정 A-23).
 
 ### 3.4 항목 자체 문서 판별 (`DomainProfile.pick_item_doc`, `data/domain_movie.py`)
 
@@ -127,7 +134,13 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 - 출력 검증: 정수가 아니거나 범위 밖인 번호는 버리고, 중복을 없애고, `max_selected_docs`개까지 자른다. 파싱 실패 시 빈 배열 → 항목 자체 문서만 수집.
 - 후보가 0개면 P2를 부르지 않는다.
 
-### 3.7 인터페이스
+### 3.7 다른 SPEC과의 경계 (단계적 구현)
+
+- **수집 캐시(SPEC-NF2002)**: `Collector`는 `manifest`를 주입받는다. 이 SPEC에서는 아무것도 기억하지 않는 `NullManifest`를 기본으로 쓰고, 실제 매니페스트는 NF2002에서 넣는다.
+- **청크 색인(SPEC-F2005)**: `Collector`는 `indexer: Callable[[SourceDocument], int] | None`을 주입받는다. `None`이면 원문 저장까지만 하고 `index` 단계는 `indexed_chunks=0`으로 보고한다. 실제 색인기는 F2005에서 연결한다.
+- 원문 저장 파일 이름: `data/raw/wiki/{movie_id}_{page_id}.json` (제목은 파일 이름에 쓰지 않는다 — 특수문자 · 길이 문제 회피, 제목은 JSON 안에 있다).
+
+### 3.8 인터페이스
 
 ```python
 class CandidateSelector:
@@ -135,13 +148,15 @@ class CandidateSelector:
     def select(self, item, question, candidates: list[Candidate]) -> SelectionResult: ...  # selected, rejected(사유)
 
 class Collector:
-    def __init__(self, source_factory, extractor, selector, manifest, raw_store, doc_indexer, profile, settings): ...
+    def __init__(self, *, api_source, bundle_source, extractor, selector, raw_store, profile, settings,
+                 manifest=None, indexer=None): ...  # api_source는 None 가능(연락처 없음)
     def collect(self, item: ItemRecord, question: str, on_progress=None) -> CollectReport: ...
 ```
 
 ```text
 python -m scripts.collect --movie-id 157336 --question "<질문>" [--source api|bundle|auto] [--dry-run]
-  → 검색어, 후보, 선별/버림(사유), 색인된 문서 제목, 사용한 소스를 출력. --dry-run은 색인 전까지만
+  → 검색어, 후보, 선별/버림(사유), 색인된 문서 제목, 사용한 소스를 출력.
+    --dry-run은 색인 · 캐시 기록을 하지 않는다(원문 저장까지만) — `Services.make_collector(dry_run=True)`
 ```
 
 ## 4. 가정
@@ -188,14 +203,22 @@ python -m scripts.collect --movie-id 157336 --question "<질문>" [--source api|
 | TC-F2004-13 | 단위 | 진행 상태 콜백 기록 | `extract_queries → resolve_item_doc → search → filter → select → fetch → index → done` | 10 | `tests/unit/test_collector.py` |
 | TC-F2004-14 | live | 실제 위키백과 + GMS로 Q1 수집 | 「인터스텔라」가 항목 자체 문서로 색인, 원문 URL이 `https://ko.wikipedia.org/wiki/`로 시작 | 03, 05 | `tests/live/test_live_collect.py` |
 | TC-F2004-15 | 수동 | Q1 수집 후 화면의 "수집 상세" 또는 스크립트 출력 | 색인된 문서와 버려진 문서(사유)를 구분해 보여 줌 | 06 | 스크린샷 |
+| TC-F2004-17 | 단위 | `WikiBundleSource`: 검색 점수(제목 일치 > 포함 > 본문, 현재 영화 가산), `fetch`가 현재 수집 맥락으로 `movie_id` 등을 바꿈, `resolve_titles` 정확 일치 | 정의대로 | 01, 08 | `tests/unit/test_wiki_bundle.py` |
+| TC-F2004-18 | 단위 | `RawStore` 저장 · 읽기, 파일 이름 `{movie_id}_{page_id}.json`, 4.2 필드 | 정의대로 | 05 | `tests/unit/test_raw_store.py` |
+| TC-F2004-19 | 단위 | 둘째 선별 문서의 본문 조회가 오류 / 색인기가 오류 | 그 문서만 `fetch_failed` · `index_failed`, 나머지는 수집 · 보고서 반환 | 06 | `tests/unit/test_collector.py` |
+| TC-F2004-20 | 단위 | API 검색 결과의 `pageprops.disambiguation` (제목에 `(동음이의)` 없음) | 동음이의로 표시 | 06 | `tests/unit/test_wiki_api.py` |
+| TC-F2004-21 | 단위 | 묶음: 본문에 검색어가 아주 많이 나오는 문서 vs 제목 포함 문서 / 문단 사이 공백이 많은 본문의 snippet | 제목 포함 문서가 앞 / snippet에 검색어 포함 | 01 | `tests/unit/test_wiki_bundle.py` |
+| TC-F2004-22 | 단위 | `auto`에서 묶음으로 대체한 검색어 · 청크 0개 문서의 캐시 기록 | 기록하지 않음 | 11 | `tests/unit/test_collector.py` |
+| TC-F2004-23 | 단위 | 프로필에 `pick_item_doc` 없음 | 예외 없음, `ITEM_DOC_NOT_FOUND` | 04 | 〃 |
+| TC-F2004-24 | 통합 | `Services.collector` 두 번 접근 · `--dry-run` | 같은 객체(묶음 한 번만 로드) · 색인기 호출 0회 | 05 | `tests/integration/test_collect_fallback.py`, `test_scripts.py` |
 | TC-F2004-16 | 통합 | 같은 질문 2회 수집 (TC-NF2002-01과 같은 테스트) | 2회째 소스 검색 · 본문 요청 0회 | 11 | `tests/integration/test_cache_path.py` |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-2 | Q1 수집 결과의 색인 / 버림 목록 캡처 | `docs/verification/screenshots/V4.2-2_selection.png` |
-| V4.2-4 | 항목 자체 문서(「인터스텔라」, 「미녀와 야수 (2017년 영화)」)가 색인된 결과 캡처 | `docs/verification/screenshots/V4.2-4_item_doc.png` |
+| V4.2-2 | Q1 실제 수집 결과의 수집 / 버림(사유) 목록 | `docs/verification/evidence/V4.2-2_selection.txt` |
+| V4.2-4 | 항목 자체 문서(「인터스텔라」 — V4.2-2 파일, 「미녀와 야수 (2017년 영화)」) 실제 수집 결과 | `docs/verification/evidence/V4.2-4_item_doc.txt` |
 
 ## 8. 범위 밖
 
