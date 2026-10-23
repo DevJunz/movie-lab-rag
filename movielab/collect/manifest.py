@@ -3,9 +3,13 @@
 제공 `wiki_manifest.json`과 호환되는 형식(`keywords` · `titles` · `page_ids` · `chunks` ·
 `collected_at`)에 `questions` · `rejected_page_ids` · `item_doc_page_id`를 더한다.
 
-여러 인스턴스 · 프로세스(앱과 `--reset-cache` 스크립트 등)가 같은 파일을 쓰므로, 파일이 바뀌었으면
-읽기 · 쓰기 전에 다시 읽는다. 쓰기는 고유한 임시 파일에 쓴 뒤 바꿔 넣는다. 깨졌거나 구조가 틀린
-파일은 백업해 두고 빈 매니페스트로 시작한다. `NullManifest`는 아무것도 기억하지 않는다.
+여러 인스턴스 · 프로세스(앱과 `--reset-cache` 스크립트 등)가 같은 파일을 쓴다 (#33):
+- 기록(읽고-고치고-쓰기)은 잠금 파일(`O_EXCL`) 안에서, 파일을 항상 다시 읽은 뒤 한다.
+- 조회는 잠금 없이, 파일 서명(파일 ID · 수정 시각 · 크기)이 바뀌었을 때만 다시 읽는다.
+- 쓰기는 고유한 임시 파일에 쓴 뒤 바꿔 넣는다.
+- 깨졌거나 구조가 틀린 파일은 백업해 두고 새로 시작한다.
+- 일시적인 파일 오류는 몇 번 다시 시도하고, 그래도 안 되면 기록을 건너뛴다 (캐시는 성능용이다).
+`NullManifest`는 아무것도 기억하지 않는다.
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ import json
 import logging
 import os
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
@@ -24,6 +29,12 @@ from typing import Any
 from movielab.core.text import normalize_key
 
 logger = logging.getLogger(__name__)
+
+Signature = tuple[int, int, int]
+
+_RETRIES = 5  # 일시적인 읽기 · 바꿔 넣기 오류 재시도 횟수
+_RETRY_WAIT_SEC = 0.05
+_LOCK_POLL_SEC = 0.01
 
 
 class NullManifest:
@@ -101,24 +112,29 @@ class Manifest(NullManifest):
         *,
         today: Callable[[], date] = date.today,
         now: Callable[[], datetime] = datetime.now,
+        lock_timeout_sec: float = 10.0,
+        stale_lock_sec: float = 30.0,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.path = Path(path)
+        self.lock_path = self.path.with_name(f"{self.path.name}.lock")
         self.today = today
         self.now = now
+        self.lock_timeout_sec = lock_timeout_sec
+        self.stale_lock_sec = stale_lock_sec
+        self.sleep = sleep
         self._lock = threading.Lock()
-        self._signature: tuple[int, int, int] | None = None
+        self._signature: Signature | None = None
         self._data: dict[str, dict[str, Any]] = {}
         self._refresh()
 
     # --- 파일 ---
 
-    def _stat(self) -> tuple[int, int, int] | None:
-        """파일 서명 — 수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 (#33).
-
-        쓰기는 늘 새 임시 파일을 바꿔 넣으므로 파일 ID(`st_ino`)가 매번 달라진다.
-        """
+    @staticmethod
+    def _signature_of(path: Path) -> Signature | None:
+        """수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 — 파일 ID · 크기도 본다."""
         try:
-            stat = self.path.stat()
+            stat = path.stat()
         except FileNotFoundError:
             return None
         return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
@@ -126,35 +142,109 @@ class Manifest(NullManifest):
     def _backup(self, reason: str) -> None:
         stamp = f"{self.now():%Y%m%d%H%M%S%f}-{next(self._backup_counter)}"
         backup = self.path.with_name(f"{self.path.name}.broken-{stamp}")
-        os.replace(self.path, backup)
+        try:
+            os.replace(self.path, backup)
+        except FileNotFoundError:
+            return  # 그 사이 다른 쪽이 지웠다
         logger.warning("매니페스트를 %s로 옮기고 새로 시작한다 (%s)", backup.name, reason)
 
-    def _refresh(self) -> None:
-        """파일이 바뀌었으면 다시 읽는다 (다른 인스턴스 · 프로세스가 쓴 내용 반영)."""
-        signature = self._stat()
-        if signature == self._signature:
-            return
-        if signature is None:
-            self._data, self._signature = {}, None
-            return
+    def _read(self) -> str | None:
+        """파일 내용. 없으면 None. 일시적인 오류(공유 위반 등)가 계속되면 OSError."""
+        for attempt in range(_RETRIES):
+            try:
+                return self.path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                return None
+            except OSError:
+                if attempt == _RETRIES - 1:
+                    raise
+                self.sleep(_RETRY_WAIT_SEC)
+        return None
+
+    def _refresh(self, *, force: bool = False) -> bool:
+        """파일이 바뀌었으면(`force`면 항상) 다시 읽는다. 읽지 못하면 지금 내용을 두고 False."""
+        signature = self._signature_of(self.path)
+        if not force and signature == self._signature:
+            return True
         try:
-            data = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
+            text = self._read()
+        except OSError as exc:
+            logger.warning("매니페스트를 읽지 못해 지금 내용을 유지한다: %s", exc)
+            return False
+        if text is None:
+            self._data, self._signature = {}, None
+            return True
+        try:
+            data = json.loads(text)
+        except ValueError as exc:
             self._backup(f"읽기 실패: {exc}")
             self._data, self._signature = {}, None
-            return
+            return True
         if not _valid(data):
             self._backup("구조가 맞지 않음")
             self._data, self._signature = {}, None
-            return
+            return True
         self._data, self._signature = data, signature
+        return True
 
     def _write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(f"{self.path.name}.{uuid.uuid4().hex}.tmp")
         tmp.write_text(json.dumps(self._data, ensure_ascii=False, indent=1), encoding="utf-8")
-        os.replace(tmp, self.path)
-        self._signature = self._stat()
+        signature = self._signature_of(tmp)  # 바꿔 넣기 전에 — 남의 쓰기 서명과 섞이지 않게
+        for attempt in range(_RETRIES):
+            try:
+                os.replace(tmp, self.path)
+                self._signature = signature
+                return
+            except PermissionError:  # Windows: 다른 프로세스가 읽는 중
+                if attempt < _RETRIES - 1:
+                    self.sleep(_RETRY_WAIT_SEC)
+        tmp.unlink(missing_ok=True)
+        self._signature = None  # 다음 조회에서 파일 내용으로 돌아간다
+        logger.warning("매니페스트를 바꿔 넣지 못해 이번 기록을 건너뛴다: %s", self.path)
+
+    def _lock_is_stale(self) -> bool:
+        try:
+            return time.time() - self.lock_path.stat().st_mtime > self.stale_lock_sec
+        except FileNotFoundError:
+            return False
+
+    def _acquire(self) -> bool:
+        """프로세스 사이 잠금. 오래된 잠금은 지우고 다시 잡는다. 시간 안에 못 잡으면 False."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        deadline = time.monotonic() + self.lock_timeout_sec
+        while True:
+            try:
+                os.close(os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                return True
+            except (FileExistsError, PermissionError):  # Windows: 지우는 중이면 PermissionError
+                if self._lock_is_stale():
+                    logger.warning("오래된 매니페스트 잠금을 지운다: %s", self.lock_path)
+                    self.lock_path.unlink(missing_ok=True)
+                    continue
+                if time.monotonic() >= deadline:
+                    return False
+                self.sleep(_LOCK_POLL_SEC)
+
+    def _release(self) -> None:
+        self.lock_path.unlink(missing_ok=True)
+
+    def _locked_update(self, change: Callable[[], None]) -> None:
+        """잠금 안에서 파일을 다시 읽고 → 고치고 → 쓴다. 잠금 · 읽기에 실패하면 기록을 건너뛴다."""
+        with self._lock:
+            if not self._acquire():
+                logger.warning(
+                    "매니페스트 잠금을 잡지 못해 이번 기록을 건너뛴다: %s", self.lock_path
+                )
+                return
+            try:
+                if not self._refresh(force=True):
+                    return
+                change()
+                self._write()
+            finally:
+                self._release()
 
     def _entry(self, item_id: str) -> dict[str, Any]:
         entry = self._data.setdefault(str(item_id), _empty_entry())
@@ -194,12 +284,12 @@ class Manifest(NullManifest):
     # --- 기록 (수집 · 색인을 마친 뒤에만 부른다) ---
 
     def _update(self, item_id: str, change: Callable[[dict[str, Any]], None]) -> None:
-        with self._lock:
-            self._refresh()
+        def apply() -> None:
             entry = self._entry(item_id)
             change(entry)
             entry["collected_at"] = self.today().isoformat()
-            self._write()
+
+        self._locked_update(apply)
 
     def record_question(self, item_id: str, question: str, queries: list[str]) -> None:
         def change(entry: dict[str, Any]) -> None:
@@ -237,10 +327,10 @@ class Manifest(NullManifest):
         self._update(item_id, change)
 
     def reset(self, item_id: str | None = None) -> None:
-        with self._lock:
-            self._refresh()
+        def apply() -> None:
             if item_id is None:
                 self._data = {}
             else:
                 self._data.pop(str(item_id), None)
-            self._write()
+
+        self._locked_update(apply)
