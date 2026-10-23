@@ -29,6 +29,7 @@
     "app_version": "0.1",
     "project_url": "https://github.com/DevJunz/movie-lab-rag"
   },
+  "logging": {"max_bytes": 1048576, "backup_count": 3, "level": "INFO"},
   "ui": {"evidence_preview_chars": 200},
   "explore": {"candidates": 20, "max_results": 10},
   "domain": {"disclaimer_enabled": false}

@@ -174,6 +174,11 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("pdf_chunk_size", _int_at_least(1)),
         ("pdf_chunk_overlap", _int_at_least(0)),
     ],
+    "logging": [  # SPEC-NF2004 (A-25)
+        ("max_bytes", _int_at_least(1)),
+        ("backup_count", _int_at_least(0)),
+        ("level", lambda v: v in ("DEBUG", "INFO", "WARNING", "ERROR")),
+    ],
     "ui": [  # SPEC-F2008
         ("evidence_preview_chars", _int_at_least(1)),
     ],

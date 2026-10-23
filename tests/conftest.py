@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import socket
 from pathlib import Path
@@ -122,6 +123,17 @@ def movies_small(movies_small_path: Path) -> list[dict]:
 def wiki_small_dir() -> Path:
     """합성 위키 문서: 공유 문서, 동명 동화 문서, 200자 미만 문서, 동음이의 문서 포함."""
     return FIXTURES / "wiki_small"
+
+
+@pytest.fixture(autouse=True)
+def _remove_log_handlers():
+    """스크립트 테스트가 붙인 로그 파일 핸들러를 테스트마다 떼어 낸다 (SPEC-NF2004)."""
+    yield
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if getattr(handler, "movielab", False):
+            root.removeHandler(handler)
+            handler.close()
 
 
 @pytest.fixture

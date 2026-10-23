@@ -18,6 +18,7 @@ from movielab.config import load_settings
 from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
+from movielab.core.logs import configure_from_settings
 from movielab.services.indexing import index_catalog
 
 logger = logging.getLogger(__name__)
@@ -101,7 +102,9 @@ def main(argv: list[str] | None = None) -> int:
 
     labels = None
     try:
-        services = build_services(load_settings())
+        settings = load_settings()
+        configure_from_settings(settings)
+        services = build_services(settings)
         labels = services.profile.labels()
         if args.show:
             return _show(services, args.show)

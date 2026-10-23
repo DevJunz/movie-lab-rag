@@ -13,12 +13,14 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 import time
 from collections.abc import Callable
 from typing import Any
 
 import streamlit as st
+from streamlit.runtime.scriptrunner_utils.exceptions import RerunException, StopException
 
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
@@ -27,6 +29,33 @@ from movielab.ui.components.evidence import render_evidence
 from movielab.ui.components.status import progress_line, render_collect_detail
 
 logger = logging.getLogger(__name__)
+
+
+def safe_run(profile: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """화면 처리 함수를 감싼다 (SPEC-NF2004 §2.2).
+
+    안내 오류는 그 코드의 문구로, 그 밖의 예외는 `GENERIC_ERROR`로 바꿔 보이고
+    traceback은 로그에만 남긴다. Streamlit 제어 예외(`st.stop` · rerun)는 그대로 던진다.
+    """
+
+    def decorate(fn: Callable[..., Any]) -> Callable[..., Any]:
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return fn(*args, **kwargs)
+            except (StopException, RerunException):
+                raise
+            except MovieLabUserError as error:
+                logger.warning("안내 오류: %s", error)
+                st.error(messages.render(error.code, profile.labels()))
+            except Exception:
+                logger.exception("화면 처리 실패")
+                st.error(messages.render("GENERIC_ERROR", profile.labels()))
+            return None
+
+        return wrapper
+
+    return decorate
 
 
 def _histories() -> dict[str, list[dict[str, Any]]]:
@@ -178,6 +207,10 @@ PAGES: dict[str, Callable[..., None]] = {messages.MENU_ASK: _page_ask}
 
 
 def main(services: Any) -> None:
+    safe_run(services.profile)(_main)(services)
+
+
+def _main(services: Any) -> None:
     profile = services.profile
     health = services.health()
     if not health.api_key_ok:  # 키가 없으면 안내하고 멈춘다 (F2012 §3.2)
@@ -196,8 +229,11 @@ def _services() -> Any:
     """실제 서비스 — LLM · Chroma · 그래프를 프로세스에서 한 번만 만든다."""
     from movielab.config import load_settings
     from movielab.container import build_services
+    from movielab.core.logs import configure_from_settings
 
-    return build_services(load_settings())
+    settings = load_settings()
+    configure_from_settings(settings)  # traceback은 logs/movielab.log에만 (NF2004)
+    return build_services(settings)
 
 
 if __name__ == "__main__":

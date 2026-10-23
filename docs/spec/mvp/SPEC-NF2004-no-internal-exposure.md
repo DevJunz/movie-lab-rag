@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **NF2004** 내부 정보 비노출 (보안) |
 | 구분 | MVP (비기능) |
-| 상태 | Draft |
-| 담당 모듈 | `movielab/ui/streamlit_app.py`, `movielab/api/server.py`(F2013), `movielab/core/messages.py`, `.streamlit/config.toml`, 로깅 설정 |
+| 상태 | Done |
+| 담당 모듈 | `movielab/ui/streamlit_app.py`, `movielab/api/server.py`(F2013), `movielab/core/messages.py`, `.streamlit/config.toml`, `movielab/core/logs.py`(로깅 설정) |
 | 선행 SPEC | SPEC-F2012, SPEC-NF2003 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #15 |
 
 ## 1. 요구사항 원문
 
@@ -34,17 +34,24 @@ def safe_run(fn):
 ```
 
 - `MovieLabUserError` 하위 예외(`MissingApiKeyError`, `IndexEmptyError` …) → 해당 안내 코드 문구.
+- `safe_run`은 화면의 최상위(`main`)를 감싼다. 질문 처리처럼 화면 안에서 오류를 직접 안내하는 곳(F2012)은 그대로 두고,
+  그 밖에서 새는 예외(목록 로드 실패 등)를 잡는다. `st.stop()` · rerun 같은 Streamlit 제어 예외는 다시 던진다.
 - 그 밖의 `Exception` → `GENERIC_ERROR` 문구 + `logger.exception(...)`(로그 파일에 traceback).
 - API 서버(F2013)도 같은 규칙: 응답 본문은 `{"error": {"code", "message"}}`만. FastAPI 기본 500 응답을 전역 예외 처리기로 바꾼다.
 
 ### 2.3 로그
 
 - `logs/movielab.log` (회전, `.gitignore`). 키는 가린다(NF2003).
+- `movielab/core/logs.configure_logging(log_path, level)` 한 곳에서 설정한다. 앱(`streamlit_app`)과 스크립트(`scripts/*`)가 시작할 때 부른다.
+  여러 번 불러도 핸들러가 겹치지 않는다. 로그 파일은 `settings.paths.log_file`(01-architecture §6.2), 회전 크기 · 개수 · 기본 레벨은 `settings.logging`(A-25).
+- 로그 기록 전에 비밀 값(`.env`의 키 · 주소)을 `***`로 바꾸는 필터를 붙인다 — 예외 메시지에 키가 섞여도 파일에 남지 않는다.
 - `INFO`: 단계 · 소요 시간 · 수집 문서 제목. `DEBUG`: 프롬프트 · LLM 원문 출력. 기본 레벨은 `INFO`.
 
 ## 3. 가정
 
-없음.
+| ID | 내용 |
+|---|---|
+| A-25 | 로그 파일 회전: 1MB × 3개, 기본 레벨 `INFO` (`settings.logging`) |
 
 ## 4. 인수 조건
 
@@ -65,13 +72,15 @@ def safe_run(fn):
 | TC-NF2004-03 | 통합 | `AppTest`: 질문 처리 후 화면 텍스트 | `[작업:` · `규칙:` 문자열 없음 | 03 | 〃 |
 | TC-NF2004-04 | 단위 | `safe_run`이 예외를 잡을 때 로그 | `caplog`에 traceback 기록 | 04 | `tests/unit/test_safe_run.py` |
 | TC-NF2004-05 | 단위 | `.streamlit/config.toml` 파싱 | `client.showErrorDetails`가 끔 값 | 05 | `tests/unit/test_streamlit_config.py` |
+| TC-NF2004-07 | 단위 | `configure_logging` 두 번 호출 · 키가 든 메시지 기록 | 핸들러 하나, 파일에 키 문자열 없고 `***` | 04 | `tests/unit/test_logs.py` |
+| TC-NF2004-08 | 통합 | `AppTest`: 항목 목록 로드가 `RuntimeError("boom C:\\secret")` | `GENERIC_ERROR`만, 예외 문자열 없음 | 01 | `tests/integration/test_ui_no_leak.py` |
 | TC-NF2004-06 | 수동 | `.env` 없이 실행, 일부러 오류 발생 | 화면 캡처에 내부 정보 없음 | 01, 02 | 스크린샷 |
 
 ## 6. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.7-4 | 오류 상황 화면 캡처 | `docs/verification/screenshots/V4.7-4_error.png` |
+| V4.7-4 | 실제 서비스로 화면 함수를 `AppTest`로 실행: 키 없음 · 서비스 예외 상황의 화면 텍스트와 로그 파일 내용(키 · traceback 위치) 기록. 브라우저 캡처는 수동 단계 | `docs/verification/evidence/V4.7-4_no_leak.txt` |
 
 ## 7. 범위 밖
 

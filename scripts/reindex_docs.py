@@ -15,6 +15,7 @@ from movielab.config import chunking_ok, load_settings
 from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
+from movielab.core.logs import configure_from_settings
 from movielab.services.indexing import reindex_documents
 from scripts.index_meta import configure_stdout, integer
 
@@ -32,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     labels = None
     try:
         settings = load_settings()
+        configure_from_settings(settings)
         chunking = settings.chunking
         size = chunking.chunk_size if args.chunk_size is None else args.chunk_size
         overlap = chunking.chunk_overlap if args.chunk_overlap is None else args.chunk_overlap
