@@ -49,10 +49,19 @@ def _count(services) -> int:
     return 0
 
 
-def _index(services, rebuild: bool, batch_size: int) -> int:
-    report = index_catalog(
-        services.catalog, services.store, services.settings, rebuild=rebuild, batch_size=batch_size
-    )
+def positive_int(value: str) -> int:
+    """argparse 형식 검사: 1 이상의 정수만 받는다 (0 · 음수는 인자 오류, 종료 코드 2)."""
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"정수가 아닙니다: {value}") from None
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"1 이상이어야 합니다: {value}")
+    return number
+
+
+def _index(services, rebuild: bool, batch_size: int | None) -> int:
+    report = index_catalog(services.catalog, services.store, rebuild=rebuild, batch_size=batch_size)
     print(
         messages.render(
             "INDEX_REPORT",
@@ -61,6 +70,8 @@ def _index(services, rebuild: bool, batch_size: int) -> int:
             skipped=report.skipped,
         )
     )
+    if report.removed:
+        print(messages.render("INDEX_REMOVED", removed=report.removed))
     if report.failed_batches:
         print(messages.render("INDEX_FAILED_BATCHES", batches=report.failed_batches))
     if not report.ok:
@@ -74,7 +85,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--show", metavar="ITEM_ID", help="색인 텍스트를 출력할 항목 ID")
     parser.add_argument("--count", action="store_true", help="현재 색인 건수만 출력")
     parser.add_argument("--rebuild", action="store_true", help="컬렉션을 지우고 다시 색인")
-    parser.add_argument("--batch-size", type=int, default=100, help="임베딩 배치 크기")
+    parser.add_argument(
+        "--batch-size",
+        type=positive_int,
+        default=None,
+        help="이번 실행의 배치 크기 (기본: settings.json의 indexing.batch_size)",
+    )
     args = parser.parse_args(argv)
     configure_stdout()
 

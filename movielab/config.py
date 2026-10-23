@@ -115,6 +115,23 @@ class Settings:
         return (value if value.is_absolute() else REPO_ROOT / value).resolve()
 
 
+def _validate(raw: dict[str, Any], source: Path) -> None:
+    """시작할 때 잡아야 하는 값 오류. 묶음별 규칙은 해당 SPEC에서 더한다."""
+    indexing = raw.get("indexing", {})
+    rules = [
+        ("indexing.batch_size", indexing.get("batch_size", 1), lambda v: int(v) >= 1),
+        ("indexing.retries", indexing.get("retries", 0), lambda v: int(v) >= 0),
+        ("indexing.retry_wait_sec", indexing.get("retry_wait_sec", 0), lambda v: float(v) >= 0),
+    ]
+    for name, value, ok in rules:
+        try:
+            valid = ok(value)
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            raise SettingsError(f"설정 값 오류: {name}={value!r} ({source})")
+
+
 def load_settings(path: str | Path | None = None) -> Settings:
     """설정 파일과 비밀 값을 읽는다.
 
@@ -129,6 +146,7 @@ def load_settings(path: str | Path | None = None) -> Settings:
         raise SettingsError(f"설정 파일이 없다: {chosen}") from exc
     except json.JSONDecodeError as exc:
         raise SettingsError(f"설정 파일 형식 오류: {chosen} ({exc.msg})") from exc
+    _validate(raw, chosen)
     for key, env_name in MODEL_ENV.items():
         override = _get(env, env_name)
         if override:

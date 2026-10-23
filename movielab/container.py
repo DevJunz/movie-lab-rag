@@ -63,7 +63,9 @@ class Services:
                 path=str(self.settings.path("chroma_dir")),
                 settings=ChromaSettings(anonymized_telemetry=False),
             )
-            self._store = VectorStore(client, lambda: self.embeddings, self.settings)
+            self._store = VectorStore(
+                client, self.settings, embeddings_factory=lambda: self.embeddings
+            )
         return self._store
 
 

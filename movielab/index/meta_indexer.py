@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
 
+import openai
 from langchain_core.documents import Document
 
 from movielab.core.errors import MovieLabUserError
@@ -12,8 +15,16 @@ from movielab.index.store import VectorStore
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BATCH_SIZE = 100
-RETRIES = 1  # 배치 하나당 재시도 횟수
+# 다시 해도 같은 결과인 오류 — 재시도하지 않고 바로 알린다 (SPEC-F2002 §3.1-5)
+UNRECOVERABLE = (
+    MovieLabUserError,
+    openai.AuthenticationError,
+    openai.PermissionDeniedError,
+    openai.BadRequestError,
+    openai.NotFoundError,
+    ValueError,
+    TypeError,
+)
 
 
 def _document(item: ItemRecord) -> Document:
@@ -25,23 +36,30 @@ def index_items(
     items: list[ItemRecord],
     *,
     collection: str,
-    batch_size: int = DEFAULT_BATCH_SIZE,
+    batch_size: int,
+    retries: int,
+    retry_wait_sec: float,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[int]:
     """배치로 나눠 upsert 한다. 재시도 후에도 실패한 배치 번호(0부터)를 돌려준다.
 
     실패한 배치가 있어도 나머지 배치는 넣는다 — 다시 실행하면 빠진 것만 채워진다.
     """
+    if batch_size < 1:
+        raise ValueError(f"batch_size는 1 이상이어야 한다: {batch_size}")
     failed: list[int] = []
     for number, start in enumerate(range(0, len(items), batch_size)):
-        batch = items[start : start + batch_size]
-        for attempt in range(RETRIES + 1):
+        documents = [_document(item) for item in items[start : start + batch_size]]
+        for attempt in range(retries + 1):
             try:
-                store.upsert(collection, [_document(i) for i in batch], [i.item_id for i in batch])
+                store.upsert(collection, documents)
                 break
-            except MovieLabUserError:
-                raise  # 키 없음 등 안내가 필요한 오류는 재시도하지 않고 그대로 알린다
+            except UNRECOVERABLE:
+                raise
             except Exception:
                 logger.exception("메타 색인 배치 %d 실패 (시도 %d)", number, attempt + 1)
+                if attempt < retries:
+                    sleep(retry_wait_sec)
         else:
             failed.append(number)
     return failed

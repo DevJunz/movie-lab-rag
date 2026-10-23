@@ -11,24 +11,32 @@ from typing import Any
 from chromadb.errors import NotFoundError
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
 
 DISTANCE = "cosine"  # A-19
 
 
 class VectorStore:
     def __init__(
-        self, client: Any, embeddings: Embeddings | Callable[[], Embeddings], settings: Any
+        self,
+        client: Any,
+        settings: Any,
+        *,
+        embeddings: Any = None,
+        embeddings_factory: Callable[[], Any] | None = None,
     ) -> None:
+        """임베딩 객체 또는 팩토리 중 하나를 받는다. 팩토리는 처음 필요할 때 한 번만 부른다."""
         self.client = client
         self.settings = settings
         self._embeddings = embeddings
+        self._factory = embeddings_factory
         self._collections: dict[str, Chroma] = {}
 
     @property
-    def embeddings(self) -> Embeddings:
-        if not isinstance(self._embeddings, Embeddings):
-            self._embeddings = self._embeddings()
+    def embeddings(self) -> Any:
+        if self._embeddings is None:
+            if self._factory is None:
+                raise ValueError("VectorStore에 임베딩이 없다")
+            self._embeddings = self._factory()
         return self._embeddings
 
     def collection(self, name: str) -> Chroma:
@@ -52,6 +60,10 @@ class VectorStore:
         raw = self._raw(name)
         return raw.count() if raw is not None else 0
 
+    def ids(self, name: str) -> list[str]:
+        raw = self._raw(name)
+        return list(raw.get(include=[])["ids"]) if raw is not None else []
+
     def distance(self, name: str) -> str | None:
         raw = self._raw(name)
         return (raw.metadata or {}).get("hnsw:space") if raw is not None else None
@@ -68,9 +80,14 @@ class VectorStore:
             )
         ]
 
-    def upsert(self, name: str, documents: list[Document], ids: list[str]) -> None:
-        """같은 ID는 덮어쓴다 (재색인해도 건수가 늘지 않는다)."""
-        self.collection(name).add_documents(documents, ids=ids)
+    def upsert(self, name: str, documents: list[Document]) -> None:
+        """ID는 `Document.id`. 같은 ID는 덮어쓴다 (재색인해도 건수가 늘지 않는다)."""
+        self.collection(name).add_documents(documents, ids=[doc.id for doc in documents])
+
+    def delete_ids(self, name: str, ids: list[str]) -> None:
+        raw = self._raw(name)
+        if raw is not None and ids:
+            raw.delete(ids=list(ids))
 
     def delete_collection(self, name: str) -> None:
         if self._raw(name) is not None:

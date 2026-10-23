@@ -32,7 +32,11 @@ TEMPLATES: dict[str, str] = {
     # 색인 스크립트 출력 (F2002)
     "INDEX_REPORT": "로드 {loaded}건 / 색인 {indexed}건 / 건너뜀 {skipped}건",
     "INDEX_FAILED_BATCHES": "실패한 배치: {batches} — 다시 실행하면 빠진 항목만 채워집니다.",
-    "INDEX_MISMATCH": "로드한 항목 수와 색인 건수가 맞지 않습니다. 로그(logs/)를 확인하세요.",
+    "INDEX_MISMATCH": (
+        "로드한 항목 수와 색인 건수가 맞지 않습니다. 로그(logs/)를 확인하고, "
+        "계속 맞지 않으면 --rebuild로 색인을 다시 만드세요."
+    ),
+    "INDEX_REMOVED": "데이터에서 빠진 항목의 문서 {removed}건을 지웠습니다.",
 }
 
 DEFAULT_LABELS = {"item_label": "항목"}
