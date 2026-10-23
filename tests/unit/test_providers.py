@@ -47,3 +47,9 @@ def test_tc_nf2003_01_embeddings_timeout_and_no_tokenizer_download(monkeypatch):
     emb = make_embeddings(load_settings())
     assert emb.request_timeout == 60
     assert emb.check_embedding_ctx_length is False
+
+
+def test_tc_f2002_19_embeddings_sdk_retries_disabled(monkeypatch):
+    monkeypatch.setenv("GMS_API_KEY", FAKE_KEY)
+    monkeypatch.setenv("GMS_BASE_URL", "https://gms.example.invalid/v1")
+    assert make_embeddings(load_settings()).max_retries == 0

@@ -136,3 +136,31 @@ def test_tc_f2002_14_batch_size_must_be_positive(tmp_settings, monkeypatch, valu
     with pytest.raises(SystemExit) as exit_info:
         index_meta.main(["--batch-size", value])
     assert exit_info.value.code == 2
+
+
+def test_tc_f2002_11_invalid_key_message_and_index_kept(
+    tmp_settings, tmp_path, monkeypatch, capsys
+):
+    import httpx
+    import openai
+
+    from tests.fakes import FakeEmbeddings
+
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path)
+    assert index_meta.main([]) == 0
+    capsys.readouterr()
+
+    def auth_error():
+        request = httpx.Request("POST", "https://gms.example.invalid/v1/embeddings")
+        return openai.AuthenticationError(
+            "bad", response=httpx.Response(401, request=request), body=None
+        )
+
+    bad = FakeEmbeddings(fail_when=lambda texts: True, error=auth_error)
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path, bad)
+    assert index_meta.main(["--rebuild"]) == 1
+    out = capsys.readouterr().out
+    assert "올바르지 않" in out and "잠시 후" not in out and "Traceback" not in out
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path)
+    assert index_meta.main(["--count"]) == 0
+    assert "movie_meta: 12" in capsys.readouterr().out

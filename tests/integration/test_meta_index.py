@@ -97,3 +97,69 @@ def test_tc_f2002_13_items_removed_from_data_are_deleted(services):
     assert services.store.count("movie_meta") == 11
     assert "670" not in services.store.ids("movie_meta")
     assert (report.indexed, report.removed) == (11, 1) and report.ok
+
+
+# --- 재리뷰: 기존 색인을 잃지 않는다 (AC-F2002-07) ---
+
+
+def _auth_error():
+    import httpx
+    import openai
+
+    request = httpx.Request("POST", "https://gms.example.invalid/v1/embeddings")
+    return openai.AuthenticationError(
+        "bad key", response=httpx.Response(401, request=request), body=None
+    )
+
+
+def _collection_names(services):
+    return sorted(c.name for c in services.store.client.list_collections())
+
+
+def test_tc_f2002_11_rebuild_success_swaps_collection(services):
+    _index(services)
+    report = _index(services, rebuild=True)
+    assert report.ok and services.store.count("movie_meta") == 12
+    assert _collection_names(services) == ["movie_meta"]
+
+
+def test_tc_f2002_11_rebuild_failure_keeps_old_index(tmp_settings):
+    good = build_services(tmp_settings, embeddings=FakeEmbeddings())
+    _index(good)
+    broken = build_services(tmp_settings, embeddings=FakeEmbeddings(fail_when=lambda texts: True))
+    report = _index(broken, rebuild=True)
+    assert not report.ok and report.failed_batches
+    assert broken.store.count("movie_meta") == 12
+    assert _collection_names(broken) == ["movie_meta"]
+
+
+def test_tc_f2002_11_rebuild_with_invalid_key_keeps_old_index(tmp_settings):
+    from movielab.core.errors import InvalidApiKeyError
+
+    _index(build_services(tmp_settings, embeddings=FakeEmbeddings()))
+    bad = build_services(
+        tmp_settings, embeddings=FakeEmbeddings(fail_when=lambda texts: True, error=_auth_error)
+    )
+    with pytest.raises(InvalidApiKeyError) as error:
+        _index(bad, rebuild=True)
+    assert error.value.code == "API_KEY_INVALID"
+    assert bad.store.count("movie_meta") == 12
+    assert _collection_names(bad) == ["movie_meta"]
+
+
+def test_tc_f2002_16_empty_catalog_stops_and_keeps_index(services):
+    from movielab.core.errors import DataEmptyError
+
+    _index(services)
+    empty = Catalog(lambda: LoadResult(items=[], skipped=3))
+    for rebuild in (False, True):
+        with pytest.raises(DataEmptyError):
+            index_catalog(empty, services.store, rebuild=rebuild, sleep=FakeClock().sleep)
+    assert services.store.count("movie_meta") == 12
+
+
+def test_tc_f2002_14_invalid_batch_size_checked_before_anything(services):
+    _index(services)
+    with pytest.raises(ValueError):
+        _index(services, rebuild=True, batch_size=0)
+    assert services.store.count("movie_meta") == 12

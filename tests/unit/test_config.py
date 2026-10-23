@@ -156,3 +156,25 @@ def test_tc_f2002_14_default_indexing_settings():
     assert settings.indexing.batch_size == 100  # A-21
     assert settings.indexing.retries == 1
     assert settings.indexing.retry_wait_sec == 2.0
+
+
+@pytest.mark.parametrize(
+    "indexing",
+    [
+        None,
+        {"batch_size": "100", "retries": 1, "retry_wait_sec": 2.0},
+        {"batch_size": 1.5, "retries": 1, "retry_wait_sec": 2.0},
+        {"batch_size": True, "retries": 1, "retry_wait_sec": 2.0},
+        {"batch_size": 100, "retries": True, "retry_wait_sec": 2.0},
+        {"batch_size": 100, "retries": 1, "retry_wait_sec": "2"},
+    ],
+)
+def test_tc_f2002_17_indexing_types_checked(tmp_path: Path, indexing):
+    from movielab.config import SettingsError
+
+    raw = json.loads((REPO_ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    raw["indexing"] = indexing
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(SettingsError):
+        load_settings(path)

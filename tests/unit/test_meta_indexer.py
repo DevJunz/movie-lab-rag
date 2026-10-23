@@ -74,3 +74,11 @@ def test_tc_f2002_12_auth_error_not_retried():
     with pytest.raises(openai.AuthenticationError):
         _run(store)
     assert store.calls == 1
+
+
+def test_tc_f2002_18_truncated_json_response_is_retried():
+    import json
+
+    store = FlakyStore([json.JSONDecodeError("잘린 응답", "{", 1)])
+    failed, clock = _run(store)
+    assert failed == [] and store.calls == 2 and clock.sleeps == [1.5]
