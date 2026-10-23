@@ -426,3 +426,44 @@ def test_tc_nf2002_26_record_collection_all_or_nothing(tmp_path):
     assert fresh.item_doc_page_id("1") == "2"
     assert fresh.has_keyword("1", "블랙홀")
     assert fresh.cached_queries("1", "블랙홀은?") == ["블랙홀"]
+
+
+# --- 여섯 번째 리뷰: 빈 기록 · 스칼라 필드 검증 · 백업 재시도 ---
+
+
+def test_tc_nf2002_27_empty_collection_writes_nothing(tmp_path):
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest(path)
+    assert manifest.record_collection("1") is True
+    assert not path.exists()
+    assert manifest.has_any("1") is False
+
+
+def test_tc_nf2002_27_bad_scalar_field_backed_up(tmp_path):
+    import json
+
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps({"1": {"keywords": [], "chunks": "x"}}), encoding="utf-8")
+    manifest = make_manifest(path)
+    assert len(list(tmp_path.glob("manifest.json.broken-*"))) == 1
+    assert manifest.record_keyword("1", "블랙홀") is True
+
+
+def test_tc_nf2002_27_backup_retried_on_permission_error(tmp_path, monkeypatch):
+    import os
+
+    path = tmp_path / "manifest.json"
+    path.write_text("{깨짐", encoding="utf-8")
+    original = os.replace
+    state = {"fail": 1}
+
+    def flaky(src, dst):
+        if ".broken-" in str(dst) and state["fail"] > 0:
+            state["fail"] -= 1
+            raise PermissionError("다른 프로세스가 읽는 중")
+        return original(src, dst)
+
+    monkeypatch.setattr(os, "replace", flaky)
+    make_manifest(path).record_keyword("1", "블랙홀")
+    assert len(list(tmp_path.glob("manifest.json.broken-*"))) == 1
+    assert make_manifest(path).has_keyword("1", "블랙홀")
