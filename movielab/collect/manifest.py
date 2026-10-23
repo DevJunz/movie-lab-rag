@@ -141,19 +141,19 @@ class NullManifest:
     def title_of(self, item_id: str, page_id: str) -> str | None:
         return None
 
-    def record_question(self, item_id: str, question: str, queries: list[str]) -> None:
-        pass
+    def record_question(self, item_id: str, question: str, queries: list[str]) -> bool:
+        return True
 
-    def record_keyword(self, item_id: str, query: str) -> None:
-        pass
+    def record_keyword(self, item_id: str, query: str) -> bool:
+        return True
 
-    def record_item_doc(self, item_id: str, page_id: str) -> None:
-        pass
+    def record_item_doc(self, item_id: str, page_id: str) -> bool:
+        return True
 
     def record_page(
         self, item_id: str, page_id: str, title: str, chunks: int, *, rejected: bool = False
-    ) -> None:
-        pass
+    ) -> bool:
+        return True
 
     def reset(self, item_id: str | None = None) -> bool:
         return True
@@ -228,7 +228,9 @@ class Manifest(NullManifest):
         """수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 — 파일 ID · 크기도 본다."""
         try:
             stat = path.stat()
-        except FileNotFoundError:
+        except (
+            OSError
+        ):  # 없음 · 접근 거부 — 알 수 없는 서명으로 본다 (캐시로 수집을 실패시키지 않는다)
             return None
         return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
@@ -287,6 +289,7 @@ class Manifest(NullManifest):
         """조회용(잠금 없음): 파일이 바뀌었으면 다시 읽는다. 반환: 깨진 파일을 새로 봤는지.
 
         읽기에 실패하거나 깨졌으면 그 서명을 기억해, 파일이 다시 바뀔 때까지 재시도하지 않는다.
+        읽기에 실패하면 옛 내용을 믿지 않고 빈 매니페스트로 둔다 (다른 쪽의 초기화를 놓치지 않게).
         """
         signature = self._signature_of(self.path)
         if self._valid_cache and signature == self._signature:
@@ -294,8 +297,8 @@ class Manifest(NullManifest):
         try:
             status, value = self._load()
         except OSError as exc:
-            logger.warning("매니페스트를 읽지 못해 지금 내용을 유지한다: %s", exc)
-            self._signature, self._valid_cache = signature, True
+            logger.warning("매니페스트를 읽지 못해 이번에는 캐시 없이 동작한다: %s", exc)
+            self._data, self._signature, self._valid_cache = {}, signature, True
             return False
         self._remember(status, value, signature)
         return status == "broken"
@@ -413,36 +416,36 @@ class Manifest(NullManifest):
 
     # --- 기록 (수집 · 색인을 마친 뒤에만 부른다) ---
 
-    def _update(self, item_id: str, change: Callable[[dict[str, Any]], None]) -> None:
+    def _update(self, item_id: str, change: Callable[[dict[str, Any]], None]) -> bool:
         def apply() -> None:
             entry = self._entry(item_id)
             change(entry)
             entry["collected_at"] = self.today().isoformat()
 
-        self._locked_update(apply)
+        return self._locked_update(apply)
 
-    def record_question(self, item_id: str, question: str, queries: list[str]) -> None:
+    def record_question(self, item_id: str, question: str, queries: list[str]) -> bool:
         def change(entry: dict[str, Any]) -> None:
             entry["questions"][normalize_key(question)] = list(queries)
 
-        self._update(item_id, change)
+        return self._update(item_id, change)
 
-    def record_keyword(self, item_id: str, query: str) -> None:
+    def record_keyword(self, item_id: str, query: str) -> bool:
         def change(entry: dict[str, Any]) -> None:
             if normalize_key(query) not in {normalize_key(k) for k in entry["keywords"]}:
                 entry["keywords"].append(query)
 
-        self._update(item_id, change)
+        return self._update(item_id, change)
 
-    def record_item_doc(self, item_id: str, page_id: str) -> None:
+    def record_item_doc(self, item_id: str, page_id: str) -> bool:
         def change(entry: dict[str, Any]) -> None:
             entry["item_doc_page_id"] = str(page_id)
 
-        self._update(item_id, change)
+        return self._update(item_id, change)
 
     def record_page(
         self, item_id: str, page_id: str, title: str, chunks: int, *, rejected: bool = False
-    ) -> None:
+    ) -> bool:
         page_id = str(page_id)
 
         def change(entry: dict[str, Any]) -> None:
@@ -454,7 +457,7 @@ class Manifest(NullManifest):
                 entry["titles"].append(title)
                 entry["chunks"] = int(entry.get("chunks") or 0) + int(chunks)
 
-        self._update(item_id, change)
+        return self._update(item_id, change)
 
     def reset(self, item_id: str | None = None) -> bool:
         """캐시를 지운다. 반환: 지웠는지 (잠금 · 읽기 · 쓰기 실패면 False)."""

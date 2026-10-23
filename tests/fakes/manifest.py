@@ -23,14 +23,17 @@ class RecordingManifest(NullManifest):
         self.pages: list[tuple[str, int]] = []
         self.questions: list[str] = []
 
-    def record_keyword(self, item_id: str, query: str) -> None:
+    def record_keyword(self, item_id: str, query: str) -> bool:
         self.keywords.append(query)
+        return True
 
-    def record_page(self, item_id, page_id, title, chunks, *, rejected=False) -> None:
+    def record_page(self, item_id, page_id, title, chunks, *, rejected=False) -> bool:
         self.pages.append((str(page_id), chunks))
+        return True
 
-    def record_question(self, item_id, question, queries) -> None:
+    def record_question(self, item_id, question, queries) -> bool:
         self.questions.append(question)
+        return True
 
 
 _CACHE_KEYS = ("lock_timeout_sec", "lock_poll_sec", "io_retries", "io_retry_wait_sec")
