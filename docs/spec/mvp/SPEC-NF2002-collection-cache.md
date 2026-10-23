@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2002** 수집 캐시 (성능) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/collect/manifest.py`, `movielab/collect/collector.py` |
 | 선행 SPEC | SPEC-F2004 |
 | 관련 ISSUE | #8 |
@@ -45,6 +45,7 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
 
 - 쓰기는 임시 파일에 쓴 뒤 `os.replace`로 바꾼다(중간에 끊겨도 깨진 JSON이 남지 않음).
 - 파일이 없으면 빈 매니페스트로 시작한다. JSON이 깨져 있으면 `manifest.json.broken-<시각>`으로 옮겨 두고 빈 매니페스트로 시작하며 경고 로그를 남긴다.
+- 캐시를 지우는 명령: `python -m scripts.collect --reset-cache [--movie-id ID]` (LLM · 키 없이 동작, `Services.manifest`).
 - 매니페스트와 Chroma가 어긋나는 경우(사용자가 `data/chroma`만 지운 경우)를 위해 `scripts.collect --reset-cache [--movie-id]`로 캐시를 지울 수 있다.
   또한 질문 캐시 적중이지만 `wiki_docs`에 그 영화 청크가 0개면 캐시를 믿지 않고 다시 수집한다. 청크 수는 `Collector`에 주입한 `chunk_counter(item_id)`로 확인한다(색인기는 F2005에서 연결 — 주입되지 않으면 이 확인을 건너뛴다).
 - 매니페스트 형식에 `item_doc_page_id`(항목 자체 문서의 page_id)를 더한다.
@@ -99,7 +100,7 @@ class Manifest:
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-3, V4.7-2 | 같은 질문 2회의 진행 상태 · 시간 비교 캡처 | `docs/verification/screenshots/V4.2-3_cache.png` |
+| V4.2-3, V4.7-2 | 같은 질문 2회 실제 실행 결과(2회차 CACHE_HIT, 외부 호출 0) — 화면의 진행 상태 캡처는 F2012 이후 | `docs/verification/evidence/V4.2-3_cache.txt` |
 
 ## 8. 범위 밖
 
