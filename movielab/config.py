@@ -179,6 +179,10 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("backup_count", _int_at_least(0)),
         ("level", lambda v: v in ("DEBUG", "INFO", "WARNING", "ERROR")),
     ],
+    "latency": [  # SPEC-NF2001 (A-10)
+        ("cached_target_sec", _number_at_least(0, strict=True)),
+        ("first_target_sec", _number_at_least(0, strict=True)),
+    ],
     "ui": [  # SPEC-F2008
         ("evidence_preview_chars", _int_at_least(1)),
     ],

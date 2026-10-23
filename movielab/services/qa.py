@@ -48,10 +48,17 @@ class QAService:
             raise ItemNotFoundError(f"항목 없음: {movie_id}")
         report = self.collector.collect(item, question, on_progress)
         collected = self.clock()
+        timings: dict[str, float] = {"collect": collected - started}
         state = run_graph(
-            self.graph, {"movie_id": item.item_id, "question": question, "task": "qa"}, on_progress
+            self.graph,
+            {"movie_id": item.item_id, "question": question, "task": "qa"},
+            on_progress,
+            timings=timings,
+            clock=self.clock,
         )
         answer, evidences = state["answer"], state["contexts"]
+        timings.setdefault("retrieve", 0.0)
+        timings.setdefault("generate", 0.0)
         cited = select_cited(answer, evidences)
         return AnswerResult(
             answer=answer,
@@ -62,5 +69,5 @@ class QAService:
             collect=report,
             no_external=bool(state.get("no_external")),
             notices=list(report.notices),
-            timings={"collect": collected - started, "total": self.clock() - started},
+            timings={**timings, "total": self.clock() - started},
         )

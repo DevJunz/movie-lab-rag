@@ -457,3 +457,61 @@ def test_tc_f2014_04_compare_retrieval_writes_table(tmp_settings, tmp_path, monk
     for metric in ("서로 다른 문서 수", "평균 코사인 유사도", "겹침 수"):
         assert metric in text
     assert QUERY in text and "Traceback" not in capsys.readouterr().out
+
+
+def test_tc_nf2001_06_measure_latency_table(tmp_settings, tmp_path, monkeypatch, capsys):
+    import json
+
+    from scripts import measure_latency
+
+    questions = tmp_path / "questions.json"
+    questions.write_text(
+        json.dumps(
+            [
+                {"id": "Q1", "movie_id": "157336", "question": "블랙홀은?", "purpose": "t"},
+                {"id": "Q6", "movie_id": "157336", "question": "렌즈?", "purpose": "확인 불가"},
+            ],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeQA:
+        def __init__(self):
+            self.calls = []
+
+        def ask(self, movie_id, question, on_progress=None):
+            from movielab.core.types import AnswerResult, CollectReport
+
+            self.calls.append((movie_id, question))
+            timings = {"collect": 1.0, "retrieve": 0.5, "generate": 2.0, "total": 3.5}
+            return AnswerResult(
+                answer="a", evidences=[], cited=[], uncited=True, not_found=False,
+                collect=CollectReport(item_id=movie_id, question=question), timings=timings,
+            )  # fmt: skip
+
+    class FakeManifest:
+        def __init__(self):
+            self.resets = []
+
+        def reset(self, movie_id=None):
+            self.resets.append(movie_id)
+            return True
+
+    class FakeServices:
+        def __init__(self, settings):
+            self.settings = settings
+            self.qa = FakeQA()
+            self.manifest = FakeManifest()
+
+    services = FakeServices(tmp_settings)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(measure_latency, "build_services", lambda s: services)
+    output = tmp_path / "latency.md"
+    args = ["--questions", str(questions), "--runs", "2", "--output", str(output)]
+    assert measure_latency.main(args) == 0
+    table = output.read_text(encoding="utf-8")
+    assert "| Q1 |" in table and "| Q6 |" not in table  # Q6은 측정하지 않는다
+    assert "중앙값" in table and "목표" in table and "10" in table and "45" in table
+    assert services.manifest.resets == ["157336"]  # 처음 1회는 캐시를 비우고
+    assert len(services.qa.calls) == 3  # 처음 1 + 캐시 적중 2
