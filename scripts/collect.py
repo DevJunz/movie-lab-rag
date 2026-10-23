@@ -17,7 +17,7 @@ from movielab.config import load_settings
 from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
-from scripts.index_meta import configure_stdout
+from scripts.index_meta import configure_stdout, positive_int
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,14 @@ def _print_report(report) -> None:
         print(f"안내 코드: {', '.join(report.notices)}")
 
 
+def _print_evidence(result) -> None:
+    """근거 목록 (SPEC-F2006 V4.3-1): 번호 · 출처 유형 · 제목 · 점수."""
+    print("근거:")
+    for evidence in result.evidences:
+        score = "" if evidence.score is None else f" · 점수 {evidence.score:.3f}"
+        print(f"[근거 {evidence.n}] {evidence.source_type} · {evidence.title}{score}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="외부 문서 수집")
     parser.add_argument("--movie-id", help="항목 ID")
@@ -54,6 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="색인 · 캐시 기록 없이 수집 결과만 확인"
     )
+    parser.add_argument("--show-evidence", action="store_true", help="수집 뒤 근거 목록 출력")
+    parser.add_argument("--top-k", type=positive_int, help="근거 검색 수 (이번 실행만)")
     args = parser.parse_args(argv)
     if not args.reset_cache and not (args.movie_id and args.question):
         parser.error("--movie-id와 --question이 필요합니다 (또는 --reset-cache)")
@@ -81,6 +91,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         collector = services.make_collector(dry_run=args.dry_run)
         _print_report(collector.collect(item, args.question))
+        if args.show_evidence:
+            _print_evidence(
+                services.retriever(top_k=args.top_k).retrieve(item.item_id, args.question)
+            )
         return 0
     except MovieLabUserError as error:
         logger.warning("안내 오류: %s", error)
