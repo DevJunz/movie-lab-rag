@@ -1,0 +1,23 @@
+# V4.7-7 출처와 이용 조건 (SPEC-NF2007)
+생성일: 2026-10-23
+
+## 기록 (README.md `## 데이터 출처와 이용 조건`)
+- 영화 메타데이터: TMDB 기반 SSAFY 가공본, 교육 · 비상업, TMDB 고지 문구, 원본 미포함
+- 한국어 위키백과: https://ko.wikipedia.org, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/deed.ko), API 수집 · collected_at, 2차 저작물 고지
+- 제공 문서 묶음: 2026-09 스냅샷, CC BY-SA 4.0, 원본 미포함
+- PDF(F2016): pdf_manifest.json에 파일별 기록
+
+## 지키기 (데이터)
+- 위키 청크 메타데이터: url · source · license · collected_at (TC-NF2007-03)
+- 위키 근거(Evidence): title · url · license="CC BY-SA 4.0" (TC-NF2007-02)
+- DomainProfile.attribution_notice: "영화 정보: TMDB · 문서: 한국어 위키백과(CC BY-SA 4.0). 답변은 문서를 바탕으로 생성한 요약이며 원문과 다를 수 있습니다." (TC-NF2007-04)
+
+## 테스트 결과
+tests/unit/test_license_docs.py::test_tc_nf2007_01_readme_source_section PASSED
+tests/unit/test_license_docs.py::test_tc_nf2007_04_attribution_notice PASSED
+tests/unit/test_license_docs.py::test_tc_nf2007_05_fixtures_are_synthetic PASSED
+tests/integration/test_source_license.py::test_tc_nf2007_03_all_wiki_chunks_keep_source_and_license PASSED
+tests/integration/test_source_license.py::test_tc_nf2007_02_wiki_evidence_has_title_url_license PASSED
+5 passed
+
+화면(근거 목록 라이선스 표시, 사이드바 고지) 캡처는 SPEC-F2008 · F2009 증빙을 따른다.

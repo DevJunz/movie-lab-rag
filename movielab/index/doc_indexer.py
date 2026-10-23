@@ -53,6 +53,7 @@ class DocIndexer:
             "page_id": str(doc.page_id),
             "title": doc.title,
             "url": doc.url,
+            "source": doc.source,  # 출처 보존 (SPEC-NF2007 §2.2)
             "related_movie": doc.related_movie,
             "search_query": doc.search_query,
             "collected_at": doc.collected_at,
