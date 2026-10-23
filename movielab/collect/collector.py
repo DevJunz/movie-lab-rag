@@ -215,6 +215,7 @@ class Collector:
             targets.append((item_doc, True))
         targets += [(c, False) for c in selection.selected]
         documents: list[SourceDocument] = []
+        empty_item_doc_id: str | None = None
         for number, (candidate, is_item_doc) in enumerate(targets, start=1):
             progress("fetch", title=candidate.title, current=number, total=len(targets))
             try:
@@ -231,6 +232,8 @@ class Collector:
             too_short = len(doc.text) < int(collect_settings.min_doc_chars)
             if (too_short and not is_item_doc) or not doc.text.strip():
                 report.rejected.append(Rejection(candidate.page_id, candidate.title, "too_short"))
+                if is_item_doc:  # 빈 항목 자체 문서 — 다음 질문에서 다시 찾거나 받지 않게 ID는 기록
+                    empty_item_doc_id = candidate.page_id
                 continue
             doc = dataclasses.replace(
                 doc,
@@ -244,7 +247,7 @@ class Collector:
 
         # 7. 색인 (F2005 색인기가 연결되면) — 키 없음 같은 안내 오류는 모든 문서에 같으므로 알린다
         recorded_pages: list[tuple[str, str, int]] = []
-        item_doc_page_id: str | None = None
+        item_doc_page_id: str | None = empty_item_doc_id
         for doc in documents:
             progress("index", title=doc.title)
             if self.indexer is None:

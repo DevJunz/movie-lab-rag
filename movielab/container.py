@@ -139,6 +139,7 @@ class Services:
         """
         settings = self.settings
         api_source = WikiApiSource(self.wiki_client) if settings.secrets.wiki_contact else None
+        indexer = None if dry_run else self.doc_indexer()  # 색인 · 대조가 같은 청크 설정을 쓴다
         return Collector(
             api_source=api_source,
             bundle_source=self.bundle_source,
@@ -148,8 +149,8 @@ class Services:
             profile=self.profile,
             settings=settings,
             manifest=None if dry_run else self.manifest,
-            indexer=None if dry_run else self.doc_indexer().index_document,
-            indexed_pages=None if dry_run else self.doc_indexer().page_ids,
+            indexer=None if indexer is None else indexer.index_document,
+            indexed_pages=None if indexer is None else indexer.page_ids,
         )
 
     @property

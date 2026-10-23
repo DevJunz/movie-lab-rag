@@ -52,16 +52,10 @@ class RawStore:
             file_movie, _, file_page = path.stem.partition("_")
             try:
                 doc = self.load(file_movie, file_page, kind)
-            except (OSError, ValueError, TypeError) as exc:
+            except (OSError, ValueError, TypeError, AttributeError) as exc:
                 logger.warning("저장 원문을 읽지 못해 건너뛴다: %s (%s)", path.name, exc)
                 broken.add((file_movie, file_page))
                 continue
             if doc is not None:
                 docs.append(doc)
         return docs, broken
-
-    def iter_documents(
-        self, kind: str = "wiki", movie_id: str | None = None
-    ) -> list[SourceDocument]:
-        """읽을 수 있는 저장 원문만. `movie_id`를 주면 그 영화의 파일만 읽는다."""
-        return self.scan(kind, movie_id)[0]

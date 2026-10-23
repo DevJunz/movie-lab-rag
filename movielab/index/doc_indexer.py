@@ -70,6 +70,12 @@ class DocIndexer:
     def _where(self, item_id: str, page_id: str) -> dict[str, Any]:
         return {"$and": [{ITEM_KEY: str(item_id)}, {"page_id": str(page_id)}]}
 
+    def _delete_ids(self, ids: list[str]) -> None:
+        """`indexing.batch_size`개씩 나눠 지운다 (Chroma 한 번 호출 한도)."""
+        size = self.store.settings.indexing.batch_size
+        for start in range(0, len(ids), size):
+            self.store.delete_ids(self.collection, ids[start : start + size])
+
     def delete_document(self, item_id: str, page_id: str) -> int:
         return self.store.delete_where(self.collection, self._where(item_id, page_id))
 
@@ -93,7 +99,7 @@ class DocIndexer:
     def prune(self, keep: set[tuple[str, str]], item_id: str | None = None) -> set[tuple[str, str]]:
         """`keep`에 없는 문서의 청크를 한 번에 지운다. 반환: 지운 `(항목 ID, 문서 ID)` 쌍."""
         stale = [(chunk_id, page) for chunk_id, page in self._pages(item_id) if page not in keep]
-        self.store.delete_ids(self.collection, [chunk_id for chunk_id, _ in stale])
+        self._delete_ids([chunk_id for chunk_id, _ in stale])
         return {page for _, page in stale}
 
     def index_document(self, doc: SourceDocument) -> int:
@@ -127,5 +133,5 @@ class DocIndexer:
             )
             if chunk_id not in new_ids
         ]
-        self.store.delete_ids(self.collection, stale)
+        self._delete_ids(stale)
         return len(documents)
