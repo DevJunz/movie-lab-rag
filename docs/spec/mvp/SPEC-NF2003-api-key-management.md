@@ -27,8 +27,9 @@ GMS 키와 주소, 위키백과 연락처는 `.env`에만 둔다. 저장소에�
 
 ### 3.2 저장소 보호
 
-- `.gitignore`: `.env`, `.env.*`(단 `!.env.example`), `/data/`, `/logs/`, `/reports/`, `/영화도메인_데이터_배포용/`, `/prd.pdf`, `/rag_project_briefing.html`, `*.zip`.
-  데이터 · 산출물 경로는 **앞에 `/`를 붙여 저장소 루트로 고정**한다. `data/`라고 쓰면 `movielab/data/` 패키지까지 무시된다(개발 기록 참고).
+- `.gitignore`: `.env`, `.env.*`(단 `!.env.example`), `/data/`, `/logs/`, `/reports/`, `영화도메인_데이터_배포용/`, `prd.pdf`, `rag_project_briefing.html`, `*.zip`.
+  - `data` · `logs` · `reports`는 **앞에 `/`를 붙여 저장소 루트로 고정**한다. `data/`라고 쓰면 `movielab/data/` 패키지까지 무시된다(개발 기록 참고).
+  - 대외비 문서 · 데이터 팩은 **고정하지 않는다** — 하위 폴더에 복사본을 두어도 커밋되지 않게 하기 위해서다.
 - `.env.example`:
 
 ```text
@@ -50,7 +51,7 @@ LANGSMITH_API_KEY=
 |---|---|
 | 키 패턴 | `sk-[A-Za-z0-9_-]{20,}`, `(?i)(api[_-]?key\|secret\|token)\s*[:=]\s*["'][^"'\s]{16,}["']` 가 소스 · 문서 · 설정에 없음 |
 | `.env` 추적 금지 | 추적 파일에 `.env`가 없음 |
-| `.gitignore` | `.env`, `/data/`, `/영화도메인_데이터_배포용/`, `/prd.pdf` 항목이 있음 |
+| `.gitignore` | `.env`, `/data/`, `영화도메인_데이터_배포용/`, `prd.pdf` 항목이 있음 |
 | `.env.example` | 모든 값이 비어 있거나 `false` |
 
 - 예외 목록(테스트 코드의 가짜 키 `sk-test…` 등)은 `tests/unit/test_secrets.py` 안에 명시적으로 둔다.
