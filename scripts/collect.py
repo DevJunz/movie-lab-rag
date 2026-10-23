@@ -67,7 +67,9 @@ def main(argv: list[str] | None = None) -> int:
         services = build_services(settings)
         labels = services.profile.labels()
         if args.reset_cache:
-            services.manifest.reset(args.movie_id)
+            if not services.manifest.reset(args.movie_id):
+                print(messages.render("CACHE_RESET_FAILED", labels))
+                return 1
             if args.movie_id:
                 print(messages.render("CACHE_RESET", labels, target=args.movie_id))
             else:

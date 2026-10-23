@@ -8,15 +8,16 @@
   파일을 항상 다시 읽은 뒤 한다.
 - 조회는 잠금 없이, 파일 서명(파일 ID · 수정 시각 · 크기)이 바뀌었을 때만 다시 읽는다.
 - 쓰기는 고유한 임시 파일에 쓴 뒤 바꿔 넣는다.
-- 깨졌거나 구조가 틀린 파일은 백업해 두고 새로 시작한다.
-- 일시적인 파일 오류는 몇 번 다시 시도하고, 그래도 안 되면 기록을 건너뛰고 메모리도 되돌린다
+- 깨졌거나 구조가 틀린 파일은 백업해 두고 새로 시작한다. 백업하지 못하면 덮어쓰지 않는다.
+- 일시적인 파일 오류는 몇 번 다시 시도하고, 그래도 안 되면 기록을 건너뛴다
   (캐시는 성능용이라 수집을 실패시키지 않는다).
+잠금 · 재시도 수치는 `settings.cache`(A-24)에서 container가 넘긴다.
 `NullManifest`는 아무것도 기억하지 않는다.
 """
 
 from __future__ import annotations
 
-import copy
+import errno
 import itertools
 import json
 import logging
@@ -35,10 +36,8 @@ logger = logging.getLogger(__name__)
 
 Signature = tuple[int, int, int]
 
-# A-24: 일시적인 읽기 · 바꿔 넣기 오류 재시도, 잠금 대기 간격
-_RETRIES = 5
-_RETRY_WAIT_SEC = 0.05
-_LOCK_POLL_SEC = 0.01
+# 다른 쪽이 잠금을 쥐고 있을 때 나는 오류 — 이때만 기다린다. 그 밖(ENOLCK 등)은 바로 포기한다.
+_CONTENDED = {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLK}
 
 if os.name == "nt":
     import msvcrt
@@ -72,16 +71,22 @@ class FileLock:
         self,
         path: Path,
         *,
+        poll_sec: float,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.path = Path(path)
+        self.poll_sec = poll_sec
         self.clock = clock
         self.sleep = sleep
         self._fd: int | None = None
 
     def acquire(self, timeout_sec: float = 0.0) -> bool:
-        """잠금을 잡으면 True. 잠금 파일을 열 수 없거나 시간 안에 못 잡으면 False."""
+        """잠금을 잡으면 True.
+
+        다른 쪽이 쥐고 있으면 `timeout_sec`까지 기다린다. 잠금 파일을 열 수 없거나
+        파일 시스템이 잠금을 지원하지 않으면 기다리지 않고 False.
+        """
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             fd = os.open(self.path, os.O_RDWR | os.O_CREAT)
@@ -92,11 +97,15 @@ class FileLock:
         while True:
             try:
                 _lock_fd(fd)
-            except OSError:
+            except OSError as exc:
+                if exc.errno not in _CONTENDED:
+                    logger.warning("매니페스트 잠금을 쓸 수 없다: %s", exc)
+                    os.close(fd)
+                    return False
                 if self.clock() >= deadline:
                     os.close(fd)
                     return False
-                self.sleep(_LOCK_POLL_SEC)
+                self.sleep(self.poll_sec)
                 continue
             self._fd = fd
             return True
@@ -146,8 +155,8 @@ class NullManifest:
     ) -> None:
         pass
 
-    def reset(self, item_id: str | None = None) -> None:
-        pass
+    def reset(self, item_id: str | None = None) -> bool:
+        return True
 
 
 _LIST_FIELDS = ("keywords", "titles", "page_ids", "rejected_page_ids")
@@ -186,26 +195,31 @@ class Manifest(NullManifest):
         self,
         path: Path,
         *,
+        lock_timeout_sec: float,
+        lock_poll_sec: float,
+        io_retries: int,
+        io_retry_wait_sec: float,
         today: Callable[[], date] = date.today,
         now: Callable[[], datetime] = datetime.now,
-        lock_timeout_sec: float = 10.0,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        """수치는 `settings.cache`(A-24)에서 받는다 — 기본값을 두지 않는다."""
         self.path = Path(path)
         self.lock_path = self.path.with_name(f"{self.path.name}.lock")
+        self.lock_timeout_sec = lock_timeout_sec
+        self.lock_poll_sec = lock_poll_sec
+        self.io_retries = io_retries
+        self.io_retry_wait_sec = io_retry_wait_sec
         self.today = today
         self.now = now
-        self.lock_timeout_sec = lock_timeout_sec
         self.clock = clock
         self.sleep = sleep
         self._lock = threading.Lock()  # 인스턴스 안의 `_data` 보호 — 파일 잠금을 잡은 뒤에만 쥔다
         self._signature: Signature | None = None
+        self._valid_cache = False  # False면 서명과 상관없이 다음 조회에서 다시 읽는다
         self._data: dict[str, dict[str, Any]] = {}
-        with self._lock:
-            broken = self._refresh()
-        if broken:
-            self._backup_if_still_broken()
+        self._peek_all()
 
     # --- 파일 ---
 
@@ -219,15 +233,17 @@ class Manifest(NullManifest):
         return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
     def _file_lock(self) -> FileLock:
-        return FileLock(self.lock_path, clock=self.clock, sleep=self.sleep)
+        return FileLock(
+            self.lock_path, poll_sec=self.lock_poll_sec, clock=self.clock, sleep=self.sleep
+        )
 
     def _load(self) -> tuple[str, Any]:
         """`("ok", 내용)` · `("missing", None)` · `("broken", 사유)`.
 
-        일시 오류가 계속되면 OSError.
+        일시 오류가 `io_retries`번 다시 해도 계속되면 OSError.
         """
         text = ""
-        for attempt in range(_RETRIES):
+        for attempt in range(self.io_retries + 1):
             try:
                 text = self.path.read_text(encoding="utf-8")
                 break
@@ -236,9 +252,9 @@ class Manifest(NullManifest):
             except UnicodeDecodeError as exc:
                 return "broken", f"UTF-8이 아님: {exc}"
             except OSError:
-                if attempt == _RETRIES - 1:
+                if attempt == self.io_retries:
                     raise
-                self.sleep(_RETRY_WAIT_SEC)
+                self.sleep(self.io_retry_wait_sec)
         try:
             data = json.loads(text)
         except ValueError as exc:
@@ -247,45 +263,50 @@ class Manifest(NullManifest):
             return "broken", "구조가 맞지 않음"
         return "ok", data
 
-    def _backup(self, reason: str) -> None:
-        """깨진 파일을 옮겨 둔다. 파일 잠금 안에서만 부른다."""
+    def _remember(self, status: str, value: Any, signature: Signature | None) -> None:
+        """읽은 결과를 메모리에 둔다. 깨졌거나 없으면 빈 매니페스트."""
+        self._data = value if status == "ok" else {}
+        self._signature = signature
+        self._valid_cache = True
+
+    def _backup(self, reason: str) -> bool:
+        """깨진 파일을 옮겨 둔다(파일 잠금 안에서만). 옮기지 못하면 False — 덮어쓰지 않게."""
         stamp = f"{self.now():%Y%m%d%H%M%S%f}-{next(self._backup_counter)}"
         backup = self.path.with_name(f"{self.path.name}.broken-{stamp}")
         try:
             os.replace(self.path, backup)
         except FileNotFoundError:
-            return  # 그 사이 다른 쪽이 지웠다
+            return True  # 그 사이 다른 쪽이 지웠다
         except OSError as exc:
             logger.warning("깨진 매니페스트를 옮기지 못했다: %s", exc)
-            return
+            return False
         logger.warning("매니페스트를 %s로 옮기고 새로 시작한다 (%s)", backup.name, reason)
+        return True
 
     def _refresh(self) -> bool:
-        """조회용(잠금 없음): 파일이 바뀌었으면 다시 읽는다. 반환: 깨진 파일을 봤는지.
+        """조회용(잠금 없음): 파일이 바뀌었으면 다시 읽는다. 반환: 깨진 파일을 새로 봤는지.
 
-        깨졌으면 메모리는 빈 매니페스트로 두고, 백업은 호출자가 잠금을 잡고 다시 확인한 뒤에 한다.
+        읽기에 실패하거나 깨졌으면 그 서명을 기억해, 파일이 다시 바뀔 때까지 재시도하지 않는다.
         """
         signature = self._signature_of(self.path)
-        if signature == self._signature:
+        if self._valid_cache and signature == self._signature:
             return False
         try:
             status, value = self._load()
         except OSError as exc:
             logger.warning("매니페스트를 읽지 못해 지금 내용을 유지한다: %s", exc)
+            self._signature, self._valid_cache = signature, True
             return False
-        if status == "ok":
-            self._data, self._signature = value, signature
-            return False
-        self._data, self._signature = {}, None
+        self._remember(status, value, signature)
         return status == "broken"
 
     def _backup_if_still_broken(self) -> None:
-        """잠금을 잡고 다시 읽어도 깨져 있을 때만 백업한다.
+        """잠금을 기다리지 않고 한 번 잡아 보고, 다시 읽어도 깨져 있을 때만 백업한다.
 
-        그 사이 다른 프로세스가 정상 파일을 썼으면 두고 간다.
+        그 사이 다른 프로세스가 정상 파일을 썼으면 두고 간다. 못 잡으면 다음 기록 때 처리한다.
         """
         lock = self._file_lock()
-        if not lock.acquire(self.lock_timeout_sec):
+        if not lock.acquire(0.0):
             return
         try:
             status, reason = self._load()
@@ -303,15 +324,15 @@ class Manifest(NullManifest):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp.write_text(json.dumps(self._data, ensure_ascii=False, indent=1), encoding="utf-8")
             signature = self._signature_of(tmp)  # 바꿔 넣기 전에 — 남의 쓰기 서명과 섞이지 않게
-            for attempt in range(_RETRIES):
+            for attempt in range(self.io_retries + 1):
                 try:
                     os.replace(tmp, self.path)
                     self._signature = signature
                     return True
                 except PermissionError:  # Windows: 다른 프로세스가 읽는 중
-                    if attempt == _RETRIES - 1:
+                    if attempt == self.io_retries:
                         raise
-                    self.sleep(_RETRY_WAIT_SEC)
+                    self.sleep(self.io_retry_wait_sec)
         except OSError as exc:
             logger.warning("매니페스트를 쓰지 못해 이번 기록을 건너뛴다: %s", exc)
             try:
@@ -320,15 +341,16 @@ class Manifest(NullManifest):
                 pass
         return False
 
-    def _locked_update(self, change: Callable[[], None]) -> None:
-        """파일 잠금 안에서 다시 읽고 → 고치고 → 쓴다.
+    def _locked_update(self, change: Callable[[], None]) -> bool:
+        """파일 잠금 안에서 다시 읽고 → 고치고 → 쓴다. 반환: 기록했는지.
 
-        잠금 · 읽기 · 쓰기에 실패하면 기록을 건너뛰고 메모리도 기록 전으로 둔다.
+        잠금 · 읽기 · 백업 · 쓰기에 실패하면 기록을 건너뛴다. 쓰기에 실패하면 메모리를 무효로
+        표시해 다음 조회가 파일에서 다시 읽게 한다 (저장 안 된 기록이 캐시 적중으로 보이지 않게).
         """
         lock = self._file_lock()
         if not lock.acquire(self.lock_timeout_sec):
             logger.warning("매니페스트 잠금을 잡지 못해 이번 기록을 건너뛴다: %s", self.lock_path)
-            return
+            return False
         try:
             with self._lock:
                 signature = self._signature_of(self.path)
@@ -336,18 +358,15 @@ class Manifest(NullManifest):
                     status, value = self._load()
                 except OSError as exc:
                     logger.warning("매니페스트를 읽지 못해 이번 기록을 건너뛴다: %s", exc)
-                    return
-                if status == "broken":
-                    self._backup(value)
-                    self._data, self._signature = {}, None
-                elif status == "missing":
-                    self._data, self._signature = {}, None
-                else:
-                    self._data, self._signature = value, signature
-                before = copy.deepcopy(self._data)
+                    return False
+                if status == "broken" and not self._backup(value):
+                    return False
+                self._remember(status, value, signature)
                 change()
-                if not self._write():
-                    self._data = before
+                if self._write():
+                    return True
+                self._valid_cache = False
+                return False
         finally:
             lock.release()
 
@@ -357,13 +376,16 @@ class Manifest(NullManifest):
             entry.setdefault(key, value)
         return entry
 
-    def _peek(self, item_id: str) -> dict[str, Any]:
+    def _peek_all(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             broken = self._refresh()
-            entry = self._data.get(str(item_id)) or {}
+            data = self._data
         if broken:
             self._backup_if_still_broken()
-        return entry
+        return data
+
+    def _peek(self, item_id: str) -> dict[str, Any]:
+        return self._peek_all().get(str(item_id)) or {}
 
     # --- 조회 ---
 
@@ -434,11 +456,13 @@ class Manifest(NullManifest):
 
         self._update(item_id, change)
 
-    def reset(self, item_id: str | None = None) -> None:
+    def reset(self, item_id: str | None = None) -> bool:
+        """캐시를 지운다. 반환: 지웠는지 (잠금 · 읽기 · 쓰기 실패면 False)."""
+
         def apply() -> None:
             if item_id is None:
                 self._data = {}
             else:
                 self._data.pop(str(item_id), None)
 
-        self._locked_update(apply)
+        return self._locked_update(apply)
