@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2003** 검색어 추출(프롬프트1) (프롬프트 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/collect/query_extractor.py`, `movielab/prompts.py`(P1), `movielab/core/jsonparse.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-F2001 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #6 |
 
 ## 1. 요구사항 원문
 
