@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2012** 진행 상태 및 안내 (UI · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/core/messages.py`, `movielab/core/errors.py`, `movielab/services/health.py`, `movielab/ui/streamlit_app.py`, `movielab/data/domain_movie.py`(면책 문구 값) |
 | 선행 SPEC | SPEC-F2004, SPEC-F2009 |
 | 관련 ISSUE | #14 |
