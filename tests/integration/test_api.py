@@ -22,7 +22,7 @@ from movielab.data.movies import load_items
 from movielab.services.catalog import Catalog
 from movielab.services.health import HealthStatus
 
-SECRET = "sk-should-never-leak"
+LEAK = "internal-detail-should-not-leak"
 
 
 def _evidence(n: int) -> Evidence:
@@ -146,19 +146,19 @@ def test_tc_f2013_02_stream(client, services):
 
 
 def test_tc_f2013_03_internal_error(client, services):
-    services.qa.error = RuntimeError(f"boom {SECRET}")
+    services.qa.error = RuntimeError(f"boom {LEAK}")
     res = client.post("/api/ask", json={"movie_id": _movie_id(services), "question": "질문"})
     assert res.status_code == 500
     assert res.json()["error"]["code"] == "INTERNAL"
-    assert "Traceback" not in res.text and SECRET not in res.text and "boom" not in res.text
+    assert "Traceback" not in res.text and LEAK not in res.text and "boom" not in res.text
 
 
 def test_tc_f2013_03_stream_error_line(client, services):
-    services.qa.error = RuntimeError(f"boom {SECRET}")
+    services.qa.error = RuntimeError(f"boom {LEAK}")
     res = client.post("/api/ask/stream", json={"movie_id": _movie_id(services), "question": "질"})
     last = json.loads(res.text.strip().splitlines()[-1])
     assert last["type"] == "error" and last["error"]["code"] == "INTERNAL"
-    assert SECRET not in res.text and "Traceback" not in res.text
+    assert LEAK not in res.text and "Traceback" not in res.text
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_tc_f2013_04_other_endpoints(client, services):
     assert fact["verdict"] == "사실" and fact["citations"][0]["n"] == 2
     explore = client.post("/api/explore", json={"condition": "조건"}).json()
     assert explore["items"][0]["movie_id"] == movie_id
-    assert set(explore["items"][0]) == {"movie_id", "title", "year", "genres", "director", "reason"}
+    assert set(explore["items"][0]) == {"movie_id", "title", "year", "genres", "caption", "reason"}
 
 
 def test_tc_f2013_05_static(client):

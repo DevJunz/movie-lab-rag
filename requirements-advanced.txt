@@ -1,0 +1,4 @@
+# 심화 기능 의존성 — 01-architecture §1, SPEC-F2013
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+pydantic==2.13.5

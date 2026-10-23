@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Movie Lab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="banner" class="banner" hidden></div>
+  <div class="layout">
+    <aside class="panel">
+      <h1>Movie Lab</h1>
+      <label for="movie-search">영화 검색</label>
+      <input id="movie-search" type="search" placeholder="제목으로 검색" autocomplete="off">
+      <ul id="movie-list" class="movie-list"></ul>
+      <p id="selected-movie" class="selected">영화를 먼저 선택하세요.</p>
+      <p id="index-counts" class="muted"></p>
+      <p class="muted small">영화 정보: TMDB · 문서: 한국어 위키백과(CC BY-SA 4.0). 근거마다 원문 링크와 라이선스를 표시합니다.</p>
+    </aside>
+    <main class="main">
+      <nav class="menu" role="tablist">
+        <button type="button" data-page="ask" class="active">질문하기</button>
+        <button type="button" data-page="guide">관람 가이드</button>
+        <button type="button" data-page="factcheck">사실 판정</button>
+        <button type="button" data-page="explore">조건 탐색</button>
+      </nav>
+
+      <section id="page-ask" class="page">
+        <div id="history" class="history"></div>
+        <div id="progress" class="progress" hidden></div>
+        <div id="answer-area" class="answer"></div>
+        <div id="evidence-area" class="evidence"></div>
+        <form id="ask-form" class="row">
+          <textarea id="question-input" rows="2" maxlength="1000" placeholder="선택한 영화에 대해 질문하세요"></textarea>
+          <button type="submit">질문</button>
+        </form>
+        <button type="button" id="clear-history" class="link">이 영화 대화 지우기</button>
+      </section>
+
+      <section id="page-guide" class="page" hidden>
+        <button type="button" id="guide-button">가이드 만들기</button>
+        <div id="guide-status" class="progress" hidden></div>
+        <div id="guide-output" class="answer"></div>
+        <div id="guide-evidence" class="evidence"></div>
+      </section>
+
+      <section id="page-factcheck" class="page" hidden>
+        <form id="factcheck-form" class="row">
+          <input id="claim-input" type="text" maxlength="1000" placeholder="예: 명량 해전에서 조선 수군의 배는 12척이었다">
+          <button type="submit">판정하기</button>
+        </form>
+        <div id="factcheck-status" class="progress" hidden></div>
+        <div id="factcheck-output" class="answer"></div>
+        <div id="factcheck-evidence" class="evidence"></div>
+      </section>
+
+      <section id="page-explore" class="page" hidden>
+        <form id="explore-form" class="row">
+          <input id="condition-input" type="text" maxlength="1000" placeholder="예: 1990년대 한국 스릴러">
+          <button type="submit">찾기</button>
+        </form>
+        <div id="explore-status" class="progress" hidden></div>
+        <div id="explore-output" class="cards"></div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
