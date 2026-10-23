@@ -127,56 +127,37 @@ def _docstring_nodes(tree: ast.AST) -> set[int]:
     return ids
 
 
-def check_domain_literals(source: str, rel_path: str) -> list[Violation]:
-    """`movielab/data/` 밖 코드의 문자열 리터럴에 영화 도메인 표현이 있으면 위반."""
-    if not rel_path.startswith(f"{PACKAGE}/") or rel_path.startswith(f"{PACKAGE}/data/"):
-        return []
-    if rel_path in FORBIDDEN_EXEMPT:
-        return []
-    tree = ast.parse(source)
-    docstrings = _docstring_nodes(tree)
-    violations: list[Violation] = []
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and id(node) not in docstrings
-        ):
-            match = FORBIDDEN_LITERAL.search(node.value)
-            if match:
-                violations.append(
-                    Violation(
-                        rel_path, node.lineno, f"도메인 표현 '{match.group(0)}'은 data/에만 둔다"
-                    )
-                )
-    return violations
-
-
 def literal_checker(
-    pattern: str, *, exempt_data: bool = True
+    pattern: str | re.Pattern[str],
+    *,
+    exempt_data: bool = True,
+    exempt_files: frozenset[str] = frozenset(),
 ) -> Callable[[str, str], list[Violation]]:
     """`movielab/` 문자열 리터럴(docstring 제외)에서 정규식을 찾는 검사기를 만든다."""
-    regex = re.compile(pattern, re.MULTILINE)
+    regex = pattern if isinstance(pattern, re.Pattern) else re.compile(pattern, re.MULTILINE)
 
     def check(source: str, rel_path: str) -> list[Violation]:
-        if not rel_path.startswith(f"{PACKAGE}/"):
+        if not rel_path.startswith(f"{PACKAGE}/") or rel_path in exempt_files:
             return []
         if exempt_data and rel_path.startswith(f"{PACKAGE}/data/"):
             return []
         tree = ast.parse(source)
         docstrings = _docstring_nodes(tree)
-        return [
-            Violation(
-                rel_path, node.lineno, f"'{regex.search(node.value).group(0)}'은 data/에만 둔다"
-            )
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Constant)
-            and isinstance(node.value, str)
-            and id(node) not in docstrings
-            and regex.search(node.value)
-        ]
+        violations: list[Violation] = []
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                continue
+            match = None if id(node) in docstrings else regex.search(node.value)
+            if match:
+                message = f"도메인 표현 '{match.group(0)}'은 data/에만 둔다"
+                violations.append(Violation(rel_path, node.lineno, message))
+        return violations
 
     return check
+
+
+# `movielab/data/` 밖 코드의 문자열 리터럴에 영화 도메인 표현이 있으면 위반 (SPEC-NF2005 §3.2)
+check_domain_literals = literal_checker(FORBIDDEN_LITERAL, exempt_files=frozenset(FORBIDDEN_EXEMPT))
 
 
 def python_files() -> list[Path]:
