@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2003** API 키 관리 (보안) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/config.py`, `movielab/providers.py`, `.env.example`, `.gitignore`, `tests/unit/test_secrets.py` |
 | 선행 SPEC | SPEC-NF2005 |
 | 관련 ISSUE | #2 |
