@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2004** 외부 문서 수집(프롬프트2) (수집 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/collect/selector.py`, `movielab/collect/collector.py`, `movielab/data/wiki_api.py`, `movielab/data/wiki_bundle.py`, `movielab/data/raw_store.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-F2003, SPEC-NF2006 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #7 |
 
 ## 1. 요구사항 원문
 
@@ -46,12 +46,12 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 | `WikiApiSource` | `data/wiki_api.py` | MediaWiki API. 호출 규칙은 SPEC-NF2006 |
 | `WikiBundleSource` | `data/wiki_bundle.py` | `movielab_wiki/wikipedia/*.json`을 읽어 메모리 색인(제목 · 본문). 외부 호출 없음 |
 
-**WikiApiSource 요청** (모두 `format=json`, `formatversion=2`, `maxlag=5`):
+**WikiApiSource 요청** (모두 `WikiHttpClient`(NF2006)를 거친다 — `format=json`, `formatversion=2`, `maxlag=5` 자동):
 
 | 기능 | 파라미터 |
 |---|---|
 | 검색 | `action=query&list=search&srsearch={q}&srlimit={search_limit}&srnamespace=0&srprop=snippet\|size` |
-| 제목 조회 | `action=query&titles={t1}\|{t2}\|{t3}&redirects=1&prop=info\|pageprops&ppprop=disambiguation&inprop=url` |
+| 제목 조회 | `action=query&titles={t1}\|{t2}\|{t3}&redirects=1&prop=info\|pageprops\|extracts&ppprop=disambiguation&inprop=url&exintro=1&explaintext=1&exchars=300` — 도입부 300자를 함께 받아 §3.4의 '괄호 없는 제목' 판별에 쓴다 |
 | 본문 | `action=query&pageids={id}&prop=extracts\|info&explaintext=1&inprop=url` |
 
 - 검색 요약(snippet)의 HTML 태그(`<span class="searchmatch">` 등)는 지우고 HTML 엔티티를 푼다.
@@ -127,7 +127,13 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 - 출력 검증: 정수가 아니거나 범위 밖인 번호는 버리고, 중복을 없애고, `max_selected_docs`개까지 자른다. 파싱 실패 시 빈 배열 → 항목 자체 문서만 수집.
 - 후보가 0개면 P2를 부르지 않는다.
 
-### 3.7 인터페이스
+### 3.7 다른 SPEC과의 경계 (단계적 구현)
+
+- **수집 캐시(SPEC-NF2002)**: `Collector`는 `manifest`를 주입받는다. 이 SPEC에서는 아무것도 기억하지 않는 `NullManifest`를 기본으로 쓰고, 실제 매니페스트는 NF2002에서 넣는다.
+- **청크 색인(SPEC-F2005)**: `Collector`는 `indexer: Callable[[SourceDocument], int] | None`을 주입받는다. `None`이면 원문 저장까지만 하고 `index` 단계는 `indexed_chunks=0`으로 보고한다. 실제 색인기는 F2005에서 연결한다.
+- 원문 저장 파일 이름: `data/raw/wiki/{movie_id}_{page_id}.json` (제목은 파일 이름에 쓰지 않는다 — 특수문자 · 길이 문제 회피, 제목은 JSON 안에 있다).
+
+### 3.8 인터페이스
 
 ```python
 class CandidateSelector:
@@ -135,7 +141,8 @@ class CandidateSelector:
     def select(self, item, question, candidates: list[Candidate]) -> SelectionResult: ...  # selected, rejected(사유)
 
 class Collector:
-    def __init__(self, source_factory, extractor, selector, manifest, raw_store, doc_indexer, profile, settings): ...
+    def __init__(self, *, api_source, bundle_source, extractor, selector, raw_store, profile, settings,
+                 manifest=None, indexer=None): ...  # api_source는 None 가능(연락처 없음)
     def collect(self, item: ItemRecord, question: str, on_progress=None) -> CollectReport: ...
 ```
 
@@ -188,6 +195,8 @@ python -m scripts.collect --movie-id 157336 --question "<질문>" [--source api|
 | TC-F2004-13 | 단위 | 진행 상태 콜백 기록 | `extract_queries → resolve_item_doc → search → filter → select → fetch → index → done` | 10 | `tests/unit/test_collector.py` |
 | TC-F2004-14 | live | 실제 위키백과 + GMS로 Q1 수집 | 「인터스텔라」가 항목 자체 문서로 색인, 원문 URL이 `https://ko.wikipedia.org/wiki/`로 시작 | 03, 05 | `tests/live/test_live_collect.py` |
 | TC-F2004-15 | 수동 | Q1 수집 후 화면의 "수집 상세" 또는 스크립트 출력 | 색인된 문서와 버려진 문서(사유)를 구분해 보여 줌 | 06 | 스크린샷 |
+| TC-F2004-17 | 단위 | `WikiBundleSource`: 검색 점수(제목 일치 > 포함 > 본문, 현재 영화 가산), `fetch`가 현재 수집 맥락으로 `movie_id` 등을 바꿈, `resolve_titles` 정확 일치 | 정의대로 | 01, 08 | `tests/unit/test_wiki_bundle.py` |
+| TC-F2004-18 | 단위 | `RawStore` 저장 · 읽기, 파일 이름 `{movie_id}_{page_id}.json`, 4.2 필드 | 정의대로 | 05 | `tests/unit/test_raw_store.py` |
 | TC-F2004-16 | 통합 | 같은 질문 2회 수집 (TC-NF2002-01과 같은 테스트) | 2회째 소스 검색 · 본문 요청 0회 | 11 | `tests/integration/test_cache_path.py` |
 
 ## 7. 증빙
