@@ -20,3 +20,17 @@ def test_tc_nf2001_07_questions_match_overview():
         assert set(q) >= {"id", "movie_id", "question", "purpose"}
         assert isinstance(q["movie_id"], str)
         assert expected[q["id"]] == (q["movie_id"], q["question"])
+
+
+def test_tc_f2015_01_questions_for_comparison():
+    questions = json.loads(
+        (REPO_ROOT / "docs" / "verification" / "questions.json").read_text(encoding="utf-8")
+    )
+    assert len(questions) >= 5
+    for q in questions:
+        assert {"id", "movie_id", "question", "reference_facts"} <= set(q)
+        assert isinstance(q["movie_id"], str) and q["movie_id"].isdigit()
+        assert isinstance(q["reference_facts"], list)
+        for fact in q["reference_facts"]:
+            assert fact["fact"].strip()
+            assert fact["source_url"].startswith("https://ko.wikipedia.org/")
