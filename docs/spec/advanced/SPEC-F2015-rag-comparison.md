@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2015** RAG 전후 품질 비교 (품질 · 심화) |
 | 구분 | 심화 |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `scripts/compare_rag.py`, `movielab/services/baseline.py`(`DirectAnswerService`), `movielab/prompts.py`(B1: RAG 없는 답변), `docs/verification/questions.json` |
 | 선행 SPEC | SPEC-F2007, SPEC-F2008 |
 | 관련 ISSUE | #21 |
