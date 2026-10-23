@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -123,20 +123,50 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _is_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _int_at_least(minimum: int) -> Callable[[Any], bool]:
+    return lambda v: _is_int(v) and v >= minimum
+
+
+def _number_at_least(minimum: float, *, strict: bool = False) -> Callable[[Any], bool]:
+    return lambda v: _is_number(v) and (v > minimum if strict else v >= minimum)
+
+
+# 묶음 → (키, 검사) — 묶음별 규칙은 해당 SPEC에서 더한다
+_RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
+    "indexing": [  # SPEC-F2002
+        ("batch_size", _int_at_least(1)),
+        ("retries", _int_at_least(0)),
+        ("retry_wait_sec", _number_at_least(0)),
+    ],
+    "wiki": [  # SPEC-NF2006
+        ("max_retries", _int_at_least(0)),
+        ("maxlag", _int_at_least(0)),
+        ("min_interval_sec", _number_at_least(0)),
+        ("backoff_base_sec", _number_at_least(0)),
+        ("max_retry_after_sec", _number_at_least(0)),
+        ("timeout_sec", _number_at_least(0, strict=True)),
+        ("api_url", _is_text),
+        ("app_name", _is_text),
+        ("app_version", _is_text),
+        ("project_url", _is_text),
+    ],
+}
+
+
 def _validate(raw: dict[str, Any], source: Path) -> None:
-    """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다. 묶음별 규칙은 해당 SPEC에서 더한다."""
-    indexing = raw.get("indexing")
-    if not isinstance(indexing, dict):
-        raise SettingsError(f"설정 값 오류: indexing은 객체여야 한다 ({source})")
-    rules = [
-        ("batch_size", lambda v: _is_int(v) and v >= 1),
-        ("retries", lambda v: _is_int(v) and v >= 0),
-        ("retry_wait_sec", lambda v: _is_number(v) and v >= 0),
-    ]
-    for name, ok in rules:
-        value = indexing.get(name)
-        if not ok(value):
-            raise SettingsError(f"설정 값 오류: indexing.{name}={value!r} ({source})")
+    """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다."""
+    for group, rules in _RULES.items():
+        section = raw.get(group)
+        if not isinstance(section, dict):
+            raise SettingsError(f"설정 값 오류: {group}은 객체여야 한다 ({source})")
+        for name, ok in rules:
+            value = section.get(name)
+            if not ok(value):
+                raise SettingsError(f"설정 값 오류: {group}.{name}={value!r} ({source})")
 
 
 def load_settings(path: str | Path | None = None) -> Settings:

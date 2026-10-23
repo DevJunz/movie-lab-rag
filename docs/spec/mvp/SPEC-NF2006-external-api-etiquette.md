@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **NF2006** 외부 API 예절 (품질) |
 | 구분 | MVP (비기능) |
-| 상태 | Draft |
+| 상태 | Done |
 | 담당 모듈 | `movielab/data/wiki_api.py` (`WikiHttpClient`) |
 | 선행 SPEC | SPEC-NF2005, SPEC-NF2003 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #5 |
 
 ## 1. 요구사항 원문
 
@@ -23,10 +23,10 @@
 ### 3.1 User-Agent
 
 ```text
-MovieLab/0.1 (+https://github.com/<owner>/movie-lab-rag; contact: <WIKI_CONTACT>) python-requests/2.34.2
+MovieLab/0.1 (+https://github.com/DevJunz/movie-lab-rag; contact: <WIKI_CONTACT>) python-requests/2.34.2
 ```
 
-- `app_name` · `app_version`은 `settings.wiki`, 연락처는 `.env`의 `WIKI_CONTACT`(A-03). 저장소 URL은 `settings.wiki.project_url`(구현 PR에서 추가).
+- `app_name` · `app_version`은 `settings.wiki`, 연락처는 `.env`의 `WIKI_CONTACT`(A-03). 저장소 URL은 `settings.wiki.project_url`.
 - `WIKI_CONTACT`가 비어 있으면 **API를 호출하지 않는다**. `source=api`이면 `ExternalSourceUnavailableError`, `auto`이면 묶음으로 대체(F2004 §3.2).
 - `Accept-Encoding: gzip`을 보낸다.
 
@@ -34,18 +34,27 @@ MovieLab/0.1 (+https://github.com/<owner>/movie-lab-rag; contact: <WIKI_CONTACT>
 
 | 규칙 | 값 | 설정 키 |
 |---|---|---|
-| 동시 요청 | 1 (직렬, 클라이언트 내부 잠금) | — |
+| 동시 요청 | 1 — **프로세스 전체에서 직렬**. 잠금과 마지막 요청 시각은 API 주소별로 공유하는 `RequestThrottle`이 가진다(Streamlit 세션 · 스레드가 여러 개여도 한 줄로 선다) | — |
 | 최소 호출 간격 | 이전 요청 **시작** 후 1.0초 | `wiki.min_interval_sec` |
 | 타임아웃 | 10초 | `wiki.timeout_sec` |
 | `maxlag` | 5 | `wiki.maxlag` |
-| 재시도 대상 | 연결 오류 · 타임아웃 · HTTP 429 · 500 · 502 · 503 · 504 · 응답 본문 `error.code == "maxlag"` | — |
+| 재시도 대상 | `requests`의 모든 요청 예외(연결 끊김 · 타임아웃 · 본문 수신 중 끊김 · 압축 오류 · 넘겨주기 과다) · HTTP 429 · **5xx 전체** · **200인데 JSON 객체가 아닌 본문**(점검 페이지, `[]`, `null` 등) · 응답 본문 `error.code == "maxlag"` | — |
 | 재시도 횟수 | 최대 3회 (첫 시도 포함 4번) | `wiki.max_retries` |
-| 대기 | `Retry-After` 헤더가 있으면 그 값(초, 최대 60), 없으면 `backoff_base × 2^시도` (1 · 2 · 4초) | `wiki.backoff_base_sec` |
-| 재시도 안 함 | 400 · 403 · 404 등 그 밖의 4xx → 즉시 `ExternalSourceUnavailableError`(403) 또는 빈 결과(404) | — |
-| 최종 실패 | `ExternalSourceUnavailableError` → `auto`면 묶음 대체 | — |
+| 대기 | `Retry-After`가 **유효하면** 그 값(초 또는 HTTP 날짜, 최대 `wiki.max_retry_after_sec`=60초). 음수 · NaN · 해석 불가면 무시하고 `backoff_base × 2^시도` (1 · 2 · 4초) | `wiki.backoff_base_sec`, `wiki.max_retry_after_sec` |
+| 재시도 안 함 | 404 → 빈 결과 `{}`. 그 밖의 4xx(400 · 403 …) → 즉시 `ExternalSourceUnavailableError`. 응답 본문의 `maxlag` 외 API 오류 코드도 즉시 오류 | — |
+| 최종 실패 | `ExternalSourceUnavailableError`(안내 코드 `SOURCE_UNAVAILABLE`) → `auto`면 묶음 대체 | — |
 
+- 호출 간격은 **재시도를 포함한 모든 요청**에 적용한다(백오프 대기가 간격보다 길면 추가 대기 없음).
 - 시간 · 대기 함수(`clock`, `sleep`)는 생성자로 주입한다. 테스트는 `FakeClock` · `fake_sleep`으로 실제로 기다리지 않고 대기 시간을 검사한다.
-- 모든 요청은 `INFO` 로그에 `action`, 상태 코드, 소요 시간, 재시도 횟수를 남긴다(연락처는 남기지 않는다).
+- `Services.wiki_client`(container)가 클라이언트를 한 번만 만든다. 주입한 `http` 세션이 있으면 그것을 쓴다.
+- 모든 요청은 성공 · 실패와 상관없이 로그에 `action`, 상태 코드(예외면 예외 이름), 소요 시간(주입된 시계 기준), 시도 번호를 남긴다(연락처는 남기지 않는다).
+- 실제 `requests.Session`은 조립 지점(container)이 만든다. `WikiHttpClient`는 세션을 반드시 주입받는다.
+- `Services.wiki_client`는 잠금 안에서 한 번만 만들고, 프로세스 공용 `RequestThrottle`을 쓴다. 공용 throttle은 `(api_url, min_interval_sec)`로 구분한다. 테스트는 공용 저장소를 매번 비운다.
+- User-Agent는 클라이언트를 만들 때 한 번 만들고 검사한다. 연락처가 HTTP 헤더에 쓸 수 없는 값(latin-1 밖 문자, 줄바꿈)이면 **요청을 보내지 않고** `ExternalSourceUnavailableError`(로그에 원인)로 알린다 — auto 대체가 동작한다.
+- 응답의 `error`가 객체가 아니어도(문자열 등) API 오류로 처리한다.
+- `Retry-After`의 HTTP 날짜는 주입된 현재 시각(`now`)으로 계산한다.
+- `wiki` 설정은 시작할 때 검사한다: `max_retries` · `maxlag`는 0 이상 정수, `min_interval_sec` · `backoff_base_sec` · `max_retry_after_sec`는 0 이상 숫자, `timeout_sec`는 0보다 큰 숫자, `api_url` · `app_name` · `app_version` · `project_url`은 빈 문자열이 아닌 문자열. 어기면 `SettingsError`.
+- 백오프 · `Retry-After` 대기 중에는 공용 잠금을 쥔 채로 기다린다. **의도된 동작이다** — 서버가 요청한 대기는 이 앱의 모든 세션에 적용되어야 하므로 다른 세션도 함께 기다린다.
 
 ### 3.3 인터페이스
 
@@ -60,7 +69,7 @@ class WikiHttpClient:
 | ID | 내용 |
 |---|---|
 | A-03 | 연락처는 `WIKI_CONTACT` |
-| A-04 | 간격 1.0초, 재시도 3회, 백오프 1 · 2 · 4초, 타임아웃 10초, `maxlag=5` |
+| A-04 | 간격 1.0초, 재시도 3회, 백오프 1 · 2 · 4초, `Retry-After` 최대 60초, 타임아웃 10초, `maxlag=5` |
 
 ## 5. 인수 조건
 
@@ -73,6 +82,7 @@ class WikiHttpClient:
 | AC-NF2006-05 | 403 등 재시도 대상이 아닌 오류는 재시도하지 않는다 | V4.7-6 |
 | AC-NF2006-06 | 모든 요청에 `maxlag`가 들어가고, `maxlag` 오류는 재시도한다 | V4.7-6 |
 | AC-NF2006-07 | 요청은 직렬로만 나간다 | V4.7-6 |
+| AC-NF2006-08 | 잘못된 설정 · 연락처 · 응답 형식도 traceback 대신 안내 오류(`SettingsError` · `ExternalSourceUnavailableError`)로 바뀐다 | V4.7-4 |
 
 ## 6. 테스트 케이스
 
@@ -87,7 +97,16 @@ class WikiHttpClient:
 | TC-NF2006-07 | 단위 | 응답 403 | 요청 1번, 즉시 예외 | 05 | 〃 |
 | TC-NF2006-08 | 단위 | 모든 요청 파라미터 | `maxlag=5`, `format=json`, `formatversion=2` | 06 | 〃 |
 | TC-NF2006-09 | 단위 | 본문 `{"error":{"code":"maxlag"}}` 후 정상 | 재시도 후 성공 | 06 | 〃 |
-| TC-NF2006-10 | 단위 | 두 스레드에서 동시에 `get` | 요청 시작 시각이 겹치지 않음 (잠금) | 07 | 〃 |
+| TC-NF2006-10 | 단위 | 요청이 나가는 순간 공유 잠금이 잡혀 있는지 (세션 훅으로 확인, 실제 시간 · 스레드 타이밍에 기대지 않음) | 매 요청마다 잠김 | 07 | 〃 |
+| TC-NF2006-12 | 단위 | 200 + JSON 아닌 본문 반복 / 한 번 후 정상 | 재시도 후 `ExternalSourceUnavailableError` / 성공 | 04 | 〃 |
+| TC-NF2006-13 | 단위 | `ChunkedEncodingError` · `ContentDecodingError` 후 정상 | 재시도해 성공 | 04 | 〃 |
+| TC-NF2006-14 | 단위 | `Retry-After`: HTTP 날짜(주입한 현재 시각 + 10초) · `-5` · `nan` · `abc` | 정확히 10초 / 백오프 · 백오프 · 백오프 | 04 | 〃 |
+| TC-NF2006-15 | 단위 | 같은 `RequestThrottle`을 쓰는 두 클라이언트의 연속 요청, container가 공용 throttle 사용 | 두 번째 요청 전 간격만큼 대기 / 같은 객체 | 03, 07 | 〃 |
+| TC-NF2006-17 | 단위 | 연락처에 한글 이름 · 줄바꿈 | 요청 0회, `ExternalSourceUnavailableError` | 08 | 〃 |
+| TC-NF2006-18 | 단위 | `wiki` 설정: `max_retries: -1` · `project_url` 없음 · `timeout_sec: 0` · `maxlag: "5"` | `SettingsError` | 08 | `tests/unit/test_config.py` |
+| TC-NF2006-19 | 단위 | 응답 `{"error": "문자열"}` / 200 + `[]` · `null` | 즉시 안내 오류 / 재시도 후 안내 오류 | 04, 08 | `tests/unit/test_wiki_http.py` |
+| TC-NF2006-20 | 단위 | HTTP 501 · 599 후 정상 | 재시도해 성공 | 04 | 〃 |
+| TC-NF2006-16 | 단위 | 성공 · 403 · API 오류 요청의 로그 | 상태 코드(또는 오류 코드) 포함, 연락처 미포함 | 01 | 〃 |
 | TC-NF2006-11 | live | 실제 위키백과에 검색 1회 | 200 응답, 결과 ≥ 1 | 01 | `tests/live/test_live_wiki.py` |
 
 ## 7. 증빙
