@@ -69,20 +69,25 @@ def test_tc_f2001_12_bad_settings_file_no_traceback(tmp_path, monkeypatch, capsy
 # --- SPEC-F2002 색인 · 건수 · 재색인 ---
 
 
-def _use_fake_embeddings(monkeypatch, tmp_settings, embeddings=None):
+def _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path, embeddings=None, **indexing):
+    """스크립트가 가짜 임베딩과 (필요하면 indexing 값을 바꾼) 임시 설정을 쓰게 한다."""
     from movielab.container import build_services
     from tests.fakes import FakeEmbeddings
 
+    raw = json.loads(json.dumps(tmp_settings.raw))
+    raw["indexing"].update(indexing)
+    path = tmp_path / "settings_index.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(path))
     emb = embeddings or FakeEmbeddings()
-    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
     monkeypatch.setattr(
         index_meta, "build_services", lambda settings: build_services(settings, embeddings=emb)
     )
     return emb
 
 
-def test_tc_f2002_05_index_count_and_rebuild(tmp_settings, monkeypatch, capsys):
-    _use_fake_embeddings(monkeypatch, tmp_settings)
+def test_tc_f2002_05_index_count_and_rebuild(tmp_settings, tmp_path, monkeypatch, capsys):
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path)
     assert index_meta.main([]) == 0
     assert "로드 12건 / 색인 12건 / 건너뜀 0건" in capsys.readouterr().out
     assert index_meta.main([]) == 0  # 재실행 안전
@@ -93,24 +98,41 @@ def test_tc_f2002_05_index_count_and_rebuild(tmp_settings, monkeypatch, capsys):
     assert "색인 12건" in capsys.readouterr().out
 
 
-def test_tc_f2002_06_failed_batch_exit_code(tmp_settings, monkeypatch, capsys):
+def test_tc_f2002_06_failed_batch_exit_code(tmp_settings, tmp_path, monkeypatch, capsys):
     from tests.fakes import FakeEmbeddings
 
-    class Broken(FakeEmbeddings):
-        def embed_documents(self, texts):
-            if any("인셉션" in t for t in texts):
-                raise RuntimeError("임베딩 서버 오류")
-            return super().embed_documents(texts)
-
-    _use_fake_embeddings(monkeypatch, tmp_settings, Broken())
+    broken = FakeEmbeddings(fail_when=lambda texts: any("인셉션" in t for t in texts))
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path, broken, retry_wait_sec=0)
     assert index_meta.main(["--batch-size", "5"]) == 1
     out = capsys.readouterr().out
     assert "실패한 배치" in out and "Traceback" not in out
 
 
-def test_tc_f2002_05_index_without_key_shows_hint(tmp_settings, monkeypatch, capsys):
+def test_tc_f2002_10_count_without_key(tmp_settings, monkeypatch, capsys):
     monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
-    assert index_meta.main([]) == 1
-    out = capsys.readouterr().out
-    assert "GMS_API_KEY" in out and "Traceback" not in out
-    assert index_meta.main(["--count"]) == 0  # 건수 확인은 키 없이 가능
+    assert index_meta.main(["--count"]) == 0
+    assert "movie_meta: 0" in capsys.readouterr().out
+
+
+def test_tc_f2002_11_no_key_keeps_existing_index(tmp_settings, tmp_path, monkeypatch, capsys):
+    from movielab.container import build_services
+
+    _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path)
+    assert index_meta.main([]) == 0
+    capsys.readouterr()
+    # 이제 키도 임베딩 주입도 없는 상태로 색인 · 재색인
+    monkeypatch.setattr(index_meta, "build_services", lambda settings: build_services(settings))
+    for argv in ([], ["--rebuild"]):
+        assert index_meta.main(argv) == 1
+        out = capsys.readouterr().out
+        assert "GMS_API_KEY" in out and "Traceback" not in out
+    assert index_meta.main(["--count"]) == 0
+    assert "movie_meta: 12" in capsys.readouterr().out  # 기존 색인 유지
+
+
+@pytest.mark.parametrize("value", ["0", "-5", "abc"])
+def test_tc_f2002_14_batch_size_must_be_positive(tmp_settings, monkeypatch, value):
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    with pytest.raises(SystemExit) as exit_info:
+        index_meta.main(["--batch-size", value])
+    assert exit_info.value.code == 2

@@ -10,6 +10,8 @@ import json
 import pickle
 from pathlib import Path
 
+import pytest
+
 from movielab.config import load_settings
 from tests.conftest import REPO_ROOT
 
@@ -130,3 +132,27 @@ def test_tc_nf2003_09_dotenv_changes_picked_up_on_reload(tmp_path: Path, monkeyp
     assert load_settings().secrets.gms_api_key is None
     dotenv.write_text(f"GMS_API_KEY={FAKE_KEY}\n", encoding="utf-8")
     assert load_settings().secrets.gms_api_key == FAKE_KEY
+
+
+# --- SPEC-F2002 indexing 설정 검증 ---
+
+
+@pytest.mark.parametrize(
+    "field,value", [("batch_size", 0), ("retries", -1), ("retry_wait_sec", -1)]
+)
+def test_tc_f2002_14_invalid_indexing_settings_rejected(tmp_path: Path, field, value):
+    from movielab.config import SettingsError
+
+    raw = json.loads((REPO_ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    raw["indexing"][field] = value
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(SettingsError):
+        load_settings(path)
+
+
+def test_tc_f2002_14_default_indexing_settings():
+    settings = load_settings()
+    assert settings.indexing.batch_size == 100  # A-21
+    assert settings.indexing.retries == 1
+    assert settings.indexing.retry_wait_sec == 2.0

@@ -41,7 +41,7 @@
 ```python
 # movielab/index/store.py
 class VectorStore:
-    def __init__(self, client, embeddings, settings): ...  # embeddings: 객체 또는 팩토리(한 번만 호출)
+    def __init__(self, client, settings, *, embeddings=None, embeddings_factory=None): ...  # 팩토리는 한 번만 호출
     settings                                               # 컬렉션 이름 등은 여기서 읽는다
     embeddings                                             # 처음 접근할 때 해결 (키 검사 시점)
     def collection(self, name: str): ...                   # langchain_chroma.Chroma 래퍼
@@ -69,7 +69,7 @@ python -m scripts.index_meta --batch-size 50  # 배치 크기를 이번 실행�
 ```
 
 - 계층 규칙상 스크립트는 `index`를 직접 부르지 않는다. `services/indexing.py`의 `index_catalog`가 F2001 `Catalog`와 `VectorStore`를 잇는다. 스크립트는 `Services.store` · `Services.catalog`(container)로 얻는다.
-- `VectorStore`는 임베딩을 **처음 필요할 때** 만든다. 그래서 `--count` · `--show`는 GMS 키 없이 동작한다. 팩토리 여부는 타입이 아니라 상태로 구분한다(팩토리는 한 번만 호출하고 결과를 캐시).
+- `VectorStore`는 임베딩을 **처음 필요할 때** 만든다. 그래서 `--count` · `--show`는 GMS 키 없이 동작한다. 객체와 팩토리는 **서로 다른 인자**로 받는다(타입으로 추측하지 않음). 팩토리는 한 번만 호출하고 결과를 캐시한다.
 - 배치 크기 · 재시도 횟수 · 재시도 대기는 `config/settings.json`의 `indexing` 묶음에서 읽는다(A-21). `batch_size < 1` 또는 `retries < 0`이면 `SettingsError`.
 - `IndexReport`: `loaded`(로드 원소 수 = 항목 + 건너뜀), `skipped`, `indexed`(로드한 ID 중 컬렉션에 있는 수), `removed`(지운 고아 문서 수), `failed_batches`, `ok`.
 - 불일치 안내에는 `--rebuild`로 다시 만들 수 있다는 해결 방법을 함께 보인다.
