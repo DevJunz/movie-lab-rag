@@ -14,6 +14,10 @@ def test_tc_nf2005_06_external_connection_blocked():
         socket.create_connection(("example.com", 80), timeout=1)
     with pytest.raises(NetworkBlockedError):
         socket.socket().connect(("93.184.216.34", 80))
+    with pytest.raises(NetworkBlockedError):
+        socket.gethostbyname("example.com")
+    with pytest.raises(NetworkBlockedError):
+        socket.gethostbyname_ex("example.com")
 
 
 def test_tc_nf2005_06_loopback_allowed():
@@ -24,3 +28,15 @@ def test_tc_nf2005_06_loopback_allowed():
     finally:
         left.close()
         right.close()
+
+
+def test_tc_nf2005_06_tracing_env_isolated():
+    import os
+
+    for name in (
+        "LANGCHAIN_TRACING_V2",
+        "LANGSMITH_TRACING_V2",
+        "LANGCHAIN_ENDPOINT",
+        "LANGSMITH_ENDPOINT",
+    ):
+        assert name not in os.environ

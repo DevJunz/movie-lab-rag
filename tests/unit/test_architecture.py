@@ -17,18 +17,12 @@ def test_tc_nf2005_01_packages_exist():
 
 
 def test_tc_nf2005_02_no_import_violations():
-    violations = []
-    for path in archcheck.python_files():
-        rel = path.relative_to(ROOT).as_posix()
-        violations += check_imports(path.read_text(encoding="utf-8"), rel)
+    violations = archcheck.scan_repo(check_imports)
     assert violations == [], "\n".join(map(str, violations))
 
 
 def test_tc_nf2005_03_no_domain_literals_outside_data():
-    violations = []
-    for path in archcheck.python_files():
-        rel = path.relative_to(ROOT).as_posix()
-        violations += check_domain_literals(path.read_text(encoding="utf-8"), rel)
+    violations = archcheck.scan_repo(check_domain_literals)
     assert violations == [], "\n".join(map(str, violations))
 
 
@@ -36,6 +30,11 @@ def test_tc_nf2005_04_checker_detects_violations():
     # rag는 data를 import 할 수 없다 (절대 · 상대 import 모두)
     assert check_imports("from movielab.data import movies\n", "movielab/rag/graph.py")
     assert check_imports("from ..data import movies\n", "movielab/rag/graph.py")
+    # 패키지 루트에서 이름으로 가져오는 형태도 잡는다 (PR #24 리뷰)
+    assert check_imports("from movielab import data\n", "movielab/rag/graph.py")
+    assert check_imports("from .. import container\n", "movielab/rag/graph.py")
+    assert check_imports("from movielab import core, data\n", "movielab/rag/graph.py")
+    assert not check_imports("from movielab import core\n", "movielab/rag/graph.py")
     # ui는 index를 직접 import 할 수 없다
     assert check_imports("import movielab.index.store\n", "movielab/ui/streamlit_app.py")
     # core는 외부 패키지(chromadb)를 쓸 수 없다
@@ -71,5 +70,6 @@ def test_tc_nf2005_11_source_files_not_git_ignored():
         text=True,
         encoding="utf-8",
     )
+    assert result.returncode in (0, 1), f"git check-ignore 실패: {result.stderr}"
     ignored = result.stdout.split()
     assert ignored == [], f".gitignore에 걸린 소스 파일: {ignored}"

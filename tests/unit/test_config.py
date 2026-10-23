@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import pickle
 from pathlib import Path
 
 from movielab.config import load_settings
@@ -40,3 +42,11 @@ def test_tc_nf2005_09_tmp_settings_points_into_tmp_path(tmp_settings, tmp_path: 
     assert tmp_settings.path("chroma_dir").is_relative_to(tmp_path)
     assert tmp_settings.path("manifest").is_relative_to(tmp_path)
     assert tmp_settings.path("movies").name == "movies_small.json"
+
+
+def test_tc_nf2005_09_settings_survive_copy_and_pickle():
+    settings = load_settings()
+    section = copy.deepcopy(settings.chunking)
+    assert section.chunk_size == 1000
+    assert pickle.loads(pickle.dumps(settings.retrieval)).top_k == 4
+    assert pickle.loads(pickle.dumps(settings)).chunking.chunk_overlap == 200

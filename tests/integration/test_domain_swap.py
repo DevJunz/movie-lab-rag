@@ -2,18 +2,8 @@
 
 from __future__ import annotations
 
-from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
-
-BOOK_PROFILE = DomainProfile(
-    item_label="도서",
-    expert_role="도서 큐레이터",
-    assistant_role="도서 지식 도우미",
-    meta_source_label="도서 메타데이터",
-    doc_source_label="위키백과",
-    meta_link_label="출판사",
-    attribution_notice="도서 정보: 테스트",
-)
+from tests.fakes import BOOK_PROFILE
 
 TEMPLATE = (
     "너는 {expert_role}이다. "
@@ -35,3 +25,14 @@ def test_tc_nf2005_05_movie_profile_renders_movie_words():
 
 def test_tc_nf2005_05_render_keeps_extra_fields():
     assert BOOK_PROFILE.render("{item_label}: {title}", title="데미안") == "도서: 데미안"
+
+
+def test_tc_nf2005_05_render_keeps_json_braces_and_unknown_placeholders():
+    template = (
+        "[작업: 사실 판정]\n"
+        '{item_label} 주장. 출력: {"verdict": "사실", "citations": [1]} {unknown}'
+    )
+    text = BOOK_PROFILE.render(template)
+    assert '{"verdict": "사실", "citations": [1]}' in text
+    assert "{unknown}" in text
+    assert text.startswith("[작업: 사실 판정]\n도서 주장.")

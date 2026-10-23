@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from movielab.container import build_services
 from movielab.data.domain_movie import MOVIE_PROFILE
-from tests.fakes import FakeChatModel, FakeEmbeddings, FakeHttpSession
-from tests.integration.test_domain_swap import BOOK_PROFILE
+from tests.fakes import BOOK_PROFILE, FakeChatModel, FakeEmbeddings, FakeHttpSession
 
 
 def test_tc_nf2005_10_injected_dependencies_are_used(tmp_settings):
