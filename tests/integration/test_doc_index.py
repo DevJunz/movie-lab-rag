@@ -353,3 +353,26 @@ def test_tc_f2005_28_prune_only_without_key(tmp_settings):
     report = reindex_documents([], _indexer(keyless.store))
     assert report.removed == 1
     assert keyless.store.count("wiki_docs") == 0
+
+
+def test_tc_f2005_32_upsert_in_batches(tmp_settings, tmp_path):
+    raw = json.loads(json.dumps(tmp_settings.raw))
+    raw["chunking"].update(chunk_size=100, chunk_overlap=0)
+    raw["indexing"]["batch_size"] = 2
+    path = tmp_path / "settings_batch.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    services = _services(load_settings(path))
+    store = services.store
+    calls = []
+    original = store.upsert
+
+    def counting_upsert(name, documents):
+        calls.append(len(documents))
+        return original(name, documents)
+
+    store.upsert = counting_upsert
+    text = "\n\n".join(["[합성] " + "가" * 90] * 5)  # 문단 5개 → 청크 5개
+    count = _indexer(store).index_document(dataclasses.replace(_doc(), text=text))
+    assert count == 5
+    assert calls == [2, 2, 1]
+    assert store.count("wiki_docs") == 5

@@ -316,3 +316,27 @@ def test_tc_f2005_30_empty_movie_id_and_override_notice(tmp_settings, monkeypatc
     assert "문서 2건" in out and "되돌" not in out
     assert reindex_docs.main(["--chunk-size", "500", "--chunk-overlap", "100"]) == 0
     assert "되돌" in capsys.readouterr().out
+
+
+def test_tc_f2005_31_broken_raw_file_skipped_and_kept(tmp_settings, monkeypatch, capsys):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    indexer = services.doc_indexer()
+    for page_id in ("1", "2", "3"):
+        doc = dataclasses.replace(make_doc(page_id, f"문서{page_id}"), movie_id="157336")
+        services.raw_store.save(doc)
+        indexer.index_document(doc)
+    services.raw_store.path("157336", "2").write_text("{깨진 json", encoding="utf-8")
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    assert reindex_docs.main([]) == 1  # 실패 1건이 있으면 종료 코드 1
+    out = capsys.readouterr().out
+    assert "문서 2건" in out and "색인하지 못한 문서 1건" in out
+    assert services.store.count_where("wiki_docs", {"page_id": "2"}) > 0  # 깨진 원문의 청크는 유지
