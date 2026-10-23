@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2006** 외부 API 예절 (품질) |
 | 구분 | MVP (비기능) |
-| 상태 | Done (live 검증 대기) |
+| 상태 | Done |
 | 담당 모듈 | `movielab/data/wiki_api.py` (`WikiHttpClient`) |
 | 선행 SPEC | SPEC-NF2005, SPEC-NF2003 |
 | 관련 ISSUE | #5 |
