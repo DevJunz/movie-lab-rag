@@ -47,3 +47,9 @@ def test_tc_f2008_04_selects_only_cited_keeping_numbers():
 def test_tc_f2008_05_uncited():
     result = select_cited("제공된 문서에서 확인되지 않습니다.", _evidences(3))
     assert result.cited == [] and result.uncited is True
+
+
+def test_tc_f2008_05_more_forms_and_noncontiguous_numbers():
+    assert extract_citations("[근거 1, 근거 3] [근거 4·5] [근거 6~8]") == [1, 3, 4, 5, 6, 7, 8]
+    evidences = [e for e in _evidences(5) if e.n in (1, 2, 5)]
+    assert [e.n for e in select_cited("가 [근거 5]", evidences).cited] == [5]

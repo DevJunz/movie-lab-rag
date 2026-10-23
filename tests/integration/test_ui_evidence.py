@@ -49,7 +49,7 @@ def test_tc_f2008_06_only_cited_with_link_type_license():
     assert "TMDB" in text and "원문" in text
     assert text.count("CC BY-SA 4.0") == 1  # 라이선스는 위키백과 근거에만
     assert len(at.expander) == 2  # 근거마다 본문 미리보기
-    previews = [m.value for e in at.expander for m in e.markdown]
+    previews = [t.value for e in at.expander for t in e.text]
     assert previews and all(len(p) <= 201 for p in previews)  # 200자 + 줄임표
     assert not at.info
 
@@ -74,4 +74,28 @@ def test_tc_f2008_06_link_with_parentheses_kept_whole():
         text="[합성]",
     )
     line = evidence_line(evidence, MOVIE_PROFILE)
-    assert "(https://ko.wikipedia.org/wiki/트리니티_%28핵_실험%29)" in line
+    assert "%28" in line and "%29" in line and line.rstrip().endswith("CC BY-SA 4.0")
+    assert (
+        "(https://ko.wikipedia.org/wiki/" in line
+        and ")" not in line.split("](", 1)[1].split(")")[0]
+    )
+
+
+def test_tc_f2008_06_title_escaped_and_preview_plain():
+    from movielab.ui.components.evidence import evidence_line
+
+    evidence = dataclasses_replace(_evidence(2), title="제목*별[x]", url="https://a.invalid/a b>c")
+    line = evidence_line(evidence, MOVIE_PROFILE)
+    assert "제목\\*별\\[x\\]" in line and "a%20b%3Ec" in line
+    at = _run(
+        CitedResult(
+            cited=[dataclasses_replace(_evidence(3), text="$100 와 $200 # 제목")], uncited=False
+        )
+    )
+    assert any("$100 와 $200 # 제목" in t.value for t in at.text)
+
+
+def dataclasses_replace(obj, **kw):
+    import dataclasses
+
+    return dataclasses.replace(obj, **kw)

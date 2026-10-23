@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 
+import re
+from urllib.parse import quote
+
 import streamlit as st
 
 from movielab.core import messages
@@ -24,15 +27,20 @@ def _link_label(evidence: Evidence, profile: DomainProfile) -> str:
 
 def evidence_line(evidence: Evidence, profile: DomainProfile) -> str:
     """`[근거 n] 출처 유형 · 제목 · 링크 ↗ (· 라이선스)` 한 줄 (마크다운)."""
-    parts = [f"**[근거 {evidence.n}]** {evidence.source_type}", evidence.title]
+    parts = [f"**[근거 {evidence.n}]** {evidence.source_type}", _escape(evidence.title)]
     if evidence.url:
-        url = evidence.url.replace("(", "%28").replace(
-            ")", "%29"
-        )  # 마크다운 링크가 괄호에서 끊기지 않게
+        # 마크다운 링크가 괄호 · 공백 · 꺾쇠에서 끊기지 않게 인코딩한다
+        url = quote(evidence.url, safe=":/?#=&%@+,;!$'*~.-_")
+        url = url.replace("(", "%28").replace(")", "%29")
         parts.append(f"[{_link_label(evidence, profile)} ↗]({url})")
     if evidence.license:
         parts.append(evidence.license)
     return " · ".join(parts)
+
+
+def _escape(text: str) -> str:
+    """제목의 마크다운 특수 문자를 이스케이프한다."""
+    return re.sub(r"([\\`*_\[\]<>#|~])", r"\\\1", text)
 
 
 def _preview(text: str, limit: int) -> str:
@@ -49,4 +57,4 @@ def render_evidence(result: CitedResult, profile: DomainProfile, *, preview_char
     for evidence in result.cited:
         st.markdown(evidence_line(evidence, profile))
         with st.expander(f"[근거 {evidence.n}] 본문 미리보기"):
-            st.markdown(_preview(evidence.text, preview_chars))
+            st.text(_preview(evidence.text, preview_chars))  # 일반 텍스트 ($ · # 해석 안 함)
