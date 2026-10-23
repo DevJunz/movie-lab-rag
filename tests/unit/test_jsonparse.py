@@ -42,3 +42,26 @@ def test_tc_f2003_08_parse_json_object_valid(text, expected):
 @pytest.mark.parametrize("text", ["", "[1]", "{깨진", None])
 def test_tc_f2003_08_parse_json_object_invalid(text):
     assert parse_json_object(text, default={"x": 0}) == {"x": 0}
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # 배열 뒤 설명에 대괄호가 있어도 앞의 배열을 읽는다 (PR #29 리뷰)
+        ('["블랙홀"]\n(참고: [1] 위키백과)', ["블랙홀"]),
+        # 앞에 JSON이 아닌 대괄호가 있으면 건너뛴다
+        ('설명 [근거 1] 이후 ["a"]', ["a"]),
+        ('```\n["a", "b"]\n```\n끝 [x]', ["a", "b"]),
+    ],
+)
+def test_tc_f2003_08_first_valid_json_value_wins(text, expected):
+    assert parse_json_array(text) == expected
+
+
+def test_tc_f2003_08_wrong_outer_shape_is_default():
+    assert parse_json_object('[{"verdict": "사실"}]', default="기본") == "기본"
+    assert parse_json_array('{"verdict": "사실", "citations": [1]}', default="기본") == "기본"
+    assert parse_json_object('{"verdict": "사실", "citations": [1]} 끝 [2]') == {
+        "verdict": "사실",
+        "citations": [1],
+    }

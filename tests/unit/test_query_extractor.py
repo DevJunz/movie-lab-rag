@@ -71,3 +71,21 @@ def test_tc_f2003_06_cleanup_dedupe_and_limit(tmp_settings, interstellar):
 def test_tc_f2003_06_empty_array_is_fallback(tmp_settings, interstellar):
     plan, _ = _extract(tmp_settings, interstellar, "[]")
     assert plan.fallback and plan.llm_queries == []
+
+
+def test_tc_f2003_12_profile_without_item_functions_does_not_crash(tmp_settings, interstellar):
+    from tests.fakes import BOOK_PROFILE  # item_card · item_doc_queries 없음
+
+    llm = FakeChatModel(rules={TASK: '["데미안"]'})
+    plan = QueryExtractor(llm, BOOK_PROFILE, tmp_settings).extract(interstellar, "작가는?")
+    assert plan.item_queries == [] and plan.llm_queries == ["데미안"]
+    (prompt,) = llm.prompts_for(TASK)
+    assert "도서: 인터스텔라 (2014)" in prompt
+
+
+def test_tc_f2003_11_card_length_comes_from_settings(tmp_settings, interstellar):
+    tmp_settings.raw["collect"]["card_overview_chars"] = 5
+    _, llm = _extract(tmp_settings, interstellar, '["블랙홀"]')
+    (prompt,) = llm.prompts_for(TASK)
+    line = next(ln for ln in prompt.splitlines() if "줄거리(앞부분):" in ln)
+    assert line.split("줄거리(앞부분): ")[1].startswith("[합성] …"[:6])
