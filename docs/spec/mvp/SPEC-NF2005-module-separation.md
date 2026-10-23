@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2005** 모듈 분리 (확장성) |
 | 구분 | MVP (비기능) — **첫 구현 이슈** |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | 패키지 골격 전체, `movielab/container.py`, `tests/conftest.py`, `tests/fakes/`, `tests/unit/test_architecture.py`, `pyproject.toml`, `.github/workflows/ci.yml` |
 | 선행 SPEC | 없음 |
 | 관련 ISSUE | #1 |

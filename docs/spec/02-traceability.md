@@ -30,7 +30,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 | NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 7 | V4.2-3, V4.7-2 | 8 | #8 | Draft |
 | NF2003 | 보안 | API 키 관리 | [SPEC-NF2003](mvp/SPEC-NF2003-api-key-management.md) | `config.py`, `providers.py` | 5 | V4.7-3 | 2 | #2 | Draft |
 | NF2004 | 보안 | 내부 정보 비노출 | [SPEC-NF2004](mvp/SPEC-NF2004-no-internal-exposure.md) | `ui/`, `core/messages.py` | 5 | V4.7-4 | 15 | #15 | Draft |
-| NF2005 | 확장성 | 모듈 분리 | [SPEC-NF2005](mvp/SPEC-NF2005-module-separation.md) | 골격 · `tests/` · CI | 6 | V4.7-5 | **1** | #1 | In Progress |
+| NF2005 | 확장성 | 모듈 분리 | [SPEC-NF2005](mvp/SPEC-NF2005-module-separation.md) | 골격 · `tests/` · CI | 6 | V4.7-5 | **1** | #1 | Done |
 | NF2006 | 품질 | 외부 API 예절 | [SPEC-NF2006](mvp/SPEC-NF2006-external-api-etiquette.md) | `data/wiki_api.py` | 7 | V4.7-6 | 5 | #5 | Draft |
 | NF2007 | 법 · 윤리 | 출처와 이용 조건 | [SPEC-NF2007](mvp/SPEC-NF2007-source-license.md) | `README.md`, `ui/` | 5 | V4.7-7 | 19 | #19 | Draft |
 
