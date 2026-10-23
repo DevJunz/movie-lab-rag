@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2001** 항목 메타데이터 적재 (데이터 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/data/movies.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-NF2005, SPEC-NF2003 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #3 |
 
 ## 1. 요구사항 원문
 
