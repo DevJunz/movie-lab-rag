@@ -372,6 +372,7 @@ class RAGState(TypedDict, total=False):
     contexts: list         # list[Evidence] — retrieve가 채움
     no_external: bool      # 외부 근거가 하나도 없음 — retrieve가 채움 (F2006 → F2012 안내)
     answer: str            # generate가 채움 (factcheck은 JSON 문자열)
+    not_found: bool        # generate가 채움 — 답 전체가 '확인되지 않음' 문장 (F2007)
 ```
 
 - 노드는 정확히 `retrieve`, `generate` 두 개. 간선 `START → retrieve → generate → END`.
