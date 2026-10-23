@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2012** 진행 상태 및 안내 (UI · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/core/messages.py`, `movielab/core/errors.py`, `movielab/services/health.py`, `movielab/ui/streamlit_app.py`, `movielab/data/domain_movie.py`(면책 문구 값) |
 | 선행 SPEC | SPEC-F2004, SPEC-F2009 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #14 |
 
 ## 1. 요구사항 원문
 
@@ -35,6 +35,7 @@
 | `extract_queries` | 검색어를 고르는 중… → 완료 후 `검색어: 웜홀, 블랙홀, …` |
 | `resolve_item_doc` | 영화 문서를 찾는 중… |
 | `search` | 위키백과에서 후보 문서를 찾는 중… (`n/N` 검색어) |
+| `filter` | 후보 문서를 정리하는 중… |
 | `select` | 읽을 문서를 고르는 중… |
 | `fetch` | 문서 본문을 가져오는 중… (`n/N`) |
 | `index` | 문서를 색인하는 중… |
@@ -42,6 +43,9 @@
 | `generate` | 답변을 작성하는 중… |
 | `done` | 완료 — 수집한 문서: `인터스텔라`, `블랙홀`, … (버린 문서 n건) |
 
+- `retrieve` · `generate`는 `QAService`가 보낸다: 그래프를 `stream(stream_mode="updates")`로 돌려 `retrieve` 시작 전에 `retrieve`,
+  `retrieve` 노드가 끝나면 `generate`를 알린다 (그래프 노드는 두 개 그대로, F2007).
+- 단계 문구는 `core/messages.PROGRESS`(단계 키 → 템플릿)에서 가져온다. 모르는 단계 키는 표시하지 않는다.
 - 완료되면 상태 상자를 접고 라벨을 `완료 (n.n초)`로 바꾼다. 펼치면 수집 상세(검색어, 색인 / 버림 목록과 사유)를 볼 수 있다 (V4.2-1, V4.2-2 증빙에도 사용).
 - 관람 가이드 · 사실 판정 · 조건 탐색에도 같은 방식으로 표시한다.
 
@@ -61,7 +65,11 @@
 | `GENERIC_ERROR` | 그 밖의 예외 | 처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요. | `st.error` (상세는 로그만, NF2004) |
 | `DISCLAIMER` | `DomainProfile.disclaimer`가 있고 `domain.disclaimer_enabled == true` | (도메인이 정한 문구) | 모든 답변 · 특화 기능 결과 아래 `st.caption` |
 
-- 시작 점검은 `services.health.check() -> HealthStatus{api_key_ok, meta_count, docs_count}` 하나로 한다. 사이드바 색인 건수(F2002)도 이 값을 쓴다.
+- 시작 점검은 `services.health() -> HealthStatus{api_key_ok, meta_count, docs_count}` 하나로 한다(`services/health.check(settings, store)`).
+  사이드바 색인 건수도 이 값을 쓴다 — F2009의 `index_counts()`를 대신한다. 건수는 임베딩(키) 없이 읽는다.
+- `NO_EXTERNAL_DOCS`는 `AnswerResult.no_external`(F2006 `RetrievalResult.no_external`을 그래프 상태로 전달)로 판단한다.
+- 질문 처리 중 안내 오류(`MovieLabUserError`: `ITEM_NOT_INDEXED` 등)는 그 코드의 문구를, 그 밖의 예외는 `GENERIC_ERROR`를 답변 자리에 `st.error`로 보인다
+  (예외 메시지 · traceback은 로그만).
 - 키 확인은 **값이 있는지만** 본다. 화면에 키 값 · 일부 · 길이를 표시하지 않는다(NF2004).
 
 ### 3.3 면책 안내
@@ -99,14 +107,14 @@
 | TC-F2012-06 | 통합 | `AppTest`: 영화 프로필 기본값 | 면책 문구 없음 | 05 | 〃 |
 | TC-F2012-07 | 단위 | `health.check()`: 키 유무 · 건수 조합 | `HealthStatus` 값 정확 | 02, 03 | `tests/unit/test_health.py` |
 | TC-F2012-08 | 통합 | `AppTest`: 서비스가 `RuntimeError("boom sk-test")` | `GENERIC_ERROR`만 보이고 `boom` · `Traceback` 미노출 | 06 | 〃 |
-| TC-F2012-09 | 수동 | 실제 Q1 첫 수집 / `.env` 없이 실행 / 빈 색인으로 실행 | 각 화면 캡처 | 01~03 | 스크린샷 |
+| TC-F2012-10 | 단위 | `QAService.ask`가 진행 콜백으로 보내는 단계 | 수집 단계들 뒤에 `retrieve` → `generate` 순서, `no_external` 전달 | 01, 04 | `tests/unit/test_qa_service.py` |
+| TC-F2012-09 | 수동 | 실제 Q1 첫 수집 / `.env` 없이 실행 / 빈 색인으로 실행 | 각 화면 기록 (실제 서비스 `AppTest` 텍스트, 브라우저 캡처는 수동 단계) | 01~03 | `docs/verification/evidence/V4.4-4_5_status.txt` |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.4-4 | 수집 중 · 완료 상태 화면 | `docs/verification/screenshots/V4.4-4_progress_*.png` |
-| V4.4-5 | 키 없음 · 색인 없음 화면 | `docs/verification/screenshots/V4.4-5_no_key.png`, `V4.4-5_no_index.png` |
+| V4.4-4, V4.4-5 | 실제 서비스로 화면 함수를 `AppTest`로 실행: 첫 수집의 단계 기록 · 완료 라벨 · 수집 상세, 키 없음 · 색인 없음 화면 문구 (브라우저 캡처는 수동 단계로 추가) | `docs/verification/evidence/V4.4-4_5_status.txt` |
 | V4.4-6 | 해당 없음(영화) — 테스트 결과로 기능만 증빙 | 검증 결과 문서에 "해당 없음(N/A), 기능 테스트 TC-F2012-05 통과"로 기록 |
 
 ## 8. 범위 밖
