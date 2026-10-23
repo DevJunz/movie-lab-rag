@@ -11,17 +11,20 @@
 from __future__ import annotations
 
 import email.utils
+import html
 import logging
 import math
+import re
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import requests
 
 from movielab.core.errors import ExternalSourceUnavailableError
+from movielab.core.types import Candidate, SourceDocument
 
 logger = logging.getLogger(__name__)
 
@@ -217,3 +220,117 @@ class WikiHttpClient:
                 )
                 return data
         raise AssertionError("도달하지 않는다")  # attempts >= 1이므로 루프 안에서 끝난다
+
+
+# --- 문서 소스 (SPEC-F2004 §3.1) ---
+
+SOURCE_NAME = "한국어 위키백과"
+_TAG = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text: str) -> str:
+    return " ".join(html.unescape(_TAG.sub("", text or "")).split())
+
+
+def _is_disambiguation(page: dict[str, Any]) -> bool:
+    return "disambiguation" in (page.get("pageprops") or {}) or str(page.get("title", "")).endswith(
+        "(동음이의)"
+    )
+
+
+class WikiApiSource:
+    """MediaWiki API 기반 문서 소스. 모든 요청은 WikiHttpClient(NF2006)를 거친다."""
+
+    kind = "api"
+
+    def __init__(self, client: WikiHttpClient) -> None:
+        self.client = client
+
+    def search(self, query: str, limit: int, item_id: str | None = None) -> list[Candidate]:
+        data = self.client.get(
+            {
+                "action": "query",
+                "list": "search",
+                "srsearch": query,
+                "srlimit": limit,
+                "srnamespace": 0,
+                "srprop": "snippet|size",
+            }
+        )
+        results = (data.get("query") or {}).get("search") or []
+        return [
+            Candidate(
+                page_id=str(r["pageid"]),
+                title=r["title"],
+                snippet=_strip_html(r.get("snippet", "")),
+                size=int(r.get("size") or 0),
+                query=query,
+                disambiguation=_is_disambiguation(r),
+            )
+            for r in results
+        ]
+
+    def resolve_titles(self, titles: list[str]) -> list[Candidate]:
+        """제목 직접 조회. 넘겨주기를 따라가고, 요청한 제목(`matched_title`) 순서로 돌려준다."""
+        data = self.client.get(
+            {
+                "action": "query",
+                "titles": "|".join(titles),
+                "redirects": 1,
+                "prop": "info|pageprops|extracts",
+                "ppprop": "disambiguation",
+                "inprop": "url",
+                "exintro": 1,
+                "explaintext": 1,
+                "exchars": 300,
+                "exlimit": len(titles),
+            }
+        )
+        query = data.get("query") or {}
+        rename = {n["from"]: n["to"] for n in query.get("normalized") or []}
+        redirect = {r["from"]: r["to"] for r in query.get("redirects") or []}
+        pages = {p["title"]: p for p in query.get("pages") or [] if not p.get("missing")}
+        found: list[Candidate] = []
+        for requested in titles:
+            title = rename.get(requested, requested)
+            title = redirect.get(title, title)
+            page = pages.get(title)
+            if page is None or "pageid" not in page:
+                continue
+            found.append(
+                Candidate(
+                    page_id=str(page["pageid"]),
+                    title=page["title"],
+                    snippet=page.get("extract") or "",
+                    url=page.get("fullurl", ""),
+                    matched_title=requested,
+                    disambiguation=_is_disambiguation(page),
+                )
+            )
+        return found
+
+    def fetch(self, page_id: str) -> SourceDocument | None:
+        data = self.client.get(
+            {
+                "action": "query",
+                "pageids": page_id,
+                "prop": "extracts|info",
+                "explaintext": 1,
+                "inprop": "url",
+            }
+        )
+        pages = (data.get("query") or {}).get("pages") or []
+        if not pages or pages[0].get("missing") or "pageid" not in pages[0]:
+            return None
+        page = pages[0]
+        return SourceDocument(
+            page_id=str(page["pageid"]),
+            title=page["title"],
+            url=page.get("fullurl", ""),
+            text=page.get("extract") or "",
+            source=SOURCE_NAME,
+            movie_id="",
+            related_movie="",
+            search_query="",
+            collected_at=date.today().isoformat(),
+        )

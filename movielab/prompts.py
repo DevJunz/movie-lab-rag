@@ -33,3 +33,34 @@ def build_query_prompt(
         min_queries=min_queries,
         max_queries=max_queries,
     )
+
+
+# P2 후보 선별 (SPEC-F2004 §3.6) — 본문을 받기 전에 제목 · 요약만 보고 고른다
+CANDIDATE_SELECTION = """[작업: 후보 선별]
+너는 자료 조사원이다. {item_label} '{item_name}'에 대한 질문에 답하는 데 도움이 될 문서를 고른다.
+질문: {question}
+
+후보 (번호. 제목: 요약):
+{candidate_lines}
+
+규칙:
+- 질문에 답하는 데 직접 도움이 되는 문서만 고른다. 최대 {max_selected}개.
+- 제목이 같아도 다른 대상(음반, 동명 인물 등)을 다룬 문서는 고르지 않는다.
+- 출력은 고른 번호의 JSON 정수 배열 하나만. 고를 것이 없으면 []."""
+
+
+def build_selection_prompt(
+    profile: DomainProfile,
+    *,
+    item_name: str,
+    question: str,
+    candidate_lines: str,
+    max_selected: int,
+) -> str:
+    return profile.render(
+        CANDIDATE_SELECTION,
+        item_name=item_name,
+        question=question,
+        candidate_lines=candidate_lines,
+        max_selected=max_selected,
+    )

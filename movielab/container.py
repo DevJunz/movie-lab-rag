@@ -15,10 +15,15 @@ import requests
 from chromadb.config import Settings as ChromaSettings
 
 from movielab import providers
+from movielab.collect.collector import Collector
+from movielab.collect.query_extractor import QueryExtractor
+from movielab.collect.selector import CandidateSelector
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
-from movielab.data.wiki_api import WikiHttpClient, shared_throttle
+from movielab.data.raw_store import RawStore
+from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttle
+from movielab.data.wiki_bundle import WikiBundleSource
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -86,6 +91,24 @@ class Services:
                     throttle=shared_throttle(wiki.api_url, wiki.min_interval_sec),
                 )
         return self._wiki_client
+
+    @property
+    def collector(self) -> Collector:
+        """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
+
+        수집 캐시(NF2002)와 청크 색인기(F2005)는 해당 SPEC에서 연결한다.
+        """
+        settings = self.settings
+        api_source = WikiApiSource(self.wiki_client) if settings.secrets.wiki_contact else None
+        return Collector(
+            api_source=api_source,
+            bundle_source=WikiBundleSource(settings.path("wiki_bundle")),
+            extractor=QueryExtractor(self.llm, self.profile, settings),
+            selector=CandidateSelector(self.llm, self.profile, settings),
+            raw_store=RawStore(settings.path("raw_dir")),
+            profile=self.profile,
+            settings=settings,
+        )
 
 
 def build_services(
