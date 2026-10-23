@@ -7,11 +7,20 @@ import math
 import pytest
 import requests
 
-from tests.fakes import FakeChatModel, FakeClock, FakeEmbeddings, FakeHttpSession, FakeResponse, task_of
+from tests.fakes import (
+    FakeChatModel,
+    FakeClock,
+    FakeEmbeddings,
+    FakeHttpSession,
+    FakeResponse,
+    task_of,
+)
 
 
 def test_tc_nf2005_08_fake_chat_routes_by_task_header():
-    llm = FakeChatModel(rules={"검색어 추출": '["웜홀"]', "답변 생성": lambda p: "길이 " + str(len(p))})
+    llm = FakeChatModel(
+        rules={"검색어 추출": '["웜홀"]', "답변 생성": lambda p: "길이 " + str(len(p))}
+    )
     assert llm.invoke("[작업: 검색어 추출]\n질문").content == '["웜홀"]'
     assert llm.invoke("[작업: 답변 생성]\nabc").content.startswith("길이 ")
     assert llm.invoke("머리표 없음").content == ""

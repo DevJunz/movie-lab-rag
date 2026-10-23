@@ -43,7 +43,9 @@ def test_tc_nf2005_04_checker_detects_violations():
     # 허용되는 import는 통과
     assert not check_imports("from movielab.core import types\n", "movielab/rag/graph.py")
     assert not check_imports("from movielab.data import movies\n", "movielab/container.py")
-    assert not check_imports("import json\nfrom langchain_core.documents import Document\n", "movielab/core/types.py")
+    assert not check_imports(
+        "import json\nfrom langchain_core.documents import Document\n", "movielab/core/types.py"
+    )
     # 도메인 표현: data/ 밖은 위반, data/ 안 · docstring은 허용
     assert check_domain_literals('LABEL = "영화 메타데이터"\n', "movielab/rag/graph.py")
     assert check_domain_literals('KEY = "director"\n', "movielab/services/qa.py")

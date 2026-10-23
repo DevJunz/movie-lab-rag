@@ -14,6 +14,7 @@ markers = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+include = ["*.py", "*.pyi"]
 extend-exclude = ["영화도메인_데이터_배포용", "data", ".venv"]
 
 [tool.ruff.lint]

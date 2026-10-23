@@ -1,4 +1,4 @@
-"""SPEC-NF2005 AC-04 — 테스트용 DomainProfile을 주입하면 data/ 밖 코드는 다른 도메인 문구로 동작한다."""
+"""SPEC-NF2005 AC-04 — 테스트용 DomainProfile을 주입하면 다른 도메인 문구로 동작한다."""
 
 from __future__ import annotations
 
@@ -15,7 +15,10 @@ BOOK_PROFILE = DomainProfile(
     attribution_notice="도서 정보: 테스트",
 )
 
-TEMPLATE = "너는 {expert_role}이다. {item_label}에 대해 {meta_source_label}와 {doc_source_label}만 근거로 답한다."
+TEMPLATE = (
+    "너는 {expert_role}이다. "
+    "{item_label}에 대해 {meta_source_label}와 {doc_source_label}만 근거로 답한다."
+)
 
 
 def test_tc_nf2005_05_book_profile_renders_without_movie_words():

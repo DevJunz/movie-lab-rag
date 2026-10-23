@@ -1,6 +1,7 @@
 """모듈 의존 규칙과 도메인 격리 규칙 검사기 (SPEC-NF2005 §3.2, §3.3).
 
-01-architecture.md §2.1의 의존 규칙 표를 코드로 옮긴 것이다. 표를 바꾸면 이 파일도 같은 PR에서 바꾼다.
+01-architecture.md §2.1의 의존 규칙 표를 코드로 옮긴 것이다.
+표를 바꾸면 이 파일도 같은 PR에서 바꾼다.
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ class Violation:
 
 
 def area_of(rel_path: str) -> str | None:
-    """`movielab/collect/x.py` → `collect`, `movielab/config.py` → `config`, `scripts/x.py` → `scripts`."""
+    """파일 경로 → 영역. 예: `movielab/collect/x.py` → `collect`, `scripts/x.py` → `scripts`."""
     parts = Path(rel_path).with_suffix("").parts
     if parts[0] == "scripts":
         return "scripts"
@@ -100,11 +101,15 @@ def check_imports(source: str, rel_path: str) -> list[Violation]:
         target = _internal_target(module)
         if target is not None:
             if "*" not in allowed and target not in allowed:
-                violations.append(Violation(rel_path, line, f"'{area}'는 '{target}'를 import 할 수 없다"))
+                violations.append(
+                    Violation(rel_path, line, f"'{area}'는 '{target}'를 import 할 수 없다")
+                )
         elif area == "core":
             top = module.split(".")[0]
             if top not in sys.stdlib_module_names and top not in CORE_THIRD_PARTY:
-                violations.append(Violation(rel_path, line, f"'core'는 외부 패키지 '{top}'를 쓸 수 없다"))
+                violations.append(
+                    Violation(rel_path, line, f"'core'는 외부 패키지 '{top}'를 쓸 수 없다")
+                )
     return violations
 
 
@@ -128,11 +133,17 @@ def check_domain_literals(source: str, rel_path: str) -> list[Violation]:
     docstrings = _docstring_nodes(tree)
     violations: list[Violation] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+        ):
             match = FORBIDDEN_LITERAL.search(node.value)
             if match:
                 violations.append(
-                    Violation(rel_path, node.lineno, f"도메인 표현 '{match.group(0)}'은 data/에만 둔다")
+                    Violation(
+                        rel_path, node.lineno, f"도메인 표현 '{match.group(0)}'은 data/에만 둔다"
+                    )
                 )
     return violations
 

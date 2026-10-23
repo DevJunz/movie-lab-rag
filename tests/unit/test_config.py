@@ -1,4 +1,7 @@
-"""설정 로드 (SPEC-NF2005 TC-09). 키 관리(NF2003) · 값 검증(F2005 등) 테스트는 각 SPEC PR에서 추가한다."""
+"""설정 로드 (SPEC-NF2005 TC-09).
+
+키 관리(NF2003) · 값 검증(F2005 등) 테스트는 각 SPEC PR에서 추가한다.
+"""
 
 from __future__ import annotations
 

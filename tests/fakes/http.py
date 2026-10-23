@@ -29,7 +29,8 @@ Matcher = Callable[[dict[str, Any]], bool] | dict[str, Any]
 class FakeHttpSession:
     """`add(조건, 응답…)`으로 등록한다. 조건은 파라미터 부분 일치 dict 또는 함수.
 
-    응답은 `FakeResponse`, dict(200 JSON), 또는 던질 예외. 같은 조건의 응답은 차례로 쓰고 마지막 것을 반복한다.
+    응답은 `FakeResponse`, dict(200 JSON), 또는 던질 예외.
+    같은 조건의 응답은 차례로 쓰고 마지막 것을 반복한다.
     """
 
     def __init__(self, clock: Any = None) -> None:
