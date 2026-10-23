@@ -115,6 +115,30 @@ class Settings:
         return (value if value.is_absolute() else REPO_ROOT / value).resolve()
 
 
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate(raw: dict[str, Any], source: Path) -> None:
+    """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다. 묶음별 규칙은 해당 SPEC에서 더한다."""
+    indexing = raw.get("indexing")
+    if not isinstance(indexing, dict):
+        raise SettingsError(f"설정 값 오류: indexing은 객체여야 한다 ({source})")
+    rules = [
+        ("batch_size", lambda v: _is_int(v) and v >= 1),
+        ("retries", lambda v: _is_int(v) and v >= 0),
+        ("retry_wait_sec", lambda v: _is_number(v) and v >= 0),
+    ]
+    for name, ok in rules:
+        value = indexing.get(name)
+        if not ok(value):
+            raise SettingsError(f"설정 값 오류: indexing.{name}={value!r} ({source})")
+
+
 def load_settings(path: str | Path | None = None) -> Settings:
     """설정 파일과 비밀 값을 읽는다.
 
@@ -129,6 +153,7 @@ def load_settings(path: str | Path | None = None) -> Settings:
         raise SettingsError(f"설정 파일이 없다: {chosen}") from exc
     except json.JSONDecodeError as exc:
         raise SettingsError(f"설정 파일 형식 오류: {chosen} ({exc.msg})") from exc
+    _validate(raw, chosen)
     for key, env_name in MODEL_ENV.items():
         override = _get(env, env_name)
         if override:

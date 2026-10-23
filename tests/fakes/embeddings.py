@@ -4,14 +4,25 @@ from __future__ import annotations
 
 import math
 import zlib
+from collections.abc import Callable
 
 from langchain_core.embeddings import Embeddings
 
 
 class FakeEmbeddings(Embeddings):
-    def __init__(self, size: int = 256) -> None:
+    """`fail_when(texts)`가 참이면 `embed_documents`가 `error()`를 던진다 (색인 실패 재현용)."""
+
+    def __init__(
+        self,
+        size: int = 256,
+        *,
+        fail_when: Callable[[list[str]], bool] | None = None,
+        error: Callable[[], BaseException] = lambda: RuntimeError("임베딩 서버 오류"),
+    ) -> None:
         self.size = size
         self.calls = 0
+        self.fail_when = fail_when
+        self.error = error
 
     def _embed(self, text: str) -> list[float]:
         vector = [0.0] * self.size
@@ -24,6 +35,8 @@ class FakeEmbeddings(Embeddings):
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         self.calls += 1
+        if self.fail_when is not None and self.fail_when(texts):
+            raise self.error()
         return [self._embed(t) for t in texts]
 
     def embed_query(self, text: str) -> list[float]:

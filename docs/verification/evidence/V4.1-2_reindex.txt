@@ -1,0 +1,7 @@
+$ python -m scripts.index_meta   # 2회차 — 건수가 늘지 않아야 함
+로드 964건 / 색인 964건 / 건너뜀 0건
+exit=0
+
+$ python -m scripts.index_meta --count
+movie_meta: 964
+wiki_docs: 0

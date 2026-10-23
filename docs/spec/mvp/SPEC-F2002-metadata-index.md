@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2002** 메타데이터 색인(RAG 1) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | Done |
 | 담당 모듈 | `movielab/index/store.py`, `movielab/index/meta_indexer.py`, `scripts/index_meta.py` |
 | 선행 SPEC | SPEC-F2001 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #4 |
 
 ## 1. 요구사항 원문
 
@@ -26,34 +26,59 @@
 
 ### 3.1 동작
 
-1. `load_items()`(F2001)로 `ItemRecord` 목록을 얻는다.
-2. 컬렉션 `settings.collections.meta`(기본 `movie_meta`)를 가져오거나 만든다(코사인 거리).
-3. `ids = [item_id]`로 **upsert** 한다. 같은 ID는 덮어쓰기만 일어나므로 재실행해도 건수가 늘지 않는다.
-4. 임베딩 호출은 배치(기본 100건)로 나눠 보낸다. 배치 하나가 실패하면 재시도 후에도 실패한 배치를 보고하고, 이미 들어간 배치는 유지한다(재실행으로 이어서 채울 수 있다).
-5. `--rebuild` 옵션은 컬렉션을 지우고 처음부터 만든다.
-6. 끝나면 `로드 N건 / 색인 M건 / 건너뜀 K건`을 출력한다. `N - K == M`이 아니면 종료 코드 1.
+1. 인자 · 설정을 검사한다(`batch_size >= 1` 등). **이 단계까지 아무것도 지우지 않는다.**
+2. `Catalog.items()`(F2001)로 `ItemRecord` 목록을 얻는다. **0건이면 색인을 중단**하고(`DataEmptyError`, 안내 코드 `DATA_EMPTY`) 기존 색인을 그대로 둔다 — 빈 데이터로 전체를 고아 처리해 지우는 것을 막는다.
+3. 임베딩(=GMS 키)을 준비한다. 키가 없으면 안내 오류로 끝난다.
+4. 대상 컬렉션 `settings.collections.meta`(기본 `movie_meta`, 코사인 거리).
+   - **보통 실행**: 기존 컬렉션에 upsert 한다.
+   - **`--rebuild`**: 임시 컬렉션 `{이름}__rebuild`에 처음부터 만든다. **모든 배치가 성공했을 때만** 기존 컬렉션을 지우고 임시 컬렉션 이름을 바꿔 교체한다. 하나라도 실패하면(틀린 키 · GMS 장애 포함) 임시 컬렉션만 지우고 **기존 색인은 그대로 둔다**. 임베딩 모델을 바꿔 벡터 차원이 달라졌을 때도 이 방법으로 다시 만든다.
+5. `Document.id = item_id`로 **upsert** 한다. 같은 ID는 덮어쓰기만 일어나므로 재실행해도 건수가 늘지 않는다.
+6. 임베딩은 배치(`indexing.batch_size`, 기본 100)로 나눠 보낸다. 배치가 실패하면 `indexing.retry_wait_sec`만큼 기다린 뒤 `indexing.retries`번 재시도한다.
+   - **재시도하지 않는 오류**: 사용자 안내 오류(`MovieLabUserError`), 인증 · 권한 · 요청 형식 오류(OpenAI `AuthenticationError` · `PermissionDeniedError` · `BadRequestError` · `NotFoundError`), `ValueError` · `TypeError`(단 응답이 잘려 나는 `json.JSONDecodeError`는 일시 오류로 보고 재시도). 다시 해도 같은 결과이므로 즉시 전파한다.
+   - 인증 · 권한 오류는 `InvalidApiKeyError`(안내 코드 `API_KEY_INVALID`: "키가 올바르지 않거나 권한이 없습니다")로 바꿔 알린다 — "잠시 후 다시 시도" 같은 틀린 안내를 하지 않는다.
+   - 재시도 횟수는 우리 정책(A-21)만 따른다. 임베딩 클라이언트의 SDK 자체 재시도는 끈다(`max_retries=0`).
+   - 재시도 후에도 실패한 배치만 보고하고, 이미 들어간 배치는 유지한다(재실행으로 이어서 채울 수 있다).
+7. (보통 실행) 모든 배치가 성공하면, **이번에 로드하지 않은 ID의 문서(고아 문서)를 지운다** — 데이터에서 빠진 영화가 검색에 남지 않게. 실패 배치가 있으면 지우지 않는다.
+8. 끝나면 `로드 N건 / 색인 M건 / 건너뜀 K건`을 출력한다. `M`은 **로드한 ID 중 컬렉션에 있는 수**다. `N - K == M`이 아니거나 실패 배치가 있으면 종료 코드 1.
 
 ### 3.2 인터페이스
 
 ```python
 # movielab/index/store.py
 class VectorStore:
-    def __init__(self, client, embeddings, settings): ...
-    def collection(self, name: str): ...                 # langchain_chroma.Chroma 래퍼
-    def count(self, name: str) -> int: ...               # 저장된 청크 수
+    def __init__(self, client, settings, *, embeddings=None, embeddings_factory=None): ...  # 팩토리는 한 번만 호출
+    settings                                               # 컬렉션 이름 등은 여기서 읽는다
+    embeddings                                             # 처음 접근할 때 해결 (키 검사 시점)
+    def collection(self, name: str): ...                   # langchain_chroma.Chroma 래퍼
+    def count(self, name: str) -> int: ...                 # 저장된 청크 수 (임베딩 불필요)
+    def ids(self, name: str) -> list[str]: ...             # 저장된 청크 ID (임베딩 불필요)
     def get_by_ids(self, name: str, ids: list[str]) -> list[Document]: ...
+    def upsert(self, name: str, documents: list[Document]) -> None: ...  # ID는 Document.id
+    def delete_ids(self, name: str, ids: list[str]) -> None: ...
+    def delete_collection(self, name: str) -> None: ...
 
 # movielab/index/meta_indexer.py
-def index_items(store: VectorStore, items: list[ItemRecord], batch_size: int = 100) -> IndexReport: ...
+def index_items(store, items, *, collection, batch_size, retries, retry_wait_sec, sleep=time.sleep) -> list[int]:
+    """반환: 재시도 후에도 실패한 배치 번호(0부터)"""
+
+# movielab/services/indexing.py
+def index_catalog(catalog, store, *, rebuild=False, batch_size=None, sleep=time.sleep) -> IndexReport: ...
 ```
 
 ```text
 python -m scripts.index_meta              # 색인 (재실행 안전)
-python -m scripts.index_meta --rebuild    # 컬렉션을 지우고 다시 색인
+python -m scripts.index_meta --rebuild    # 키 확인 후 컬렉션을 지우고 다시 색인
 python -m scripts.index_meta --show 157336  # 색인 텍스트 출력 (F2001)
-python -m scripts.index_meta --count      # 현재 건수만 출력
+python -m scripts.index_meta --count      # 현재 건수만 출력 (키 없이 가능)
+python -m scripts.index_meta --batch-size 50  # 배치 크기를 이번 실행만 바꿈 (1 이상 정수)
 ```
 
+- 계층 규칙상 스크립트는 `index`를 직접 부르지 않는다. `services/indexing.py`의 `index_catalog`가 F2001 `Catalog`와 `VectorStore`를 잇는다. 스크립트는 `Services.store` · `Services.catalog`(container)로 얻는다.
+- `VectorStore`는 임베딩을 **처음 필요할 때** 만든다. 그래서 `--count` · `--show`는 GMS 키 없이 동작한다. 객체와 팩토리는 **서로 다른 인자**로 받는다(타입으로 추측하지 않음). 팩토리는 한 번만 호출하고 결과를 캐시한다.
+- 배치 크기 · 재시도 횟수 · 재시도 대기는 `config/settings.json`의 `indexing` 묶음에서 읽는다(A-21). 시작할 때 **타입까지** 검사한다: `batch_size` · `retries`는 정수(불리언 · 문자열 불가), `retry_wait_sec`은 숫자, `batch_size >= 1`, `retries >= 0`, `retry_wait_sec >= 0`, `indexing`은 객체. 어기면 `SettingsError`.
+- 스크립트의 인자 오류 문구도 `core/messages`에서 가져온다.
+- `IndexReport`: `loaded`(로드 원소 수 = 항목 + 건너뜀), `skipped`, `indexed`(로드한 ID 중 컬렉션에 있는 수), `removed`(지운 고아 문서 수), `failed_batches`, `ok`.
+- 불일치 안내에는 `--rebuild`로 다시 만들 수 있다는 해결 방법을 함께 보인다.
 - 메타데이터 필드는 [01-architecture.md §5.3](../01-architecture.md#53-메타데이터-필드)을 따른다.
 - UI 사이드바는 `services.health`를 통해 `movie_meta` · `wiki_docs` 건수를 표시한다(F2009 화면, F2012 안내와 연결).
 
@@ -62,7 +87,7 @@ python -m scripts.index_meta --count      # 현재 건수만 출력
 | ID | 내용 |
 |---|---|
 | A-19 | 코사인 거리 |
-| — | 임베딩 배치 크기 100 (설정 없이 상수. 바꿔야 하면 settings로 옮긴다) |
+| A-21 | 메타 색인 배치 100건, 배치당 재시도 1회, 재시도 전 2초 대기 (`settings.indexing`) |
 
 ## 5. 인수 조건
 
@@ -71,9 +96,11 @@ python -m scripts.index_meta --count      # 현재 건수만 출력
 | AC-F2002-01 | 색인 후 `movie_meta` 건수 == 로드한 영화 수 − 건너뛴 수 | V4.1-1 |
 | AC-F2002-02 | 색인을 두 번 실행해도 건수가 같다 | V4.1-2 |
 | AC-F2002-03 | 청크 ID는 `movie_id`이고, `get_by_ids([movie_id])`로 바로 꺼낼 수 있다 | (F2006 선행) |
-| AC-F2002-04 | 저장된 메타데이터에 `source_kind="meta"`, `source_type="영화 메타데이터"`, `url=tmdb_url`, `year`(int), `original_language`가 있다 | (F2007, F2011 선행) |
-| AC-F2002-05 | 스크립트와 UI에서 현재 색인 건수를 확인할 수 있다 | V4.1-1 |
+| AC-F2002-04 | 저장된 메타데이터에 `source_kind="meta"`, `source_type="영화 메타데이터"`, `url=tmdb_url`, `year`(int), `original_language`가 있고, 컬렉션은 코사인 거리다 | (F2007, F2011 선행) |
+| AC-F2002-05 | 스크립트와 UI에서 현재 색인 건수를 확인할 수 있다(스크립트는 키 없이) | V4.1-1 |
 | AC-F2002-06 | 목록 값이 Chroma 메타데이터에 문자열로 저장된다(목록 그대로 넣지 않는다) | — |
+| AC-F2002-07 | 키가 없거나 임베딩이 실패해도 기존 색인을 잃지 않는다(`--rebuild` 포함). 복구할 수 없는 오류는 재시도하지 않고 바로 안내한다 | — |
+| AC-F2002-08 | 데이터에서 빠진 항목의 문서는 다음 색인 후 남지 않는다 | V4.1-1 |
 
 ## 6. 테스트 케이스
 
@@ -83,17 +110,28 @@ python -m scripts.index_meta --count      # 현재 건수만 출력
 | TC-F2002-02 | 통합 | 같은 12편을 두 번 색인 | 두 번째 후에도 `count == 12` | 02 | 〃 |
 | TC-F2002-03 | 통합 | 한 편의 줄거리를 바꿔 재색인 | `count` 그대로, 해당 문서 본문만 바뀜 | 02, 03 | 〃 |
 | TC-F2002-04 | 통합 | `get_by_ids(["157336"])` | 문서 1개, 메타데이터 필드 검증 | 03, 04, 06 | 〃 |
-| TC-F2002-05 | 통합 | `--rebuild` 후 건수 | 12 (지운 뒤 다시 채움) | 01 | `tests/integration/test_scripts.py` |
-| TC-F2002-06 | 통합 | 임베딩이 두 번째 배치에서 예외 | 첫 배치는 남고 보고서에 실패 배치 표시, 종료 코드 1 | 01 | 〃 |
+| TC-F2002-05 | 통합 | 스크립트: 색인 · 재실행 · `--count` · `--rebuild` | 매번 12, `--count` 출력 | 01, 02, 05 | `tests/integration/test_scripts.py` |
+| TC-F2002-06 | 통합 | 임베딩이 특정 배치에서 계속 예외 (서비스 · 스크립트) | 나머지 배치는 남고 실패 배치 보고, 재시도 전 대기, 종료 코드 1 | 01, 07 | 〃 |
 | TC-F2002-07 | live | 실제 GMS 임베딩으로 영화 3편 색인 | `count == 3` | 01 | `tests/live/test_live_index.py` |
-| TC-F2002-08 | 수동 | 실제 964편 색인 2회 실행 | 두 번 모두 `색인 964건` | 01, 02, 05 | 스크린샷 |
+| TC-F2002-08 | 수동 | 실제 964편 색인 2회 실행 | 두 번 모두 `색인 964건` | 01, 02, 05 | 증빙 파일 |
+| TC-F2002-09 | 통합 | 컬렉션 거리 설정 확인 | `cosine` | 04 | `tests/integration/test_meta_index.py` |
+| TC-F2002-10 | 통합 | 키 없이 `count` · `get_by_ids` · `--count` | 0 · `[]` · 출력, 예외 없음 | 05 | `test_meta_index.py`, `test_scripts.py` |
+| TC-F2002-11 | 통합 | 12편 색인 후 키 없이 색인 · `--rebuild` / 틀린 키(인증 오류) · 계속 실패하는 임베딩으로 `--rebuild` | 키 안내(`API_KEY_MISSING` · `API_KEY_INVALID`) 또는 실패 보고, **모든 경우 건수 12 · 기존 문서 유지**, 임시 컬렉션 없음 | 07 | `tests/integration/test_scripts.py`, `test_meta_index.py` |
+| TC-F2002-12 | 통합 | 복구 불가 오류(`ValueError`, 인증 오류) | 재시도 0회로 즉시 전파 | 07 | `tests/unit/test_meta_indexer.py` |
+| TC-F2002-13 | 통합 | 12편 색인 후 1편이 빠진 데이터로 재색인 | 11건, 빠진 ID 없음, `removed == 1`, `ok` | 08 | `tests/integration/test_meta_index.py` |
+| TC-F2002-14 | 단위 | `--batch-size 0` · `-5`, 설정 `batch_size: 0` | 인자 오류(종료 코드 2) · `SettingsError` | 01 | `test_scripts.py`, `tests/unit/test_config.py` |
+| TC-F2002-16 | 통합 | 12편 색인 후 0건 데이터로 색인 · `--rebuild` | `DATA_EMPTY` 안내, 건수 12 유지 | 07 | `tests/integration/test_meta_index.py` |
+| TC-F2002-17 | 단위 | `indexing`이 `null` · `batch_size: "100"` · `1.5` · `true` · `retries: true` · `retry_wait_sec: "2"` | 모두 `SettingsError` | 01 | `tests/unit/test_config.py` |
+| TC-F2002-18 | 단위 | `json.JSONDecodeError` 후 성공 | 재시도해서 성공 | 07 | `tests/unit/test_meta_indexer.py` |
+| TC-F2002-19 | 단위 | 임베딩 클라이언트 `max_retries` | 0 | 07 | `tests/unit/test_providers.py` |
+| TC-F2002-15 | 단위 | `Embeddings`를 상속하지 않은 덕 타이핑 임베딩 주입, 컬렉션 2개 사용 | 호출되지 않고 그대로 사용 | 05 | `tests/unit/test_store.py` |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.1-1 | 색인 출력 + 사이드바 건수 캡처 | `docs/verification/screenshots/V4.1-1_meta_count.png` |
-| V4.1-2 | 두 번째 실행 출력 캡처 | `docs/verification/screenshots/V4.1-2_reindex.png` |
+| V4.1-1 | 색인 출력(+ 사이드바 건수 캡처는 F2009 이후) | `docs/verification/evidence/V4.1-1_meta_count.txt` |
+| V4.1-2 | 두 번째 실행 출력 | `docs/verification/evidence/V4.1-2_reindex.txt` |
 
 ## 8. 범위 밖
 

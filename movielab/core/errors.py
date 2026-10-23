@@ -25,3 +25,15 @@ class DataFormatError(MovieLabUserError):
     """항목 메타데이터 파일의 형식이 잘못되었다 (JSON 오류, 배열이 아님)."""
 
     code = "DATA_INVALID"
+
+
+class InvalidApiKeyError(MovieLabUserError):
+    """GMS가 키를 거부했다 (틀린 키 · 권한 없음). 다시 시도해도 같은 결과다."""
+
+    code = "API_KEY_INVALID"
+
+
+class DataEmptyError(MovieLabUserError):
+    """불러온 항목이 0건이다. 빈 데이터로 기존 색인을 지우지 않도록 작업을 멈춘다."""
+
+    code = "DATA_EMPTY"

@@ -15,6 +15,14 @@ TEMPLATES: dict[str, str] = {
         "GMS API 키가 설정되지 않았습니다. .env 파일에 GMS_API_KEY와 GMS_BASE_URL을 "
         "설정한 뒤 다시 실행하세요."
     ),
+    "API_KEY_INVALID": (
+        "GMS API 키가 올바르지 않거나 권한이 없습니다. .env의 GMS_API_KEY와 GMS_BASE_URL을 "
+        "확인하세요. 기존 색인은 그대로 두었습니다."
+    ),
+    "DATA_EMPTY": (
+        "불러온 {item_label} 데이터가 0건입니다. 데이터 파일을 확인하세요. "
+        "기존 색인은 그대로 두었습니다."
+    ),
     "DATA_MISSING": (
         "{item_label} 데이터 파일을 찾을 수 없습니다. 제공 데이터 팩을 저장소 루트에 두었는지, "
         "config/settings.json의 paths.movies 경로를 확인하세요."
@@ -29,6 +37,17 @@ TEMPLATES: dict[str, str] = {
     "SOURCE_UNAVAILABLE": "외부 문서 출처에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
     "ITEM_NOT_FOUND": "ID {item_id}인 {item_label}을(를) 찾을 수 없습니다.",
     "GENERIC_ERROR": "처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
+    # 스크립트 인자 오류
+    "ARG_NOT_INTEGER": "정수가 아닙니다: {value}",
+    "ARG_NOT_POSITIVE": "1 이상이어야 합니다: {value}",
+    # 색인 스크립트 출력 (F2002)
+    "INDEX_REPORT": "로드 {loaded}건 / 색인 {indexed}건 / 건너뜀 {skipped}건",
+    "INDEX_FAILED_BATCHES": "실패한 배치: {batches} — 다시 실행하면 빠진 항목만 채워집니다.",
+    "INDEX_MISMATCH": (
+        "로드한 항목 수와 색인 건수가 맞지 않습니다. 로그(logs/)를 확인하고, "
+        "계속 맞지 않으면 --rebuild로 색인을 다시 만드세요."
+    ),
+    "INDEX_REMOVED": "데이터에서 빠진 항목의 문서 {removed}건을 지웠습니다.",
 }
 
 DEFAULT_LABELS = {"item_label": "항목"}
