@@ -21,7 +21,7 @@ def item(movies_small_path):
     return next(i for i in load_items(movies_small_path).items if i.item_id == "157336")
 
 
-def _setup(settings, *, indexer="default", chunk_counter=None):
+def _setup(settings, *, indexer="default", indexed_pages=None):
     source = FakeSource()
     source.add(make_doc("1", "인터스텔라"), title_intro=ITEM_INTRO)
     source.add(make_doc("2", "블랙홀"), queries=["블랙홀"])
@@ -40,7 +40,7 @@ def _setup(settings, *, indexer="default", chunk_counter=None):
         settings=settings,
         manifest=manifest,
         indexer=(lambda doc: 1) if indexer == "default" else indexer,
-        chunk_counter=chunk_counter,
+        indexed_pages=indexed_pages,
     )
     return collector, source, manifest
 
@@ -78,11 +78,15 @@ def test_tc_nf2002_11_no_indexer_records_nothing(tmp_settings, item):
 
 
 def test_tc_nf2002_12_empty_index_resets_movie_cache_for_new_question(tmp_settings, item):
-    counts = {"157336": 1}
-    collector, source, manifest = _setup(tmp_settings, chunk_counter=lambda i: counts[i])
+    present: set[str] = set()  # 가짜 색인: 청크가 있는 문서
+    collector, source, manifest = _setup(
+        tmp_settings,
+        indexer=lambda doc: (present.add(doc.page_id), 1)[1],
+        indexed_pages=lambda i: present,
+    )
     collector.collect(item, "블랙홀은?")
     assert manifest.has_page("157336", "1")
-    counts["157336"] = 0  # data/chroma를 지운 상황
+    present.clear()  # data/chroma를 지운 상황
     report = collector.collect(item, "완전히 새로운 질문")
     assert "인터스텔라" in report.indexed_titles  # 항목 자체 문서까지 다시 수집
     assert source.fetched().count("1") == 2
@@ -91,7 +95,7 @@ def test_tc_nf2002_12_empty_index_resets_movie_cache_for_new_question(tmp_settin
 def test_tc_nf2002_20_failed_reset_distrusts_cache(tmp_settings, item):
     from movielab.collect.manifest import FileLock
 
-    collector, source, manifest = _setup(tmp_settings, chunk_counter=lambda i: 0)
+    collector, source, manifest = _setup(tmp_settings, indexed_pages=lambda i: set())
     collector.collect(item, "블랙홀은?")
     assert manifest.cached_queries("157336", "블랙홀은?") is not None
     holder = FileLock(manifest.lock_path, poll_sec=0.01)
@@ -159,3 +163,33 @@ def test_tc_nf2002_26_one_write_per_collection(tmp_settings, item, monkeypatch):
     assert len(writes) == 1
     assert manifest.item_doc_page_id("157336") == "1"
     assert manifest.has_page("157336", "2") and manifest.has_keyword("157336", "블랙홀")
+
+
+def test_tc_f2005_34_stale_records_after_failed_reset_not_trusted(tmp_settings, item):
+    from movielab.collect.manifest import FileLock
+
+    present: set[str] = set()
+    tracking = {"on": True}
+
+    def indexer(doc):
+        if tracking["on"]:
+            present.add(doc.page_id)
+        return 1
+
+    collector, source, manifest = _setup(
+        tmp_settings, indexer=indexer, indexed_pages=lambda i: present
+    )
+    collector.collect(item, "블랙홀은?")
+    present.discard("2")  # 한 문서의 청크만 사라짐
+    tracking["on"] = False  # 이번 수집에서 다시 색인한 것은 색인에 반영되지 않았다고 가정
+    holder = FileLock(manifest.lock_path, poll_sec=0.01)
+    assert holder.acquire()  # 초기화 실패
+    try:
+        assert "CACHE_HIT" not in collector.collect(item, "블랙홀은?").notices
+    finally:
+        holder.release()
+    tracking["on"] = True
+    report = collector.collect(item, "블랙홀은?")  # 옛 기록이 남아 있어도 다시 대조한다
+    assert "CACHE_HIT" not in report.notices
+    assert manifest.cached_queries("157336", "블랙홀은?") is not None  # 초기화 후 새로 기록
+    assert "2" in present

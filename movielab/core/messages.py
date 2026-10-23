@@ -42,6 +42,23 @@ TEMPLATES: dict[str, str] = {
     "ARG_NOT_POSITIVE": "1 이상이어야 합니다: {value}",
     "CACHE_RESET": "수집 캐시를 지웠습니다: {target}",
     "CACHE_RESET_ALL": "수집 캐시를 모두 지웠습니다.",
+    "REINDEX_REPORT": (
+        "chunk_size={chunk_size} overlap={chunk_overlap} → 문서 {documents}건 / 청크 {chunks}개 "
+        "(컬렉션 전체 {total_chunks}개)"
+    ),
+    "REINDEX_FAILED": "색인하지 못한 문서 {failed}건 — 로그(logs/)를 확인하고 다시 실행하세요.",
+    "REINDEX_REMOVED": "저장 원문이 없는 문서 {removed}건의 청크를 지웠습니다.",
+    "REINDEX_OVERRIDE_NOTICE": (
+        "설정 파일과 다른 청크 값으로 색인했습니다. 이후 수집되는 문서는 설정 값으로 색인되어 "
+        "크기가 섞이니, 비교가 끝나면 인자 없이 다시 실행해 되돌리세요."
+    ),
+    "REINDEX_BAD_CHUNKING": (
+        "청크 크기는 1 이상, 청크 중복은 0 이상이고 크기보다 작아야 합니다 "
+        "(크기 {chunk_size}, 중복 {chunk_overlap})."
+    ),
+    "REINDEX_EMPTY": (
+        "다시 색인할 저장 원문이 없습니다. 먼저 문서를 수집하세요 (python -m scripts.collect)."
+    ),
     "CACHE_RESET_FAILED": (
         "수집 캐시를 지우지 못했습니다. "
         "다른 프로그램이 사용 중일 수 있으니 잠시 후 다시 시도하세요."

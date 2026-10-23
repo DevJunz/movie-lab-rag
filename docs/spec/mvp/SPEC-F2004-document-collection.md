@@ -110,7 +110,7 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 | 규칙 | 기준 | 사유 코드 |
 |---|---|---|
 | 동음이의 문서 | `pageprops.disambiguation` 또는 제목이 `(동음이의)`로 끝남 | `disambiguation` |
-| 너무 짧은 문서 | 본문 `min_doc_chars`(200)자 미만 | `too_short` |
+| 너무 짧은 문서 | 본문 `min_doc_chars`(200)자 미만. 항목 자체 문서는 길이 규칙을 면제하되 본문이 비어 있으면 버린다 (SPEC-F2005 AC-17) | `too_short` |
 | 이미 수집 | 이 영화로 이미 수집한 `page_id` | `already_collected` |
 
 ### 3.6 프롬프트 P2 (후보 선별)

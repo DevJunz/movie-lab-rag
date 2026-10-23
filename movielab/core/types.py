@@ -29,6 +29,17 @@ class LoadResult:
 
 
 @dataclass(frozen=True)
+class ReindexReport:
+    """외부 문서 재색인 결과 (F2005 §3.3). `total_chunks`는 재색인 후 컬렉션 전체 청크 수."""
+
+    documents: int
+    chunks: int
+    failed: int = 0
+    removed: int = 0  # 저장 원문이 없어 청크를 지운 문서 수
+    total_chunks: int = 0
+
+
+@dataclass(frozen=True)
 class IndexReport:
     """메타 색인 결과 (F2002).
 

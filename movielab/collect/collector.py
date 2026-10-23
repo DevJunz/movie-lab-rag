@@ -39,7 +39,7 @@ class Collector:
         settings: Any,
         manifest: Any | None = None,
         indexer: Callable[[SourceDocument], int] | None = None,
-        chunk_counter: Callable[[str], int] | None = None,
+        indexed_pages: Callable[[str], set[str]] | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.api_source = api_source
@@ -51,7 +51,8 @@ class Collector:
         self.settings = settings
         self.manifest = manifest or NullManifest()
         self.indexer = indexer
-        self.chunk_counter = chunk_counter  # 색인된 청크 수 (NF2002: 0이면 캐시를 믿지 않는다)
+        # 그 영화의 색인에 청크가 있는 문서 (NF2002: 매니페스트 기록과 대조)
+        self.indexed_pages = indexed_pages
         self.clock = clock
 
     # --- 소스 선택 · 대체 (§3.2) ---
@@ -122,14 +123,16 @@ class Collector:
         collect_settings = self.settings.collect
         manifest = self.manifest
 
-        # 0. 캐시 (NF2002). 색인이 비었는데 기록이 남았으면(chroma 삭제 등) 그 영화 캐시를 비운다.
-        # 비우지 못하면(잠금 실패 등) 옛 기록을 믿지 않도록 이번 수집은 매니페스트를 쓰지 않는다
+        # 0. 캐시 (NF2002). 매니페스트는 힌트일 뿐 — 기록된 문서 중 색인에 없는 것이 있으면
+        # (chroma 삭제 · 일부 손실 · 이전 초기화 실패) 캐시를 비운다. 비우지 못하면 이번 수집은
+        # 옛 기록을 믿지 않도록 매니페스트를 읽지도 쓰지도 않는다
+        recorded = manifest.page_ids(item.item_id)
         if (
-            self.chunk_counter is not None
-            and manifest.has_any(item.item_id)
-            and self.chunk_counter(item.item_id) == 0
+            self.indexed_pages is not None
+            and recorded
+            and not recorded <= {str(p) for p in self.indexed_pages(item.item_id)}
         ):
-            logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)
+            logger.warning("색인에 없는 문서 기록이 있어 %s의 수집 캐시를 비운다", item.item_id)
             if not manifest.reset(item.item_id):
                 logger.warning("수집 캐시를 비우지 못해 이번 수집은 캐시 없이 한다")
                 manifest = NullManifest()
@@ -212,6 +215,7 @@ class Collector:
             targets.append((item_doc, True))
         targets += [(c, False) for c in selection.selected]
         documents: list[SourceDocument] = []
+        empty_item_doc_id: str | None = None
         for number, (candidate, is_item_doc) in enumerate(targets, start=1):
             progress("fetch", title=candidate.title, current=number, total=len(targets))
             try:
@@ -224,8 +228,12 @@ class Collector:
                     Rejection(candidate.page_id, candidate.title, "fetch_failed")
                 )
                 continue
-            if not is_item_doc and len(doc.text) < int(collect_settings.min_doc_chars):
+            # 항목 자체 문서는 길이 규칙 면제 — 단 본문이 비어 있으면 색인할 수 없으므로 버린다
+            too_short = len(doc.text) < int(collect_settings.min_doc_chars)
+            if (too_short and not is_item_doc) or not doc.text.strip():
                 report.rejected.append(Rejection(candidate.page_id, candidate.title, "too_short"))
+                if is_item_doc:  # 빈 항목 자체 문서 — 다음 질문에서 다시 찾거나 받지 않게 ID는 기록
+                    empty_item_doc_id = candidate.page_id
                 continue
             doc = dataclasses.replace(
                 doc,
@@ -239,7 +247,7 @@ class Collector:
 
         # 7. 색인 (F2005 색인기가 연결되면) — 키 없음 같은 안내 오류는 모든 문서에 같으므로 알린다
         recorded_pages: list[tuple[str, str, int]] = []
-        item_doc_page_id: str | None = None
+        item_doc_page_id: str | None = empty_item_doc_id
         for doc in documents:
             progress("index", title=doc.title)
             if self.indexer is None:

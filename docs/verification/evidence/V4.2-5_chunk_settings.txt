@@ -1,0 +1,15 @@
+# V4.2-5 청크 크기 · 중복 설정에 따른 청크 수 (2026-10-23 13:14, 실제 수집 원문 · 실제 GMS 임베딩)
+$ python -m scripts.reindex_docs 
+chunk_size=1000 overlap=200 → 문서 12건 / 청크 302개 (컬렉션 전체 302개)
+(종료 코드 0)
+$ python -m scripts.reindex_docs --chunk-size 500 --chunk-overlap 100
+chunk_size=500 overlap=100 → 문서 12건 / 청크 630개 (컬렉션 전체 630개)
+(종료 코드 0)
+$ python -m scripts.reindex_docs --chunk-size 1500 --chunk-overlap 300
+chunk_size=1500 overlap=300 → 문서 12건 / 청크 200개 (컬렉션 전체 200개)
+(종료 코드 0)
+$ python -m scripts.reindex_docs 
+chunk_size=1000 overlap=200 → 문서 12건 / 청크 302개 (컬렉션 전체 302개)
+(종료 코드 0)
+$ python -m scripts.reindex_docs --chunk-size 500 --chunk-overlap 500   # 잘못된 값은 색인 전에 거부 (AC-F2005-10)
+reindex_docs.py: error: 청크 크기는 1 이상, 청크 중복은 0 이상이고 크기보다 작아야 합니다 (크기 500, 중복 500).

@@ -39,6 +39,10 @@ class VectorStore:
             self._embeddings = self._factory()
         return self._embeddings
 
+    def ensure_embeddings(self) -> None:
+        """임베딩(키)을 지금 준비한다 — 키가 없으면 여기서 안내 오류 (색인 전 확인용)."""
+        _ = self.embeddings
+
     def collection(self, name: str) -> Chroma:
         """LangChain Chroma 래퍼. 없으면 코사인 거리로 만든다."""
         if name not in self._collections:
@@ -83,6 +87,36 @@ class VectorStore:
     def upsert(self, name: str, documents: list[Document]) -> None:
         """ID는 `Document.id`. 같은 ID는 덮어쓴다 (재색인해도 건수가 늘지 않는다)."""
         self.collection(name).add_documents(documents, ids=[doc.id for doc in documents])
+
+    def ids_where(self, name: str, where: dict[str, Any]) -> list[str]:
+        raw = self._raw(name)
+        return list(raw.get(where=where, include=[])["ids"]) if raw is not None else []
+
+    def count_where(self, name: str, where: dict[str, Any]) -> int:
+        return len(self.ids_where(name, where))
+
+    def has_where(self, name: str, where: dict[str, Any]) -> bool:
+        """조건에 맞는 청크가 하나라도 있는지 — 한 건만 읽는다 (매 질문의 캐시 확인용)."""
+        raw = self._raw(name)
+        return raw is not None and bool(raw.get(where=where, limit=1, include=[])["ids"])
+
+    def entries(
+        self, name: str, where: dict[str, Any] | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """(청크 ID, 메타데이터) 목록 — 본문 · 벡터는 읽지 않는다."""
+        raw = self._raw(name)
+        if raw is None:
+            return []
+        got = raw.get(where=where, include=["metadatas"])
+        return [
+            (doc_id, meta or {}) for doc_id, meta in zip(got["ids"], got["metadatas"], strict=True)
+        ]
+
+    def delete_where(self, name: str, where: dict[str, Any]) -> int:
+        """조건에 맞는 청크를 지우고 지운 수를 돌려준다."""
+        ids = self.ids_where(name, where)
+        self.delete_ids(name, ids)
+        return len(ids)
 
     def delete_ids(self, name: str, ids: list[str]) -> None:
         raw = self._raw(name)

@@ -161,6 +161,12 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("max_selected_docs", _int_at_least(0)),
         ("min_doc_chars", _int_at_least(0)),
     ],
+    "chunking": [  # SPEC-F2005 (중복 < 크기는 _validate_chunking)
+        ("chunk_size", _int_at_least(1)),
+        ("chunk_overlap", _int_at_least(0)),
+        ("pdf_chunk_size", _int_at_least(1)),
+        ("pdf_chunk_overlap", _int_at_least(0)),
+    ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),
         ("maxlag", _int_at_least(0)),
@@ -176,6 +182,29 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
 }
 
 
+def chunking_ok(size: Any, overlap: Any) -> bool:
+    """청크 크기는 1 이상 정수, 중복은 0 이상 정수이고 크기보다 작아야 한다 (SPEC-F2005).
+
+    설정 파일 검증과 재색인 스크립트의 일시 덮어쓰기 값이 같은 규칙을 쓴다.
+    """
+    return _is_int(size) and size >= 1 and _is_int(overlap) and 0 <= overlap < size
+
+
+def _validate_chunking(raw: dict[str, Any], source: Path) -> None:
+    """각 값의 타입 · 범위는 `_RULES`가 먼저 검사한다. 여기서는 중복 < 크기만 (SPEC-F2005)."""
+    chunking = raw["chunking"]
+    for size_key, overlap_key in (
+        ("chunk_size", "chunk_overlap"),
+        ("pdf_chunk_size", "pdf_chunk_overlap"),
+    ):
+        size, overlap = chunking[size_key], chunking[overlap_key]
+        if not chunking_ok(size, overlap):
+            raise SettingsError(
+                f"설정 값 오류: chunking.{overlap_key}={overlap!r}는 0 이상, "
+                f"{size_key}({size})보다 작아야 한다 ({source})"
+            )
+
+
 def _validate(raw: dict[str, Any], source: Path) -> None:
     """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다."""
     for group, rules in _RULES.items():
@@ -186,6 +215,7 @@ def _validate(raw: dict[str, Any], source: Path) -> None:
             value = section.get(name)
             if not ok(value):
                 raise SettingsError(f"설정 값 오류: {group}.{name}={value!r} ({source})")
+    _validate_chunking(raw, source)
 
 
 def load_settings(path: str | Path | None = None) -> Settings:
