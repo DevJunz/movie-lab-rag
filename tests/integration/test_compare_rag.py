@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from movielab.core.types import AnswerResult, CollectReport, Evidence, ItemRecord
 from tests.fakes import FakeChatModel
 
@@ -76,6 +78,8 @@ def test_tc_f2015_02_compare_rag_report(tmp_settings, tmp_path, monkeypatch):
     out = tmp_path / "out.md"
     raw_dir = tmp_path / "raw"
     argv = ["--questions", str(_questions(tmp_path)), "--out", str(out), "--raw-dir", str(raw_dir)]
+    out.write_text("옛 보고서", encoding="utf-8")
+    argv.append("--force")
     assert compare_rag.main(argv) == 0
 
     text = out.read_text(encoding="utf-8")
@@ -99,3 +103,14 @@ def test_tc_f2015_02_compare_rag_report(tmp_settings, tmp_path, monkeypatch):
     assert "출처 언급: 있음" in text  # RAG 없는 답변의 출처 언급 자동 보조값
     raw = json.loads(next(raw_dir.glob("*.json")).read_text(encoding="utf-8"))
     assert [r["id"] for r in raw["results"]] == ["Q1", "Q2", "Q3"]
+
+
+def test_tc_f2015_05_existing_report_not_overwritten(tmp_settings, tmp_path, monkeypatch):
+    from scripts import compare_rag
+
+    monkeypatch.setattr(compare_rag, "build_services", lambda settings: pytest.fail("호출 안 됨"))
+    out = tmp_path / "out.md"
+    out.write_text("사람이 채운 평가", encoding="utf-8")
+    argv = ["--questions", str(_questions(tmp_path)), "--out", str(out)]
+    assert compare_rag.main(argv) == 1
+    assert out.read_text(encoding="utf-8") == "사람이 채운 평가"

@@ -48,6 +48,7 @@
 - 제목 (연도)는 `Catalog.get(movie_id).display_name`. 카탈로그에 없는 `movie_id`는 그 질문을 건너뛰고 표에 "항목 없음"으로 적는다.
 - 같은 모델 · 온도: 두 조건 모두 `services.llm`(설정 `models.chat` · `models.temperature`)을 쓴다. 실험 조건 절에 두 값을 적는다.
 - 답변 표 칸 안의 줄바꿈은 `<br>`, `|`는 `/`로 바꾼다.
+- 보고서 파일이 이미 있으면 덮어쓰지 않고 종료 코드 1로 끝낸다(사람이 채운 평가 보호). `--force`를 주면 덮어쓴다.
 - 평가 열은 스크립트가 빈칸으로 만들고 **사람이 채운다**: 사실 정확성(정확 / 부분 / 틀림), 근거 제시(있음 / 없음), 모르면 모른다고 답함(예 / 아니오 / 해당 없음).
 - 근거 제시 열은 자동 보조값을 제공한다: RAG 답변의 인용 수, RAG 없는 답변의 출처 언급 여부.
 
@@ -79,6 +80,7 @@
 |---|---|---|---|---|---|
 | TC-F2015-01 | 단위 | `questions.json` 검사 | 5개 이상, 필수 키 존재, `movie_id`가 `movies.json` 형식(문자열) | 01 | `tests/unit/test_questions.py` |
 | TC-F2015-02 | 통합 | 가짜 LLM으로 `compare_rag` 실행 | 질문 수만큼 행, 두 답변 열, 평가 열 3개(빈칸), 실험 조건 절 | 02, 03 | `tests/integration/test_compare_rag.py` |
+| TC-F2015-05 | 통합 | 보고서 파일이 이미 있을 때 `--force` 없이 / 있게 실행 | 없으면 파일 그대로 · 종료 코드 1, 있으면 덮어씀 | 03 | `tests/integration/test_compare_rag.py` |
 | TC-F2015-03 | 단위 | B1 프롬프트 | 근거 블록 없음, `[작업: 직접 답변]` | 05 | `tests/unit/test_prompts.py` |
 | TC-F2015-04 | live / 수동 | 실제 GMS로 실행 후 평가 기입 | 보고서 완성 | 03, 04 | `docs/deliverables/04_RAG_전후_비교.md` |
 

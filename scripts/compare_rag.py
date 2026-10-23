@@ -113,8 +113,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--questions", type=Path, default=DEFAULT_QUESTIONS)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--raw-dir", type=Path, default=DEFAULT_RAW_DIR)
+    parser.add_argument("--force", action="store_true", help="기존 보고서를 덮어쓴다")
     args = parser.parse_args(argv)
     configure_stdout()
+    if args.out.exists() and not args.force:
+        print(
+            f"{args.out}이(가) 이미 있다. 사람이 채운 평가를 지키려면 --out을 바꾸고,"
+            " 덮어쓰려면 --force"
+        )
+        return 1
 
     settings = load_settings()
     configure_from_settings(settings)
