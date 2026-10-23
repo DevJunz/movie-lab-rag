@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2007** 근거 기반 답변 생성(프롬프트3) (생성 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/rag/graph.py`, `movielab/prompts.py`(P3), `movielab/providers.py` |
 | 선행 SPEC | SPEC-F2006 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #11 |
 
 ## 1. 요구사항 원문
 
@@ -71,7 +71,8 @@ START → retrieve → generate → END
 
 - 규칙 5는 위키 본문에 섞인 문장이 지시처럼 읽히는 경우(프롬프트 주입)를 막기 위한 것이다.
 - 모델: `settings.models.chat`(기본 `gpt-4o-mini`), `temperature = 0`, 타임아웃 `timeout_sec`.
-- `not_found` 판정: 답변을 정규화했을 때 `NOT_FOUND` 문장으로 시작하고 `[근거 n]`이 없으면 `AnswerResult.not_found = True`.
+- `not_found` 판정: `rag.graph.is_not_found(answer)` — 답변을 정규화했을 때 `NOT_FOUND` 문장으로 시작하고 `[근거 n]`이 없으면 참. `AnswerResult.not_found`(F2009)가 이 함수를 쓴다.
+- `generate` 노드는 작업(`task`) → 프롬프트 생성 함수 표를 쓴다. 이 SPEC은 `qa`(P3)만 등록하고, `guide`(G1) · `factcheck`(C1)는 SPEC-F2010이 같은 표에 더한다. 등록되지 않은 작업은 `ValueError`.
 
 ### 3.4 인터페이스
 
@@ -105,8 +106,8 @@ def format_context(evidences: list[Evidence]) -> str: ...
 | TC-F2007-01 | 단위 | `build_graph(...).get_graph().nodes` | `{__start__, retrieve, generate, __end__}` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-02 | 통합 | 가짜 LLM으로 `invoke` | `contexts`, `answer`가 채워지고 LLM 호출 1회 | 01 | `tests/integration/test_graph_flow.py` |
 | TC-F2007-03 | 단위 | 가짜 LLM이 받은 P3 프롬프트 검사 | 규칙 1~5, `[근거 1] (영화 메타데이터)`, `[근거 2] (위키백과)`, 질문 포함 | 02, 03 | `tests/unit/test_prompts.py` |
-| TC-F2007-04 | 단위 | 가짜 LLM이 `NOT_FOUND` 문장 반환 | `not_found == True`, 인용 0 | 04 | `tests/unit/test_qa_service.py` |
-| TC-F2007-05 | 단위 | `task="guide"` / `"factcheck"` | 각각 G1 / C1 머리표 프롬프트 사용 | 01 | `tests/unit/test_graph.py` |
+| TC-F2007-04 | 단위 | `is_not_found`: `NOT_FOUND` 문장 · 앞뒤 공백 · 인용이 붙은 답 · 일부만 확인되지 않은 답 | 참 · 참 · 거짓 · 거짓 | 04 | `tests/unit/test_graph.py` |
+| TC-F2007-05 | 단위 | 등록되지 않은 `task`로 실행 (G1 · C1 사용 검사는 SPEC-F2010 TC로) | `ValueError` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-06 | live | 실제 GMS로 Q6 | `not_found == True` 또는 답변에 "확인되지 않" 포함 | 05 | `tests/live/test_live_answer.py` |
 | TC-F2007-07 | live | 실제 GMS로 Q1 | `[근거 n]` 1개 이상 | 02 | 〃 |
 | TC-F2007-08 | 수동 | `python -m scripts.show_graph` | mermaid 출력 캡처 | 06 | 스크린샷 |
