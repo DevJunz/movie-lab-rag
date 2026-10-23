@@ -117,16 +117,20 @@ class Collector:
         report = CollectReport(item_id=item.item_id, question=question)
         collect_settings = self.settings.collect
 
-        # 0. 캐시 (NF2002): 같은 질문 · 같은 검색어를 이미 수집했으면 외부 호출 없이 끝낸다
+        # 0. 캐시 (NF2002). 색인이 비었는데 기록이 남았으면(chroma 삭제 등) 그 영화 캐시를 비운다
+        if (
+            self.chunk_counter is not None
+            and self.manifest.has_any(item.item_id)
+            and self.chunk_counter(item.item_id) == 0
+        ):
+            logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)
+            self.manifest.reset(item.item_id)
+        # 같은 질문 · 같은 검색어를 이미 수집했으면 외부 호출 없이 끝낸다
         cached = self.manifest.cached_queries(item.item_id, question)
-        if cached is not None and self.chunk_counter is not None:
-            if self.chunk_counter(item.item_id) == 0:
-                logger.warning("캐시는 있지만 색인된 청크가 없어 %s를 다시 수집한다", item.item_id)
-                self.manifest.reset(item.item_id)
-                cached = None
         if cached is not None and all(self.manifest.has_keyword(item.item_id, q) for q in cached):
             progress("cache_hit", queries=cached)
-            report.queries = report.cached_queries = list(cached)
+            report.queries = list(cached)
+            report.cached_queries = list(cached)
             report.notices.append("CACHE_HIT")
             report.source_used = "cache"
             report.timings["collect"] = self.clock() - started
@@ -245,14 +249,19 @@ class Collector:
                     continue
             report.indexed_chunks += chunks
             report.indexed_titles.append(doc.title)
+            if self.indexer is None:
+                continue  # 색인하지 않은 문서는 수집됨으로 기록하지 않는다 (NF2002 §3.2)
             self.manifest.record_page(item.item_id, doc.page_id, doc.title, chunks)
             if doc.is_item_doc:
                 self.manifest.record_item_doc(item.item_id, doc.page_id)
 
-        # 8. 기록
-        for query in searched:
-            self.manifest.record_keyword(item.item_id, query)
-        self.manifest.record_question(item.item_id, question, queries)
+        # 8. 기록 — 완전히 성공했을 때만 검색어 · 질문을 남긴다(실패한 문서는 다음 질문 때 재시도)
+        failed = any(r.reason in ("fetch_failed", "index_failed") for r in report.rejected)
+        if self.indexer is not None and not failed:
+            for query in searched:
+                self.manifest.record_keyword(item.item_id, query)
+            if len(searched) == len(todo):
+                self.manifest.record_question(item.item_id, question, queries)
         report.source_used = state["source"].kind
         report.timings["collect"] = self.clock() - started
         progress("done", titles=report.indexed_titles, rejected=len(report.rejected))
