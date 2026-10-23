@@ -10,7 +10,7 @@ from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_bundle import WikiBundleSource
-from tests.fakes import FakeChatModel, FakeHttpSession, pick_titles
+from tests.fakes import FakeChatModel, FakeEmbeddings, FakeHttpSession, pick_titles
 from tests.fakes.source import FakeSource
 
 QUESTION = "블랙홀 묘사는 실제 물리와 얼마나 다른가?"
@@ -47,7 +47,9 @@ def test_tc_f2004_11_api_failure_switches_to_bundle(
 
 def test_tc_f2004_12_no_contact_uses_bundle_without_api_calls(tmp_settings, movies_small_path):
     session = FakeHttpSession()
-    services = build_services(tmp_settings, llm=_llm(), http=session)  # WIKI_CONTACT 없음
+    services = build_services(
+        tmp_settings, llm=_llm(), http=session, embeddings=FakeEmbeddings()
+    )  # WIKI_CONTACT 없음
     report = services.collector.collect(_item(movies_small_path), QUESTION)
     assert session.requests == []
     assert report.source_used == "bundle" and "SOURCE_FALLBACK" in report.notices

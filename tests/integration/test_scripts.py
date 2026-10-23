@@ -172,11 +172,13 @@ def test_tc_f2002_11_invalid_key_message_and_index_kept(
 def test_tc_f2004_15_collect_script_reports_selection(tmp_settings, monkeypatch, capsys):
     from movielab.container import build_services
     from scripts import collect
-    from tests.fakes import FakeChatModel, pick_titles
+    from tests.fakes import FakeChatModel, FakeEmbeddings, pick_titles
 
     llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
     monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
-    monkeypatch.setattr(collect, "build_services", lambda s: build_services(s, llm=llm))
+    monkeypatch.setattr(
+        collect, "build_services", lambda s: build_services(s, llm=llm, embeddings=FakeEmbeddings())
+    )
     code = collect.main(["--movie-id", "157336", "--question", "블랙홀은?", "--source", "bundle"])
     out = capsys.readouterr().out
     assert code == 0
