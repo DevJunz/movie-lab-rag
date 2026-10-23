@@ -27,6 +27,7 @@ from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttl
 from movielab.data.wiki_bundle import WikiBundleSource
 from movielab.index.doc_indexer import DocIndexer
 from movielab.index.store import VectorStore
+from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
 from movielab.services.catalog import Catalog
 
@@ -135,6 +136,10 @@ class Services:
     def retriever(self, top_k: int | None = None) -> Retriever:
         """근거 검색기 (F2006). `top_k`를 주면 이번 검색만 설정 값을 덮어쓴다."""
         return Retriever(self.store, top_k=top_k, meta_title=self.profile.meta_title)
+
+    def rag_graph(self, *, llm: Any = None, top_k: int | None = None) -> Any:
+        """retrieve → generate 그래프 (F2007). `llm`을 주면 그것을 쓴다(구조 출력 등)."""
+        return build_graph(self.retriever(top_k=top_k), llm or self.llm, self.profile)
 
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
