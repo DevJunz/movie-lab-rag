@@ -84,6 +84,20 @@ class VectorStore:
         """ID는 `Document.id`. 같은 ID는 덮어쓴다 (재색인해도 건수가 늘지 않는다)."""
         self.collection(name).add_documents(documents, ids=[doc.id for doc in documents])
 
+    def count_where(self, name: str, where: dict[str, Any]) -> int:
+        raw = self._raw(name)
+        return len(raw.get(where=where, include=[])["ids"]) if raw is not None else 0
+
+    def delete_where(self, name: str, where: dict[str, Any]) -> int:
+        """조건에 맞는 청크를 지우고 지운 수를 돌려준다."""
+        raw = self._raw(name)
+        if raw is None:
+            return 0
+        ids = raw.get(where=where, include=[])["ids"]
+        if ids:
+            raw.delete(ids=ids)
+        return len(ids)
+
     def delete_ids(self, name: str, ids: list[str]) -> None:
         raw = self._raw(name)
         if raw is not None and ids:

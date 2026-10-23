@@ -14,7 +14,8 @@ from collections.abc import Callable
 import openai
 
 from movielab.core.errors import DataEmptyError, InvalidApiKeyError
-from movielab.core.types import IndexReport
+from movielab.core.types import IndexReport, SourceDocument
+from movielab.index.doc_indexer import DocIndexer
 from movielab.index.meta_indexer import index_items
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
@@ -89,3 +90,9 @@ def index_catalog(
         failed_batches=failed,
         removed=removed,
     )
+
+
+def reindex_documents(documents: list[SourceDocument], indexer: DocIndexer) -> tuple[int, int]:
+    """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3). 반환: (문서 수, 청크 수)."""
+    chunks = sum(indexer.index_document(doc) for doc in documents)
+    return len(documents), chunks

@@ -42,6 +42,12 @@ TEMPLATES: dict[str, str] = {
     "ARG_NOT_POSITIVE": "1 이상이어야 합니다: {value}",
     "CACHE_RESET": "수집 캐시를 지웠습니다: {target}",
     "CACHE_RESET_ALL": "수집 캐시를 모두 지웠습니다.",
+    "REINDEX_REPORT": (
+        "chunk_size={chunk_size} overlap={chunk_overlap} → 문서 {documents}건 / 청크 {chunks}개"
+    ),
+    "REINDEX_EMPTY": (
+        "다시 색인할 저장 원문이 없습니다. 먼저 문서를 수집하세요 (python -m scripts.collect)."
+    ),
     # 색인 스크립트 출력 (F2002)
     "INDEX_REPORT": "로드 {loaded}건 / 색인 {indexed}건 / 건너뜀 {skipped}건",
     "INDEX_FAILED_BATCHES": "실패한 배치: {batches} — 다시 실행하면 빠진 항목만 채워집니다.",

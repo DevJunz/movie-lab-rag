@@ -25,6 +25,7 @@ from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttle
 from movielab.data.wiki_bundle import WikiBundleSource
+from movielab.index.doc_indexer import ITEM_KEY, DocIndexer
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -114,11 +115,23 @@ class Services:
         """수집 캐시 (NF2002). LLM · 키 없이도 쓸 수 있다 (예: 캐시 초기화)."""
         return Manifest(self.settings.path("manifest"))
 
+    @property
+    def raw_store(self) -> RawStore:
+        """수집 원문 저장소 (F2004). 재색인 스크립트도 여기서 원문을 읽는다."""
+        return RawStore(self.settings.path("raw_dir"))
+
+    def doc_indexer(self, **chunking: int) -> DocIndexer:
+        """위키 문서 색인기 (F2005). 인자를 주면 청크 값을 이번 실행만 덮어쓴다."""
+        return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
+
+    def _chunks_of(self, item_id: str) -> int:
+        return self.store.count_where(self.settings.collections.docs, {ITEM_KEY: item_id})
+
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
 
+        수집 캐시(NF2002)는 파일 매니페스트를, 색인은 청크 색인기(F2005)를 쓴다.
         `dry_run`이면 색인 · 캐시 기록을 하지 않는다(원문 저장까지만).
-        수집 캐시(NF2002)는 파일 매니페스트를 쓴다. 청크 색인기(F2005)는 해당 SPEC에서 연결한다.
         """
         settings = self.settings
         api_source = WikiApiSource(self.wiki_client) if settings.secrets.wiki_contact else None
@@ -127,10 +140,12 @@ class Services:
             bundle_source=self.bundle_source,
             extractor=QueryExtractor(self.llm, self.profile, settings),
             selector=CandidateSelector(self.llm, self.profile, settings),
-            raw_store=RawStore(settings.path("raw_dir")),
+            raw_store=self.raw_store,
             profile=self.profile,
             settings=settings,
             manifest=None if dry_run else self.manifest,
+            indexer=None if dry_run else self.doc_indexer().index_document,
+            chunk_counter=None if dry_run else self._chunks_of,
         )
 
     @property
