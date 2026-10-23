@@ -78,21 +78,20 @@ def _chat_texts(at: AppTest) -> list[str]:
 
 
 def test_tc_f2009_01_movie_options_distinguish_same_titles(at):
-    box = at.sidebar.selectbox[0]
-    labels = [box.format_func(o) for o in box.options if o is not None]
+    labels = at.sidebar.selectbox[0].options  # 화면에 보이는 형식
     assert len(labels) == 12
     assert "괴물 (2006)" in labels and "괴물 (1982)" in labels
     assert "미녀와 야수 (1991)" in labels and "미녀와 야수 (2017)" in labels
 
 
 def test_tc_f2009_04_no_selection_disables_input(at):
-    assert at.chat_input[0].disabled is True
+    assert at.chat_input[0].proto.disabled is True
     assert any("영화를 먼저 선택하세요" in i.value for i in at.info)
 
 
 def test_tc_f2009_02_question_uses_selected_movie(at, services):
     _select(at, "157336")
-    assert at.chat_input[0].disabled is False
+    assert at.chat_input[0].proto.disabled is False
     _ask(at, "블랙홀은?")
     assert services.qa.calls == [("157336", "블랙홀은?")]
     texts = _chat_texts(at)
