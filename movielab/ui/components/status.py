@@ -30,22 +30,8 @@ def _joined(values: Any) -> str:
 
 
 def progress_line(stage: str, info: dict[str, Any], profile: DomainProfile) -> str | None:
-    """단계 하나의 표시 문구. 모르는 단계는 None (표시하지 않는다)."""
-    key = stage
-    values: dict[str, Any] = dict(info)
-    if stage == "extract_queries" and info.get("queries"):
-        key, values["queries"] = "extract_queries_done", _joined(info["queries"])
-    elif stage == "done":
-        key = "done" if info.get("titles") else "done_none"
-        values["titles"] = _joined(info.get("titles"))
-        values.setdefault("rejected", 0)
-    template = messages.PROGRESS.get(key)
-    if template is None:
-        return None
-    try:
-        return profile.render(template, **values)
-    except (KeyError, IndexError, ValueError):
-        return None
+    """단계 하나의 표시 문구. 모르는 단계는 None (표시하지 않는다). 웹 API와 같은 함수."""
+    return messages.progress_text(stage, info, profile)
 
 
 def render_collect_detail(report: CollectReport, profile: DomainProfile) -> None:

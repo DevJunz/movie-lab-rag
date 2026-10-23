@@ -126,6 +126,10 @@ TEMPLATES: dict[str, str] = {
     "SOURCE_UNAVAILABLE": "외부 문서 출처에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
     "ITEM_NOT_FOUND": "ID {item_id}인 {item_label}을(를) 찾을 수 없습니다.",
     "GENERIC_ERROR": "처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
+    # 웹 API 입력 오류 (SPEC-F2013)
+    "BAD_REQUEST": (
+        "입력을 확인하세요. 빈 값이거나 {max_chars}자를 넘었거나, 없는 {item_label}입니다."
+    ),
     # 색인 안내 (SPEC-F2006 AC-07 · 08, 화면 표시는 SPEC-F2012)
     "INDEX_EMPTY": (
         "{item_label} 색인이 비어 있습니다. 터미널에서 python -m scripts.index_meta를 실행하세요."
@@ -196,3 +200,30 @@ def render(code: str, labels: Mapping[str, str] | None = None, **values: Any) ->
     return _PLACEHOLDER.sub(
         lambda m: str(mapping[m.group(1)]) if m.group(1) in mapping else m.group(0), template
     )
+
+
+def _joined(values: Any) -> str:
+    items = [str(v) for v in values or []]
+    return ", ".join(items) if items else NONE_MARK
+
+
+def progress_text(stage: str, info: Mapping[str, Any], profile: Any) -> str | None:
+    """진행 단계 하나의 표시 문구. 모르는 단계는 None (F2012 · F2013 공용).
+
+    `profile.render(template, **values)`로 라벨과 값을 채운다.
+    """
+    key = stage
+    values: dict[str, Any] = dict(info)
+    if stage == "extract_queries" and info.get("queries"):
+        key, values["queries"] = "extract_queries_done", _joined(info["queries"])
+    elif stage == "done":
+        key = "done" if info.get("titles") else "done_none"
+        values["titles"] = _joined(info.get("titles"))
+        values.setdefault("rejected", 0)
+    template = PROGRESS.get(key)
+    if template is None:
+        return None
+    try:
+        return profile.render(template, **values)
+    except (KeyError, IndexError, ValueError):
+        return None

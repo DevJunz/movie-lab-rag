@@ -38,7 +38,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 
 | 요구사항 | 분류 | 이름 | SPEC | 주 모듈 | AC 수 | 4장 검증 항목 | 구현 순서 | 이슈 | 상태 |
 |---|---|---|---|---|---|---|---|---|---|
-| F2013 | UI | 프론트엔드 직접 구현 | [SPEC-F2013](advanced/SPEC-F2013-web-frontend.md) | `api/`, `web/` | 6 | V4.5-1 | 23 | #23 | Draft |
+| F2013 | UI | 프론트엔드 직접 구현 | [SPEC-F2013](advanced/SPEC-F2013-web-frontend.md) | `api/`, `web/` | 6 | V4.5-1 | 23 | #23 | Done |
 | F2014 | 검색 | MMR 검색 적용 | [SPEC-F2014](advanced/SPEC-F2014-mmr-search.md) | `rag/retriever.py` | 5 | V4.5-2 | 20 | #20 | Done |
 | F2015 | 품질 | RAG 전후 품질 비교 | [SPEC-F2015](advanced/SPEC-F2015-rag-comparison.md) | `scripts/compare_rag.py` | 5 | V4.5-3, V4.6-1~4 | 21 | #21 | Done |
 | F2016 | 수집 | 여러 문서 출처 결합 | [SPEC-F2016](advanced/SPEC-F2016-multi-source-pdf.md) | `data/pdf_source.py` | 6 | V4.5-4 | 22 | #22 | Done |

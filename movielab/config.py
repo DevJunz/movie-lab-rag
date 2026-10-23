@@ -185,6 +185,8 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
     ],
     "ui": [  # SPEC-F2008
         ("evidence_preview_chars", _int_at_least(1)),
+        ("max_input_chars", _int_at_least(1)),  # SPEC-F2013
+        ("movie_search_limit", _int_at_least(1)),  # SPEC-F2013
     ],
     "pdf": [  # SPEC-F2016 (A-12)
         ("min_page_chars", _int_at_least(0)),

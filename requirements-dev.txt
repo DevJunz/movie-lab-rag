@@ -1,3 +1,5 @@
 # 개발 도구 (A-13) — SPEC-NF2005에서 버전 고정
 pytest==9.1.1
 ruff==0.17.2
+# API 테스트 TestClient (SPEC-F2013, A-26)
+httpx==0.28.1
