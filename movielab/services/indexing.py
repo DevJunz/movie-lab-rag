@@ -13,7 +13,7 @@ from collections.abc import Callable
 
 import openai
 
-from movielab.core.errors import DataEmptyError, InvalidApiKeyError
+from movielab.core.errors import DataEmptyError, InvalidApiKeyError, MovieLabUserError
 from movielab.core.types import IndexReport, ReindexReport, SourceDocument
 from movielab.index.doc_indexer import DocIndexer
 from movielab.index.meta_indexer import index_items
@@ -93,22 +93,41 @@ def index_catalog(
 
 
 def reindex_documents(
-    documents: list[SourceDocument], indexer: DocIndexer, *, movie_id: str | None = None
+    documents: list[SourceDocument],
+    indexer: DocIndexer,
+    *,
+    movie_id: str | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> ReindexReport:
     """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3).
 
-    - 잘못된 키는 `InvalidApiKeyError`로 바꿔 바로 중단한다 (모든 문서가 같은 이유로 실패한다).
-    - 그 밖의 오류는 그 문서만 실패로 세고 다음 문서로 넘어간다 — 실패한 문서의 옛 청크는 남는다.
+    - 시작 전에 임베딩(키)을 준비한다. 안내 오류(키 없음 · 잘못된 키)는 바로 중단한다.
+    - 그 밖의 오류는 설정 횟수만큼 다시 시도하고(A-21), 그래도 실패하면 그 문서만 실패로 센다
+      — 실패한 문서의 옛 청크는 남는다.
     - 원문이 없는 문서의 청크는 지운다. `movie_id`를 주면 그 항목 범위에서만.
     """
-    chunks = failed = 0
+    _ = indexer.store.embeddings  # 키가 없으면 여기서 안내 오류
+    indexing = indexer.store.settings.indexing
+    succeeded = chunks = failed = 0
     for doc in documents:
-        try:
-            chunks += indexer.index_document(doc)
-        except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
-            raise InvalidApiKeyError(str(exc)) from exc
-        except Exception:
-            logger.exception("재색인 실패: %s/%s", doc.movie_id, doc.page_id)
+        for attempt in range(indexing.retries + 1):
+            try:
+                chunks += indexer.index_document(doc)
+                succeeded += 1
+                break
+            except MovieLabUserError:
+                raise
+            except Exception:
+                logger.exception(
+                    "재색인 실패 (%d/%d): %s/%s",
+                    attempt + 1,
+                    indexing.retries + 1,
+                    doc.movie_id,
+                    doc.page_id,
+                )
+                if attempt < indexing.retries:
+                    sleep(indexing.retry_wait_sec)
+        else:
             failed += 1
 
     keep = {(str(doc.movie_id), str(doc.page_id)) for doc in documents}
@@ -116,7 +135,7 @@ def reindex_documents(
     for orphan_item, page_id in orphans:
         indexer.delete_document(orphan_item, page_id)
     return ReindexReport(
-        documents=len(documents),
+        documents=succeeded,
         chunks=chunks,
         failed=failed,
         removed=len(orphans),

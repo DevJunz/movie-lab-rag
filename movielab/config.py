@@ -155,6 +155,12 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("max_selected_docs", _int_at_least(0)),
         ("min_doc_chars", _int_at_least(0)),
     ],
+    "chunking": [  # SPEC-F2005 (중복 < 크기는 _validate_chunking)
+        ("chunk_size", _int_at_least(1)),
+        ("chunk_overlap", _int_at_least(0)),
+        ("pdf_chunk_size", _int_at_least(1)),
+        ("pdf_chunk_overlap", _int_at_least(0)),
+    ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),
         ("maxlag", _int_at_least(0)),
@@ -179,17 +185,13 @@ def chunking_ok(size: Any, overlap: Any) -> bool:
 
 
 def _validate_chunking(raw: dict[str, Any], source: Path) -> None:
-    """청크 크기는 1 이상 정수, 중복은 0 이상 정수이고 크기보다 작아야 한다 (SPEC-F2005)."""
-    chunking = raw.get("chunking")
-    if not isinstance(chunking, dict):
-        raise SettingsError(f"설정 값 오류: chunking은 객체여야 한다 ({source})")
+    """각 값의 타입 · 범위는 `_RULES`가 먼저 검사한다. 여기서는 중복 < 크기만 (SPEC-F2005)."""
+    chunking = raw["chunking"]
     for size_key, overlap_key in (
         ("chunk_size", "chunk_overlap"),
         ("pdf_chunk_size", "pdf_chunk_overlap"),
     ):
-        size, overlap = chunking.get(size_key), chunking.get(overlap_key)
-        if not (_is_int(size) and size >= 1):
-            raise SettingsError(f"설정 값 오류: chunking.{size_key}={size!r} ({source})")
+        size, overlap = chunking[size_key], chunking[overlap_key]
         if not chunking_ok(size, overlap):
             raise SettingsError(
                 f"설정 값 오류: chunking.{overlap_key}={overlap!r}는 0 이상, "
@@ -199,7 +201,6 @@ def _validate_chunking(raw: dict[str, Any], source: Path) -> None:
 
 def _validate(raw: dict[str, Any], source: Path) -> None:
     """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다."""
-    _validate_chunking(raw, source)
     for group, rules in _RULES.items():
         section = raw.get(group)
         if not isinstance(section, dict):
@@ -208,6 +209,7 @@ def _validate(raw: dict[str, Any], source: Path) -> None:
             value = section.get(name)
             if not ok(value):
                 raise SettingsError(f"설정 값 오류: {group}.{name}={value!r} ({source})")
+    _validate_chunking(raw, source)
 
 
 def load_settings(path: str | Path | None = None) -> Settings:

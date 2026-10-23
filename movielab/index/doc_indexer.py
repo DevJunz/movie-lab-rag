@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
+import openai
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from movielab.config import chunking_ok
+from movielab.core.errors import InvalidApiKeyError
 from movielab.core.types import SourceDocument
 from movielab.index.store import VectorStore
 
@@ -49,7 +51,7 @@ class DocIndexer:
 
     def _metadata(self, doc: SourceDocument, index: int) -> dict[str, Any]:
         return {
-            ITEM_KEY: doc.movie_id,
+            ITEM_KEY: str(doc.movie_id),
             "page_id": str(doc.page_id),
             "title": doc.title,
             "url": doc.url,
@@ -80,8 +82,13 @@ class DocIndexer:
         }
 
     def index_document(self, doc: SourceDocument) -> int:
-        """문서 1건을 청킹해 색인한다. 반환: 색인한 청크 수."""
+        """문서 1건을 청킹해 색인한다. 반환: 색인한 청크 수.
+
+        본문이 비면 `ValueError`(옛 청크는 그대로), 임베딩 인증 오류는 `InvalidApiKeyError`.
+        """
         chunks = [c for c in self.splitter.split_text(doc.text) if c.strip()]
+        if not chunks:
+            raise ValueError(f"본문이 비어 있다: {doc.movie_id}/{doc.page_id}")
         documents = [
             Document(
                 page_content=chunk,
@@ -90,8 +97,10 @@ class DocIndexer:
             )
             for index, chunk in enumerate(chunks)
         ]
-        if documents:
+        try:
             self.store.upsert(self.collection, documents)  # 실패하면 옛 청크는 그대로 남는다
+        except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
+            raise InvalidApiKeyError(str(exc)) from exc
         new_ids = {d.id for d in documents}
         stale = [
             chunk_id

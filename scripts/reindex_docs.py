@@ -52,10 +52,11 @@ def main(argv: list[str] | None = None) -> int:
         documents = services.raw_store.iter_documents()
         if args.movie_id:
             documents = [d for d in documents if d.movie_id == args.movie_id]
-        if not documents:
+        indexer = services.doc_indexer(chunk_size=size, chunk_overlap=overlap)
+        if not documents and not indexer.indexed_pages(args.movie_id):
             print(messages.render("REINDEX_EMPTY", labels))
             return 1
-        indexer = services.doc_indexer(chunk_size=size, chunk_overlap=overlap)
+        # 원문이 0건이어도 색인된 문서가 있으면 정리한다 (AC-F2005-12)
         report = reindex_documents(documents, indexer, movie_id=args.movie_id)
         print(
             messages.render(
