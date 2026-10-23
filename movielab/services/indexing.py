@@ -14,7 +14,7 @@ from collections.abc import Callable
 import openai
 
 from movielab.core.errors import DataEmptyError, InvalidApiKeyError
-from movielab.core.types import IndexReport, SourceDocument
+from movielab.core.types import IndexReport, ReindexReport, SourceDocument
 from movielab.index.doc_indexer import DocIndexer
 from movielab.index.meta_indexer import index_items
 from movielab.index.store import VectorStore
@@ -92,7 +92,33 @@ def index_catalog(
     )
 
 
-def reindex_documents(documents: list[SourceDocument], indexer: DocIndexer) -> tuple[int, int]:
-    """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3). 반환: (문서 수, 청크 수)."""
-    chunks = sum(indexer.index_document(doc) for doc in documents)
-    return len(documents), chunks
+def reindex_documents(
+    documents: list[SourceDocument], indexer: DocIndexer, *, movie_id: str | None = None
+) -> ReindexReport:
+    """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3).
+
+    - 잘못된 키는 `InvalidApiKeyError`로 바꿔 바로 중단한다 (모든 문서가 같은 이유로 실패한다).
+    - 그 밖의 오류는 그 문서만 실패로 세고 다음 문서로 넘어간다 — 실패한 문서의 옛 청크는 남는다.
+    - 원문이 없는 문서의 청크는 지운다. `movie_id`를 주면 그 항목 범위에서만.
+    """
+    chunks = failed = 0
+    for doc in documents:
+        try:
+            chunks += indexer.index_document(doc)
+        except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
+            raise InvalidApiKeyError(str(exc)) from exc
+        except Exception:
+            logger.exception("재색인 실패: %s/%s", doc.movie_id, doc.page_id)
+            failed += 1
+
+    keep = {(str(doc.movie_id), str(doc.page_id)) for doc in documents}
+    orphans = sorted(indexer.indexed_pages(movie_id) - keep)
+    for orphan_item, page_id in orphans:
+        indexer.delete_document(orphan_item, page_id)
+    return ReindexReport(
+        documents=len(documents),
+        chunks=chunks,
+        failed=failed,
+        removed=len(orphans),
+        total_chunks=indexer.store.count(indexer.collection),
+    )

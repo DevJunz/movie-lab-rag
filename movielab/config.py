@@ -170,6 +170,14 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
 }
 
 
+def chunking_ok(size: Any, overlap: Any) -> bool:
+    """청크 크기는 1 이상 정수, 중복은 0 이상 정수이고 크기보다 작아야 한다 (SPEC-F2005).
+
+    설정 파일 검증과 재색인 스크립트의 일시 덮어쓰기 값이 같은 규칙을 쓴다.
+    """
+    return _is_int(size) and size >= 1 and _is_int(overlap) and 0 <= overlap < size
+
+
 def _validate_chunking(raw: dict[str, Any], source: Path) -> None:
     """청크 크기는 1 이상 정수, 중복은 0 이상 정수이고 크기보다 작아야 한다 (SPEC-F2005)."""
     chunking = raw.get("chunking")
@@ -182,7 +190,7 @@ def _validate_chunking(raw: dict[str, Any], source: Path) -> None:
         size, overlap = chunking.get(size_key), chunking.get(overlap_key)
         if not (_is_int(size) and size >= 1):
             raise SettingsError(f"설정 값 오류: chunking.{size_key}={size!r} ({source})")
-        if not (_is_int(overlap) and 0 <= overlap < size):
+        if not chunking_ok(size, overlap):
             raise SettingsError(
                 f"설정 값 오류: chunking.{overlap_key}={overlap!r}는 0 이상, "
                 f"{size_key}({size})보다 작아야 한다 ({source})"

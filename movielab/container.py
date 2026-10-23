@@ -124,8 +124,8 @@ class Services:
         """위키 문서 색인기 (F2005). 인자를 주면 청크 값을 이번 실행만 덮어쓴다."""
         return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
 
-    def _chunks_of(self, item_id: str) -> int:
-        return self.store.count_where(self.settings.collections.docs, {ITEM_KEY: item_id})
+    def _has_chunks(self, item_id: str) -> bool:
+        return self.store.has_where(self.settings.collections.docs, {ITEM_KEY: item_id})
 
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
@@ -145,7 +145,7 @@ class Services:
             settings=settings,
             manifest=None if dry_run else self.manifest,
             indexer=None if dry_run else self.doc_indexer().index_document,
-            chunk_counter=None if dry_run else self._chunks_of,
+            has_chunks=None if dry_run else self._has_chunks,
         )
 
     @property

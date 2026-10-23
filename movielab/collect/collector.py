@@ -39,7 +39,7 @@ class Collector:
         settings: Any,
         manifest: Any | None = None,
         indexer: Callable[[SourceDocument], int] | None = None,
-        chunk_counter: Callable[[str], int] | None = None,
+        has_chunks: Callable[[str], bool] | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.api_source = api_source
@@ -51,7 +51,7 @@ class Collector:
         self.settings = settings
         self.manifest = manifest or NullManifest()
         self.indexer = indexer
-        self.chunk_counter = chunk_counter  # 색인된 청크 수 (NF2002: 0이면 캐시를 믿지 않는다)
+        self.has_chunks = has_chunks  # 색인된 청크가 있는지 (NF2002: 없으면 캐시를 믿지 않는다)
         self.clock = clock
 
     # --- 소스 선택 · 대체 (§3.2) ---
@@ -119,9 +119,9 @@ class Collector:
 
         # 0. 캐시 (NF2002). 색인이 비었는데 기록이 남았으면(chroma 삭제 등) 그 영화 캐시를 비운다
         if (
-            self.chunk_counter is not None
+            self.has_chunks is not None
             and self.manifest.has_any(item.item_id)
-            and self.chunk_counter(item.item_id) == 0
+            and not self.has_chunks(item.item_id)
         ):
             logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)
             self.manifest.reset(item.item_id)

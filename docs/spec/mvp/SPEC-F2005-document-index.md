@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2005** 외부 문서 색인(RAG 2) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress (PR #32 리뷰 반영) |
+| 상태 | Done |
 | 담당 모듈 | `movielab/index/doc_indexer.py`, `movielab/index/store.py`, `scripts/reindex_docs.py` |
 | 선행 SPEC | SPEC-F2002, SPEC-F2004 |
 | 관련 ISSUE | #9 |
