@@ -36,7 +36,7 @@ class NullManifest:
     def has_page(self, item_id: str, page_id: str) -> bool:
         return False
 
-    def has_any(self, item_id: str) -> bool:
+    def has_indexed_pages(self, item_id: str) -> bool:
         return False
 
     def item_doc_page_id(self, item_id: str) -> str | None:
@@ -175,8 +175,9 @@ class Manifest(NullManifest):
     def has_page(self, item_id: str, page_id: str) -> bool:
         return str(page_id) in (self._peek(item_id).get("page_ids") or [])
 
-    def has_any(self, item_id: str) -> bool:
-        return bool(self._peek(item_id))
+    def has_indexed_pages(self, item_id: str) -> bool:
+        """색인했다고 기록된 문서가 있는지 (NF2002 색인 확인용)."""
+        return bool(self._peek(item_id).get("page_ids"))
 
     def item_doc_page_id(self, item_id: str) -> str | None:
         return self._peek(item_id).get("item_doc_page_id")

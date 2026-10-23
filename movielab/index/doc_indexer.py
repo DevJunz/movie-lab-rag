@@ -73,13 +73,22 @@ class DocIndexer:
     def delete_document(self, item_id: str, page_id: str) -> int:
         return self.store.delete_where(self.collection, self._where(item_id, page_id))
 
+    def _pages(self, item_id: str | None) -> list[tuple[str, tuple[str, str]]]:
+        where = {ITEM_KEY: str(item_id)} if item_id is not None else None
+        return [
+            (chunk_id, (str(meta.get(ITEM_KEY)), str(meta.get("page_id"))))
+            for chunk_id, meta in self.store.entries(self.collection, where)
+        ]
+
     def indexed_pages(self, item_id: str | None = None) -> set[tuple[str, str]]:
         """색인된 `(항목 ID, 문서 ID)` 쌍. `item_id`를 주면 그 항목 범위만."""
-        where = {ITEM_KEY: str(item_id)} if item_id is not None else None
-        return {
-            (str(meta.get(ITEM_KEY)), str(meta.get("page_id")))
-            for meta in self.store.metadatas(self.collection, where)
-        }
+        return {page for _, page in self._pages(item_id)}
+
+    def prune(self, keep: set[tuple[str, str]], item_id: str | None = None) -> set[tuple[str, str]]:
+        """`keep`에 없는 문서의 청크를 한 번에 지운다. 반환: 지운 `(항목 ID, 문서 ID)` 쌍."""
+        stale = [(chunk_id, page) for chunk_id, page in self._pages(item_id) if page not in keep]
+        self.store.delete_ids(self.collection, [chunk_id for chunk_id, _ in stale])
+        return {page for _, page in stale}
 
     def index_document(self, doc: SourceDocument) -> int:
         """문서 1건을 청킹해 색인한다. 반환: 색인한 청크 수.

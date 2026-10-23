@@ -49,12 +49,17 @@ def _count(services) -> int:
     return 0
 
 
-def positive_int(value: str) -> int:
-    """argparse 형식 검사: 1 이상의 정수만 받는다 (0 · 음수는 인자 오류, 종료 코드 2)."""
+def integer(value: str) -> int:
+    """argparse 형식 검사: 정수만 받는다 (인자 오류는 종료 코드 2)."""
     try:
-        number = int(value)
+        return int(value)
     except ValueError:
         raise argparse.ArgumentTypeError(messages.render("ARG_NOT_INTEGER", value=value)) from None
+
+
+def positive_int(value: str) -> int:
+    """argparse 형식 검사: 1 이상의 정수만 받는다 (0 · 음수는 인자 오류, 종료 코드 2)."""
+    number = integer(value)
     if number < 1:
         raise argparse.ArgumentTypeError(messages.render("ARG_NOT_POSITIVE", value=value))
     return number

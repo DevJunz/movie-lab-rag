@@ -117,10 +117,10 @@ class Collector:
         report = CollectReport(item_id=item.item_id, question=question)
         collect_settings = self.settings.collect
 
-        # 0. 캐시 (NF2002). 색인이 비었는데 기록이 남았으면(chroma 삭제 등) 그 영화 캐시를 비운다
+        # 0. 캐시 (NF2002). 색인한 문서 기록이 있는데 청크가 없으면(chroma 삭제 등) 캐시를 비운다
         if (
             self.has_chunks is not None
-            and self.manifest.has_any(item.item_id)
+            and self.manifest.has_indexed_pages(item.item_id)
             and not self.has_chunks(item.item_id)
         ):
             logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)

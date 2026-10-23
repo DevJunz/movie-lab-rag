@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from typing import Any
 
 import openai
 
@@ -97,26 +98,33 @@ def reindex_documents(
     indexer: DocIndexer,
     *,
     movie_id: str | None = None,
+    manifest: Any = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> ReindexReport:
     """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3).
 
     - 시작 전에 임베딩(키)을 준비한다. 안내 오류(키 없음 · 잘못된 키)는 바로 중단한다.
     - 그 밖의 오류는 설정 횟수만큼 다시 시도하고(A-21), 그래도 실패하면 그 문서만 실패로 센다
-      — 실패한 문서의 옛 청크는 남는다.
+      — 실패한 문서의 옛 청크는 남는다. 다시 해도 같은 `ValueError`(빈 본문 등)는 재시도하지 않는다.
     - 원문이 없는 문서의 청크는 지운다. `movie_id`를 주면 그 항목 범위에서만.
+      청크를 지운 영화는 수집 매니페스트(`manifest`)도 초기화해 다음 질문에서 다시 수집되게 한다.
     """
     _ = indexer.store.embeddings  # 키가 없으면 여기서 안내 오류
     indexing = indexer.store.settings.indexing
     succeeded = chunks = failed = 0
     for doc in documents:
+        done = False
         for attempt in range(indexing.retries + 1):
             try:
                 chunks += indexer.index_document(doc)
                 succeeded += 1
+                done = True
                 break
             except MovieLabUserError:
                 raise
+            except ValueError:
+                logger.exception("재색인 실패 (재시도 안 함): %s/%s", doc.movie_id, doc.page_id)
+                break
             except Exception:
                 logger.exception(
                     "재색인 실패 (%d/%d): %s/%s",
@@ -127,13 +135,14 @@ def reindex_documents(
                 )
                 if attempt < indexing.retries:
                     sleep(indexing.retry_wait_sec)
-        else:
+        if not done:
             failed += 1
 
     keep = {(str(doc.movie_id), str(doc.page_id)) for doc in documents}
-    orphans = sorted(indexer.indexed_pages(movie_id) - keep)
-    for orphan_item, page_id in orphans:
-        indexer.delete_document(orphan_item, page_id)
+    orphans = indexer.prune(keep, movie_id)
+    if manifest is not None:
+        for orphan_item in sorted({item for item, _ in orphans}):
+            manifest.reset(orphan_item)
     return ReindexReport(
         documents=succeeded,
         chunks=chunks,

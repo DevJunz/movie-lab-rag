@@ -16,17 +16,9 @@ from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
 from movielab.services.indexing import reindex_documents
-from scripts.index_meta import configure_stdout
+from scripts.index_meta import configure_stdout, integer
 
 logger = logging.getLogger(__name__)
-
-
-def integer(value: str) -> int:
-    """argparse 형식 검사: 정수만 받는다 (범위는 설정과 같은 규칙으로 따로 검사한다)."""
-    try:
-        return int(value)
-    except ValueError:
-        raise argparse.ArgumentTypeError(messages.render("ARG_NOT_INTEGER", value=value)) from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,13 +43,15 @@ def main(argv: list[str] | None = None) -> int:
         labels = services.profile.labels()
         documents = services.raw_store.iter_documents()
         if args.movie_id:
-            documents = [d for d in documents if d.movie_id == args.movie_id]
+            documents = [d for d in documents if str(d.movie_id) == args.movie_id]
         indexer = services.doc_indexer(chunk_size=size, chunk_overlap=overlap)
         if not documents and not indexer.indexed_pages(args.movie_id):
             print(messages.render("REINDEX_EMPTY", labels))
             return 1
         # 원문이 0건이어도 색인된 문서가 있으면 정리한다 (AC-F2005-12)
-        report = reindex_documents(documents, indexer, movie_id=args.movie_id)
+        report = reindex_documents(
+            documents, indexer, movie_id=args.movie_id, manifest=services.manifest
+        )
         print(
             messages.render(
                 "REINDEX_REPORT",

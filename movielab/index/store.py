@@ -96,11 +96,17 @@ class VectorStore:
         raw = self._raw(name)
         return raw is not None and bool(raw.get(where=where, limit=1, include=[])["ids"])
 
-    def metadatas(self, name: str, where: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    def entries(
+        self, name: str, where: dict[str, Any] | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """(청크 ID, 메타데이터) 목록 — 본문 · 벡터는 읽지 않는다."""
         raw = self._raw(name)
         if raw is None:
             return []
-        return [meta or {} for meta in raw.get(where=where, include=["metadatas"])["metadatas"]]
+        got = raw.get(where=where, include=["metadatas"])
+        return [
+            (doc_id, meta or {}) for doc_id, meta in zip(got["ids"], got["metadatas"], strict=True)
+        ]
 
     def delete_where(self, name: str, where: dict[str, Any]) -> int:
         """조건에 맞는 청크를 지우고 지운 수를 돌려준다."""
