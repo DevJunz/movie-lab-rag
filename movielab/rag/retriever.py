@@ -84,6 +84,7 @@ class Retriever:
         *,
         top_k: int | None = None,
         meta_title: Callable[[dict[str, Any]], str] | None = None,
+        search_type: str | None = None,
     ) -> None:
         """`store`: VectorStore(F2002) — rag는 index를 import 하지 않으므로 구조로만 쓴다.
 
@@ -97,6 +98,12 @@ class Retriever:
         if isinstance(self.top_k, bool) or not isinstance(self.top_k, int) or self.top_k < 1:
             raise ValueError(f"top_k는 1 이상이어야 한다: {self.top_k!r}")
         self.meta_title = meta_title or default_meta_title
+        retrieval = settings.retrieval
+        self.search_type = retrieval.search_type if search_type is None else search_type
+        if self.search_type not in ("similarity", "mmr"):
+            raise ValueError(f"search_type은 similarity 또는 mmr이어야 한다: {self.search_type!r}")
+        self.fetch_k = retrieval.mmr_fetch_k
+        self.lambda_mult = retrieval.mmr_lambda
 
     def _meta(self, item_id: str) -> list[Evidence]:
         docs = self.store.get_by_ids(self.meta_collection, [item_id])
@@ -115,12 +122,26 @@ class Retriever:
         collection = self.store.collection(self.docs_collection)
         k = self.top_k
         while True:
-            results = collection.similarity_search_with_score(query, k=k, filter=where)
+            results = self._search(collection, query, k, where)
             externals = [_external_evidence(doc, d if cosine else None) for doc, d in results]
             merged = merge_evidences(meta, externals)
             if len(merged) - len(meta) >= self.top_k or len(results) < k:
                 return merged[: len(meta) + self.top_k]
             k *= 2
+
+    def _search(
+        self, collection: Any, query: str, k: int, where: dict[str, str]
+    ) -> list[tuple[Document, float | None]]:
+        """(문서, 거리) 목록. MMR이면 다양성으로 고르고 거리는 유사도 검색 결과에서 찾는다."""
+        if self.search_type != "mmr":
+            return collection.similarity_search_with_score(query, k=k, filter=where)
+        fetch_k = max(self.fetch_k, k)
+        docs = collection.max_marginal_relevance_search(
+            query, k=k, fetch_k=fetch_k, lambda_mult=self.lambda_mult, filter=where
+        )
+        scored = collection.similarity_search_with_score(query, k=fetch_k, filter=where)
+        distances = {str(doc.id): d for doc, d in scored}
+        return [(doc, distances.get(str(doc.id))) for doc in docs]
 
     def check(self, item_id: str) -> None:
         """메타 색인에 이 항목이 있는지만 확인한다 (없으면 안내 오류) — 수집 전 점검용."""

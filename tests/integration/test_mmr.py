@@ -14,6 +14,7 @@ from tests.fakes import FakeClock, FakeEmbeddings
 from tests.fakes.source import make_doc
 
 DUP = "[합성] 블랙홀은 빛조차 빠져나오지 못하는 무거운 천체이다 사건의 지평선"
+QUERY = "블랙홀 천체"  # 중복 청크와 가장 가깝지만 다른 주제와도 일부 겹친다
 
 
 def _doc(movie_id, page_id, title, text):
@@ -51,15 +52,17 @@ def _externals(result):
 
 
 def test_tc_f2014_01_mmr_diversifies(services):
-    sim_result = services.retriever(top_k=3, search_type="similarity").retrieve("157336", DUP)
-    mmr_result = services.retriever(top_k=3, search_type="mmr").retrieve("157336", DUP)
+    sim_result = services.retriever(top_k=3, search_type="similarity").retrieve("157336", QUERY)
+    mmr_result = services.retriever(top_k=3, search_type="mmr").retrieve("157336", QUERY)
     sim, mmr = _externals(sim_result), _externals(mmr_result)
     assert len(sim) == 3 and len(mmr) == 3
     assert sum(e.title.startswith("중복") for e in sim) >= 2
     assert sum(e.title.startswith("중복") for e in mmr) <= 1
-    assert len({e.title for e in mmr}) > len({e.title for e in sim}) or len(
-        {e.title for e in sim}
-    ) == len(sim)
+
+    def topics(items):  # 거의 같은 청크 셋은 한 주제로 센다
+        return {"중복" if e.title.startswith("중복") else e.title for e in items}
+
+    assert len(topics(mmr)) > len(topics(sim))
     assert all(e.score is not None and 0 <= e.score <= 1 for e in mmr)
 
 
@@ -80,7 +83,7 @@ def test_tc_f2014_01_mmr_from_settings(tmp_settings, tmp_path):
 
 
 def test_tc_f2014_02_mmr_meta_first_and_scoped(services):
-    result = services.retriever(search_type="mmr").retrieve("157336", DUP)
+    result = services.retriever(search_type="mmr").retrieve("157336", QUERY)
     assert result.evidences[0].n == 1 and result.evidences[0].source_kind == "meta"
     assert [e.n for e in result.evidences] == list(range(1, len(result.evidences) + 1))
     externals = _externals(result)
