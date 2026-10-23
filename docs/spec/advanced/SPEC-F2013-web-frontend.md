@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2013** 프론트엔드 직접 구현 (UI · 심화) |
 | 구분 | 심화 |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/api/server.py`, `movielab/api/schemas.py`, `web/index.html`, `web/app.js`, `web/style.css` |
 | 선행 SPEC | MVP 전체 (특히 F2009~F2012, NF2004) |
 | 관련 ISSUE | #23 |
