@@ -109,7 +109,7 @@ class Manifest:
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-3, V4.7-2 | 같은 질문 2회 실제 실행 결과(2회차 CACHE_HIT, 외부 호출 0) — 화면의 진행 상태 캡처는 F2012 이후 | `docs/verification/evidence/V4.2-3_cache.txt` |
+| V4.2-3, V4.7-2 | 같은 질문 2회 실제 실행 결과 — 색인기(F2005) 연결 후 다시 생성: 1회차 30초 수집 · 색인, 2회차 CACHE_HIT · 외부 호출 0 — 화면의 진행 상태 캡처는 F2012 이후 | `docs/verification/evidence/V4.2-3_cache.txt` |
 
 ## 8. 범위 밖
 
