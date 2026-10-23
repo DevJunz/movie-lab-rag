@@ -47,10 +47,14 @@
 ```
 
 규칙:
-- 목록 필드는 `", "`로 잇는다. 빈 목록은 `정보 없음`으로 쓴다 (실데이터: `1084390` 소주전쟁의 감독).
-- `원어` 줄은 `original_language == "ko"`이면 `ko (한국 영화)`, 아니면 `<코드> (해외 영화)`로 쓴다 — "한국 영화" 조건 검색용.
-- 줄 순서와 라벨은 `DomainProfile`(영화)에 정의하고, `data/movies.py`의 `to_index_text(movie) -> str`가 만든다.
-- 필수 필드(`movie_id`, `title`, `year`, `overview`)가 없는 원소는 건너뛰고 경고 로그를 남긴다. 건너뛴 수를 반환 정보에 포함한다.
+- 색인 텍스트는 **8줄**이다(연도는 제목 줄에 들어간다).
+- 목록 필드는 `", "`로 잇는다. 빈 목록 · `null` · 공백뿐인 값은 `정보 없음`으로 쓴다 (실데이터: `1084390` 소주전쟁의 감독).
+- `원어` 줄은 언어 코드를 소문자로 정규화한 뒤 `ko`이면 `ko (한국 영화)`, 다른 코드면 `<코드> (해외 영화)`, 값이 없으면 `정보 없음`으로 쓴다 — "한국 영화" 조건 검색용.
+- 줄 순서와 라벨은 데이터 준비 영역 `data/movies.py`에 정의하고 `to_index_text(movie) -> str`가 만든다. `DomainProfile.to_index_text` · `DomainProfile.load_items`로 노출하며, container는 **프로필의 로더**로 `Catalog`를 만든다(다른 프로필을 주입하면 다른 데이터를 읽는다).
+- 필수 필드(`movie_id`, `title`, `year`, `overview`)가 없거나 공백뿐인 원소, **숫자 필드(`year`, `runtime`, `vote_average`)를 숫자로 바꿀 수 없는 원소**는 건너뛰고 경고 로그를 남긴다. 건너뛴 수를 반환 정보에 포함한다. 한 편의 잘못된 값 때문에 전체 로드가 실패하지 않는다.
+- 연도는 정수로 정규화해 제목 줄과 `ItemRecord.year`에 같은 값을 쓴다(`2014.0` → `2014`).
+- 파일이 JSON 배열이 아니면 `DataNotFoundError`가 아니라 `DataFormatError`(안내 코드 `DATA_INVALID`).
+- 스크립트의 사용자 문구는 `core/messages.py`에서 가져오고, 예상하지 못한 오류도 traceback 없이 안내 문구만 출력한다(NF2004).
 - `movie_id`는 문자열로 정규화한다. 중복 `movie_id`가 있으면 첫 번째만 쓰고 경고한다.
 
 ### 3.3 인터페이스
@@ -98,7 +102,7 @@ class Catalog:
 
 | ID | 수준 | 시나리오 | 기대 결과 | AC | 위치 |
 |---|---|---|---|---|---|
-| TC-F2001-01 | 단위 | 합성 영화 1편으로 `to_index_text` 호출 | 9개 라벨 줄이 순서대로 있고 값이 맞다 | 02 | `tests/unit/test_movies.py` |
+| TC-F2001-01 | 단위 | 합성 영화 1편으로 `to_index_text` 호출 | 8개 라벨 줄이 순서대로 있고 값이 맞다 | 02 | `tests/unit/test_movies.py` |
 | TC-F2001-02 | 단위 | `director: []`인 영화 | `감독: 정보 없음` | 03 | 〃 |
 | TC-F2001-03 | 단위 | `original_language: "ko"` / `"en"` | `ko (한국 영화)` / `en (해외 영화)` | 02 | 〃 |
 | TC-F2001-04 | 단위 | `overview`가 없는 원소 1개가 섞인 목록 | `skipped == 1`, 나머지는 정상 | 04 | 〃 |
@@ -106,7 +110,9 @@ class Catalog:
 | TC-F2001-06 | 통합 | 제공 `movies.json`이 있으면 로드 (없으면 `skip`) | 964건, `skipped == 0` | 01 | `tests/integration/test_movies_real.py` |
 | TC-F2001-07 | 수동 | `python -m scripts.index_meta --show 157336` | §3.2 예시와 같은 텍스트 출력 | 02 | 스크린샷 |
 | TC-F2001-09 | 단위 | `Catalog`에 가짜 로더 주입: `items()` 2번 · `get()` | 로더는 1번만 호출, 없는 ID는 `None` | 01 | `tests/unit/test_catalog.py` |
-| TC-F2001-10 | 통합 | `tmp_settings`로 `scripts.index_meta --show 157336` 실행 / 데이터 파일 없음 | 9줄 색인 텍스트 출력 / 안내 문구 · 종료 코드 1 | 02 | `tests/integration/test_scripts.py` |
+| TC-F2001-10 | 통합 | `tmp_settings`로 `scripts.index_meta --show 157336` 실행 / 데이터 파일 없음 | 8줄 색인 텍스트(라벨 목록 정확히 일치) 출력 / 안내 문구 · 종료 코드 1 | 02 | `tests/integration/test_scripts.py` |
+| TC-F2001-11 | 단위 | `director: [null]` · `original_language` 없음 · `"KO"` · 공백뿐인 `title` · `year: "미상"` · `runtime: "169분"` · `year: 2014.0` | 정보 없음 / 정보 없음 / 한국 영화 / 건너뜀 / 건너뜀 / 건너뜀 / `2014` | 03, 04 | `tests/unit/test_movies.py` |
+| TC-F2001-12 | 통합 | 깨진 JSON · 배열이 아닌 JSON · 잘못된 설정 파일로 `--show` | 안내 문구, traceback 없음, 종료 코드 1 | 02 | `tests/integration/test_scripts.py` |
 | TC-F2001-08 | 단위 | 색인 텍스트 라벨(`제목:`, `감독:` …)이 `movielab/data/` 밖에 없는지 검사 (TC-NF2005-03과 같은 검사기) | 0건 | 06 | `tests/unit/test_architecture.py` |
 
 > TC-F2001-06은 데이터 팩이 저장소에 없으므로 CI에서는 `skip`된다. 로컬 검증 결과를 검증 문서에 기록한다.
