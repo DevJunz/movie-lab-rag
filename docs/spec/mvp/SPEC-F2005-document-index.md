@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2005** 외부 문서 색인(RAG 2) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/index/doc_indexer.py`, `movielab/index/store.py`, `scripts/reindex_docs.py` |
 | 선행 SPEC | SPEC-F2002, SPEC-F2004 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #9 |
 
 ## 1. 요구사항 원문
 
@@ -48,7 +48,13 @@
 - `scripts.reindex_docs`는 `data/raw/wiki/`의 저장 원문으로 `wiki_docs`를 다시 만든다(외부 호출 없음).
   `--chunk-size`, `--chunk-overlap` 인자는 **설정 파일 값을 일시적으로 덮어쓰는 실험용**이며, 출력에 사용한 값과 청크 수를 보여 준다 (V4.2-5).
 
-### 3.4 인터페이스
+### 3.4 연결
+
+- `Collector`(F2004)의 `indexer`로 `DocIndexer.index_document`를, `chunk_counter`(NF2002)로 `VectorStore.count_where(docs, {"movie_id": …})`를 container에서 연결한다.
+- 계층 규칙상 `scripts.reindex_docs`는 `services/indexing.reindex_documents(documents, indexer)`를 쓰고, 저장 원문은 `Services.raw_store`(container)에서 얻는다.
+- 설정 검증: `chunk_size`는 1 이상 정수, `chunk_overlap`은 0 이상 정수이고 `chunk_size`보다 작아야 한다(PDF 값도 같은 규칙). 어기면 `SettingsError`.
+
+### 3.5 인터페이스
 
 ```python
 class DocIndexer:
