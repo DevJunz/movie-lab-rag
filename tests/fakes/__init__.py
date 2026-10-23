@@ -5,6 +5,7 @@ from tests.fakes.domain import BOOK_PROFILE
 from tests.fakes.embeddings import FakeEmbeddings
 from tests.fakes.http import FakeHttpSession, FakeResponse
 from tests.fakes.llm import FakeChatModel, pick_titles, task_of
+from tests.fakes.manifest import make_manifest
 
 __all__ = [
     "BOOK_PROFILE",
@@ -14,5 +15,6 @@ __all__ = [
     "FakeHttpSession",
     "FakeResponse",
     "pick_titles",
+    "make_manifest",
     "task_of",
 ]

@@ -1,8 +1,20 @@
-"""기록 호출을 남기는 가짜 매니페스트 (캐시 기록 시점 검사용)."""
+"""가짜 매니페스트.
+
+- `RecordingManifest`: 기록 호출을 남긴다 (캐시 기록 시점 검사용).
+- `make_manifest`: 실제 시간을 쓰지 않는 매니페스트
+  (수치는 `config/settings.json`의 `cache`, 시계는 `FakeClock`).
+"""
 
 from __future__ import annotations
 
-from movielab.collect.manifest import NullManifest
+import json
+from pathlib import Path
+from typing import Any
+
+from movielab.collect.manifest import Manifest, NullManifest
+from tests.fakes.clock import FakeClock
+
+_SETTINGS = Path(__file__).resolve().parents[2] / "config" / "settings.json"
 
 
 class RecordingManifest(NullManifest):
@@ -19,3 +31,17 @@ class RecordingManifest(NullManifest):
 
     def record_question(self, item_id, question, queries) -> None:
         self.questions.append(question)
+
+
+def cache_settings() -> dict[str, Any]:
+    return dict(json.loads(_SETTINGS.read_text(encoding="utf-8"))["cache"])
+
+
+def make_manifest(path: Path, **overrides: Any) -> Manifest:
+    """실제 시간을 쓰지 않는 매니페스트. `clock` · `sleep`을 주지 않으면 새 `FakeClock`을 쓴다."""
+    options: dict[str, Any] = cache_settings()
+    if "clock" not in overrides and "sleep" not in overrides:
+        clock = FakeClock()
+        options.update(clock=clock.monotonic, sleep=clock.sleep)
+    options.update(overrides)
+    return Manifest(path, **options)
