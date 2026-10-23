@@ -24,6 +24,8 @@ GMS 키와 주소, 위키백과 연락처는 `.env`에만 둔다. 저장소에�
 - `python-dotenv`의 `load_dotenv()`는 **`movielab.config.load_settings()` 안에서 한 번만** 부른다. 이미 설정된 환경변수를 덮어쓰지 않는다(`override=False`).
 - 비밀 값은 `Settings.secrets`(`gms_api_key`, `gms_base_url`, `wiki_contact`)로만 꺼낸다. `__repr__` · 로그 출력 시 `***`로 가린다.
 - `providers.make_chat_model(settings)` · `make_embeddings(settings)`는 키가 없으면 `MissingApiKeyError`를 던진다(F2012 안내로 연결).
+- `container.build_services()`는 키가 없어도 **실패하지 않는다.** 실제 `llm` · `embeddings`는 처음 쓸 때 만든다 — 키가 없을 때 앱이 시작되어 안내 화면을 띄울 수 있어야 하기 때문이다(F2012).
+- 테스트는 개발자 PC의 실제 `.env`를 읽지 않는다. `tests/conftest.py`가 `.env` 경로(`movielab.config.DOTENV_PATH`)를 없는 임시 경로로 바꾼다.
 
 ### 3.2 저장소 보호
 
@@ -81,6 +83,8 @@ LANGSMITH_API_KEY=
 | TC-NF2003-03 | 단위 | `repr(settings)`, 로그 레코드 | 키 원문 없음, `***` 있음 | 04 | `tests/unit/test_config.py` |
 | TC-NF2003-04 | 단위 | 저장소 스캔 | 키 패턴 0건, `.env` 미추적, `.gitignore` 항목 존재 | 02, 05 | `tests/unit/test_secrets.py` |
 | TC-NF2003-05 | 단위 | 스캐너에 `sk-` 키가 든 임시 파일을 넣음 | 검출됨 (스캐너 자체 검증) | 02 | 〃 |
+| TC-NF2003-07 | 단위 | 임시 `.env` 파일로 `load_settings` / 같은 변수가 이미 환경에 있음 | 파일 값을 읽음 / 환경 값을 덮어쓰지 않음 | 01 | `tests/unit/test_config.py` |
+| TC-NF2003-08 | 단위 | 키 없이 `build_services()` 후 `services.llm` 접근 | 생성은 성공, 접근 시 `MissingApiKeyError` | 03 | `tests/unit/test_container.py` |
 | TC-NF2003-06 | 수동 | 제출 zip 목록 확인 | `.env` · `data/` · 데이터 팩 없음 | 05 | 제출 전 점검 |
 
 ## 7. 증빙
