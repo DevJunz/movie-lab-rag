@@ -38,10 +38,12 @@ class FakeGraph:
         self.answer = answer
         self.states: list[dict] = []
 
-    def invoke(self, state):
+    def stream(self, state, stream_mode="updates"):
+        """LangGraph `stream(stream_mode="updates")`처럼 노드마다 갱신을 낸다."""
         self.log.append("graph")
         self.states.append(dict(state))
-        return {**state, "contexts": [_evidence(n) for n in (1, 2, 3)], "answer": self.answer}
+        yield {"retrieve": {"contexts": [_evidence(n) for n in (1, 2, 3)], "no_external": False}}
+        yield {"generate": {"answer": self.answer}}
 
 
 @pytest.fixture
@@ -69,7 +71,7 @@ def test_tc_f2009_05_ask_collects_then_answers_with_citations(catalog):
     assert result.not_found is False
     assert result.collect.notices == ["CACHE_HIT"]
     assert set(result.timings) >= {"collect", "total"}
-    assert stages == ["done"]  # 진행 상태 콜백은 수집기에 그대로 넘긴다
+    assert stages[0] == "done"  # 진행 상태 콜백은 수집기에 그대로 넘긴다
 
 
 def test_tc_f2009_05_not_found_answer(catalog):
@@ -83,3 +85,11 @@ def test_tc_f2009_05_unknown_item(catalog):
     with pytest.raises(ItemNotFoundError):
         service.ask("0", "질문")
     assert log == []
+
+
+def test_tc_f2012_10_progress_stages_in_order(catalog):
+    service, *_ = _service(catalog, "답 [근거 1]")
+    stages = []
+    result = service.ask("157336", "블랙홀은?", on_progress=lambda s, info: stages.append(s))
+    assert stages == ["done", "retrieve", "generate"]  # 수집 단계 뒤에 검색 → 생성
+    assert result.no_external is False
