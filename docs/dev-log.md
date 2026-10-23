@@ -20,3 +20,5 @@ RAG 파이프라인 설계문서의 "겪은 문제, 해결 과정" 절의 원본
 | 2026-10-23 | SPEC-F2002 (#27) | 실제 964편 색인 결과 | GMS `text-embedding-3-small`, 배치 100 | 1회차 73초, 2회차도 964건(중복 없음) — `docs/verification/evidence/V4.1-1_meta_count.txt`, `V4.1-2_reindex.txt` | NF2001 참고 |
 | 2026-10-23 | SPEC-F2002 (#27 재리뷰) | 키 '없음'만 막아서, 틀린 키 · GMS 장애에서는 `--rebuild`가 여전히 색인을 지웠다 | 삭제 후 재생성 방식은 첫 임베딩이 성공하기 전에 기존 색인을 잃는다 | `--rebuild`를 임시 컬렉션 `movie_meta__rebuild`에 만든 뒤 모두 성공했을 때만 교체(`modify(name=)`). 실제 964편으로 교체 확인 | AC-F2002-07 |
 | 2026-10-23 | SPEC-F2002 (#27 재리뷰) | 빈 `movies.json`이면 모든 문서가 고아로 판정돼 오류 없이 색인이 사라질 수 있었다 | 고아 삭제가 '로드 0건'을 정상으로 취급했다 | 0건이면 `DataEmptyError`로 중단 | AC-F2002-07 |
+| 2026-10-23 | SPEC-NF2006 (#28) | 호출 간격 잠금이 클라이언트마다 따로라서 Streamlit 세션이 여러 개면 위키백과 요청이 한 줄로 서지 않을 구조였다 (리뷰 지적) | 잠금 · 마지막 요청 시각이 인스턴스 필드였다 | API 주소별 프로세스 공용 `RequestThrottle` | AC-NF2006-03 · 07 |
+| 2026-10-23 | SPEC-NF2006 (#28) | 점검 페이지(HTML 200) · 본문 수신 중 끊김이 원래 예외로 새어 나가 `auto` 대체가 동작하지 않을 수 있었다 (리뷰 지적) | 연결 오류 · 타임아웃만 재시도 대상이었다 | `requests.RequestException` 전체와 JSON이 아닌 200을 재시도 후 `ExternalSourceUnavailableError`로 통일 | F2004 §3.2 |
