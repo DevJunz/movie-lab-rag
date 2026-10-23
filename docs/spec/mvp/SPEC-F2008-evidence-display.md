@@ -51,7 +51,7 @@
 
 - 링크는 `Evidence.url`. 클릭하면 새 탭으로 연다. 링크 이름은 출처 종류별 라벨(`DomainProfile.meta_link_label` = `TMDB`, 외부 문서는 `원문`).
 - 라이선스는 `Evidence.license`가 있을 때만 붙인다 (위키백과 청크 메타데이터의 `license`, F2005).
-- 근거 본문 미리보기는 펼침(`st.expander`) 안에 200자까지만 보인다.
+- 근거 본문 미리보기는 펼침(`st.expander`) 안에 `settings.ui.evidence_preview_chars`(200)자까지만 보인다. 컴포넌트는 이 값을 인자(`preview_chars`)로 받는다.
 - `uncited`이면 근거 목록 대신 안내 `이 답변에는 인용된 근거가 없습니다.`(`core/messages.UNCITED`)를 `st.info`로 보인다.
   `not_found`인 경우도 인용이 없으므로 같은 안내가 나온다.
 - 같은 형식을 관람 가이드 · 사실 판정(F2010), API 응답(F2013)에서도 쓴다.
