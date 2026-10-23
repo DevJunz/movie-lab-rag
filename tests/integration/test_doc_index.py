@@ -307,8 +307,8 @@ def test_tc_f2005_24_pruned_movie_manifest_reset(tmp_settings):
         manifest.record_page(doc.movie_id, doc.page_id, doc.title, 1)
     report = reindex_documents([kept, other], indexer, manifest=manifest)
     assert report.removed == 1
-    assert not manifest.has_indexed_pages("157336")  # 지운 문서를 다시 수집할 수 있게
-    assert manifest.has_indexed_pages("27205")
+    assert manifest.page_ids("157336") == set()  # 지운 문서를 다시 수집할 수 있게
+    assert manifest.page_ids("27205") == {"9"}
 
 
 def test_tc_f2005_27_retry_classification_matches_meta_index(tmp_settings):
@@ -376,3 +376,16 @@ def test_tc_f2005_32_upsert_in_batches(tmp_settings, tmp_path):
     assert count == 5
     assert calls == [2, 2, 1]
     assert store.count("wiki_docs") == 5
+
+    deletes = []
+    original_delete = store.delete_ids
+
+    def counting_delete(name, ids):
+        deletes.append(len(ids))
+        return original_delete(name, ids)
+
+    store.delete_ids = counting_delete
+    short = "\n\n".join(["[합성] " + "나" * 90] * 2)  # 청크 2개로 줄어 옛 청크 3개 정리
+    _indexer(store).index_document(dataclasses.replace(_doc(), text=short))
+    assert sum(deletes) == 3 and max(deletes) <= 2
+    assert store.count("wiki_docs") == 2

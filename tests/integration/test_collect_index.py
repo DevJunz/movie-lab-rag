@@ -118,6 +118,8 @@ def test_tc_f2005_29_blank_item_doc_rejected_and_cache_hits(tmp_settings):
     first = collector.collect(item, QUESTION)
     assert ("1", "too_short") in {(r.page_id, r.reason) for r in first.rejected}
     assert "CACHE_HIT" in collector.collect(item, QUESTION).notices
+    collector.collect(item, "다른 질문")  # 빈 항목 자체 문서를 다시 찾거나 받지 않는다
+    assert source.fetched().count("1") == 1
 
 
 def test_tc_f2005_33_partial_chunk_loss_detected(tmp_settings):

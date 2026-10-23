@@ -329,14 +329,16 @@ def test_tc_f2005_31_broken_raw_file_skipped_and_kept(tmp_settings, monkeypatch,
     emb = FakeEmbeddings()
     services = build_services(tmp_settings, embeddings=emb)
     indexer = services.doc_indexer()
-    for page_id in ("1", "2", "3"):
+    for page_id in ("1", "2", "3", "4"):
         doc = dataclasses.replace(make_doc(page_id, f"문서{page_id}"), movie_id="157336")
         services.raw_store.save(doc)
         indexer.index_document(doc)
     services.raw_store.path("157336", "2").write_text("{깨진 json", encoding="utf-8")
+    services.raw_store.path("157336", "4").write_text("null", encoding="utf-8")  # 객체가 아닌 JSON
     monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
     monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
-    assert reindex_docs.main([]) == 1  # 실패 1건이 있으면 종료 코드 1
+    assert reindex_docs.main([]) == 1  # 실패가 있으면 종료 코드 1
     out = capsys.readouterr().out
-    assert "문서 2건" in out and "색인하지 못한 문서 1건" in out
-    assert services.store.count_where("wiki_docs", {"page_id": "2"}) > 0  # 깨진 원문의 청크는 유지
+    assert "문서 2건" in out and "색인하지 못한 문서 2건" in out
+    for page_id in ("2", "4"):  # 읽지 못한 원문의 청크는 유지
+        assert services.store.count_where("wiki_docs", {"page_id": page_id}) > 0

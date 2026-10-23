@@ -436,7 +436,7 @@ def test_tc_nf2002_27_empty_collection_writes_nothing(tmp_path):
     manifest = make_manifest(path)
     assert manifest.record_collection("1") is True
     assert not path.exists()
-    assert manifest.has_indexed_pages("1") is False
+    assert manifest.page_ids("1") == set()
 
 
 def test_tc_nf2002_27_bad_scalar_field_backed_up(tmp_path):
