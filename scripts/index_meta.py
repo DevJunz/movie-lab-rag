@@ -54,9 +54,9 @@ def positive_int(value: str) -> int:
     try:
         number = int(value)
     except ValueError:
-        raise argparse.ArgumentTypeError(f"정수가 아닙니다: {value}") from None
+        raise argparse.ArgumentTypeError(messages.render("ARG_NOT_INTEGER", value=value)) from None
     if number < 1:
-        raise argparse.ArgumentTypeError(f"1 이상이어야 합니다: {value}")
+        raise argparse.ArgumentTypeError(messages.render("ARG_NOT_POSITIVE", value=value))
     return number
 
 

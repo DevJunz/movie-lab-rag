@@ -35,4 +35,6 @@ def make_embeddings(settings: Settings) -> OpenAIEmbeddings:
         timeout=settings.models.timeout_sec,
         # 토큰 계산 파일을 외부에서 내려받지 않고, 호환 프록시에 문자열을 그대로 보낸다
         check_embedding_ctx_length=False,
+        # 재시도는 색인 정책(A-21)만 따른다 — SDK 자체 재시도를 겹치지 않는다
+        max_retries=0,
     )

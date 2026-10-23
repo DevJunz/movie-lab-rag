@@ -115,21 +115,28 @@ class Settings:
         return (value if value.is_absolute() else REPO_ROOT / value).resolve()
 
 
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _validate(raw: dict[str, Any], source: Path) -> None:
-    """시작할 때 잡아야 하는 값 오류. 묶음별 규칙은 해당 SPEC에서 더한다."""
-    indexing = raw.get("indexing", {})
+    """시작할 때 잡아야 하는 값 오류 — 타입까지 검사한다. 묶음별 규칙은 해당 SPEC에서 더한다."""
+    indexing = raw.get("indexing")
+    if not isinstance(indexing, dict):
+        raise SettingsError(f"설정 값 오류: indexing은 객체여야 한다 ({source})")
     rules = [
-        ("indexing.batch_size", indexing.get("batch_size", 1), lambda v: int(v) >= 1),
-        ("indexing.retries", indexing.get("retries", 0), lambda v: int(v) >= 0),
-        ("indexing.retry_wait_sec", indexing.get("retry_wait_sec", 0), lambda v: float(v) >= 0),
+        ("batch_size", lambda v: _is_int(v) and v >= 1),
+        ("retries", lambda v: _is_int(v) and v >= 0),
+        ("retry_wait_sec", lambda v: _is_number(v) and v >= 0),
     ]
-    for name, value, ok in rules:
-        try:
-            valid = ok(value)
-        except (TypeError, ValueError):
-            valid = False
-        if not valid:
-            raise SettingsError(f"설정 값 오류: {name}={value!r} ({source})")
+    for name, ok in rules:
+        value = indexing.get(name)
+        if not ok(value):
+            raise SettingsError(f"설정 값 오류: indexing.{name}={value!r} ({source})")
 
 
 def load_settings(path: str | Path | None = None) -> Settings:

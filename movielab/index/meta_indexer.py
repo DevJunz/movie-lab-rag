@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -15,7 +16,8 @@ from movielab.index.store import VectorStore
 
 logger = logging.getLogger(__name__)
 
-# 다시 해도 같은 결과인 오류 — 재시도하지 않고 바로 알린다 (SPEC-F2002 §3.1-5)
+# 다시 해도 같은 결과인 오류 — 재시도하지 않고 바로 알린다 (SPEC-F2002 §3.1-6).
+# 단 응답이 잘려 나는 JSONDecodeError(ValueError의 하위)는 일시 오류로 보고 재시도한다.
 UNRECOVERABLE = (
     MovieLabUserError,
     openai.AuthenticationError,
@@ -54,6 +56,11 @@ def index_items(
             try:
                 store.upsert(collection, documents)
                 break
+            except json.JSONDecodeError:
+                logger.exception("메타 색인 배치 %d 응답 해석 실패 (시도 %d)", number, attempt + 1)
+                if attempt < retries:
+                    sleep(retry_wait_sec)
+                continue
             except UNRECOVERABLE:
                 raise
             except Exception:

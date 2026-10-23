@@ -89,6 +89,15 @@ class VectorStore:
         if raw is not None and ids:
             raw.delete(ids=list(ids))
 
+    def collection_names(self) -> list[str]:
+        return sorted(c.name for c in self.client.list_collections())
+
+    def rename_collection(self, source: str, target: str) -> None:
+        """`source` 컬렉션 이름을 `target`으로 바꾼다 (target은 비어 있어야 한다)."""
+        self.client.get_collection(source).modify(name=target)
+        self._collections.pop(source, None)
+        self._collections.pop(target, None)
+
     def delete_collection(self, name: str) -> None:
         if self._raw(name) is not None:
             self.client.delete_collection(name)

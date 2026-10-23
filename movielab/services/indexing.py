@@ -1,14 +1,27 @@
-"""색인 작업 조율 — 스크립트는 이 함수로 Catalog(F2001)와 VectorStore(F2002)를 잇는다."""
+"""색인 작업 조율 — 스크립트는 이 함수로 Catalog(F2001)와 VectorStore(F2002)를 잇는다.
+
+어떤 실패에서도 기존 색인을 잃지 않는 것이 원칙이다 (AC-F2002-07):
+- 검사 · 로드 · 키 준비가 끝나기 전에는 아무것도 지우지 않는다.
+- `rebuild`는 임시 컬렉션에 새로 만든 뒤, 모든 배치가 성공했을 때만 기존 것과 바꾼다.
+"""
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 
+import openai
+
+from movielab.core.errors import DataEmptyError, InvalidApiKeyError
 from movielab.core.types import IndexReport
 from movielab.index.meta_indexer import index_items
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
+
+logger = logging.getLogger(__name__)
+
+REBUILD_SUFFIX = "__rebuild"
 
 
 def index_catalog(
@@ -19,34 +32,60 @@ def index_catalog(
     batch_size: int | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> IndexReport:
-    """SPEC-F2002 §3.1 순서: 항목 로드 → 임베딩(키) 확인 → (rebuild면 삭제) → upsert → 고아 삭제."""
+    """SPEC-F2002 §3.1: 검사 → 로드(0건이면 중단) → 키 준비 → upsert(또는 임시 컬렉션) → 정리."""
     settings = store.settings
     collection = settings.collections.meta
     indexing = settings.indexing
+    size = indexing.batch_size if batch_size is None else batch_size
+    if size < 1:
+        raise ValueError(f"batch_size는 1 이상이어야 한다: {size}")
+
     items = catalog.items()
-    _ = store.embeddings  # 키가 없으면 여기서 안내 오류 — 기존 색인을 지우기 전에 확인한다
+    if not items:
+        raise DataEmptyError(f"불러온 항목이 0건이다 (건너뜀 {catalog.skipped}건)")
+    _ = store.embeddings  # 키가 없으면 여기서 안내 오류
+
+    target = f"{collection}{REBUILD_SUFFIX}" if rebuild else collection
     if rebuild:
-        store.delete_collection(collection)
-    failed = index_items(
-        store,
-        items,
-        collection=collection,
-        batch_size=batch_size or indexing.batch_size,
-        retries=indexing.retries,
-        retry_wait_sec=indexing.retry_wait_sec,
-        sleep=sleep,
-    )
+        store.delete_collection(target)  # 이전에 실패하고 남은 임시 컬렉션
+    try:
+        failed = index_items(
+            store,
+            items,
+            collection=target,
+            batch_size=size,
+            retries=indexing.retries,
+            retry_wait_sec=indexing.retry_wait_sec,
+            sleep=sleep,
+        )
+    except (openai.AuthenticationError, openai.PermissionDeniedError) as exc:
+        if rebuild:
+            store.delete_collection(target)
+        raise InvalidApiKeyError(str(exc)) from exc
+    except Exception:
+        if rebuild:
+            store.delete_collection(target)
+        raise
+
     loaded_ids = {item.item_id for item in items}
     removed = 0
-    if not failed:
+    if rebuild:
+        if failed:
+            logger.warning("rebuild 실패 배치 %s — 기존 색인을 유지한다", failed)
+            store.delete_collection(target)
+        else:
+            store.delete_collection(collection)
+            store.rename_collection(target, collection)
+    elif not failed:
         orphans = [doc_id for doc_id in store.ids(collection) if doc_id not in loaded_ids]
         store.delete_ids(collection, orphans)
         removed = len(orphans)
-    indexed = sum(1 for doc_id in store.ids(collection) if doc_id in loaded_ids)
+
+    current_ids = store.ids(collection)
     return IndexReport(
         loaded=len(items) + catalog.skipped,
         skipped=catalog.skipped,
-        indexed=indexed,
+        indexed=sum(1 for doc_id in current_ids if doc_id in loaded_ids),
         failed_batches=failed,
         removed=removed,
     )
