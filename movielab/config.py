@@ -171,6 +171,9 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("pdf_chunk_size", _int_at_least(1)),
         ("pdf_chunk_overlap", _int_at_least(0)),
     ],
+    "ui": [  # SPEC-F2008
+        ("evidence_preview_chars", _int_at_least(1)),
+    ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),
         ("maxlag", _int_at_least(0)),

@@ -18,6 +18,11 @@ EVIDENCE_LIST_SCORE = " · 점수 {score:.3f}"
 # 근거로 답할 수 없을 때 답변이 그대로 써야 하는 문장 (SPEC-F2007 §3.3)
 NOT_FOUND = "제공된 문서에서 확인되지 않습니다."
 
+# 근거 목록 (SPEC-F2008 §3.3)
+EVIDENCE_HEADER = "근거"
+EVIDENCE_SOURCE_LINK = "원문"
+UNCITED = "이 답변에는 인용된 근거가 없습니다."
+
 TEMPLATES: dict[str, str] = {
     "API_KEY_MISSING": (
         "GMS API 키가 설정되지 않았습니다. .env 파일에 GMS_API_KEY와 GMS_BASE_URL을 "
