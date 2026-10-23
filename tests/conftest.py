@@ -81,8 +81,11 @@ def _block_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPat
 
 
 @pytest.fixture(autouse=True)
-def _isolate_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """실제 키 · 설정이 테스트에 새지 않게 환경변수를 지운다."""
+def _isolate_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """실제 키 · 설정이 테스트에 새지 않게 환경변수를 지우고, 저장소의 .env를 읽지 않게 한다."""
+    import movielab.config
+
+    monkeypatch.setattr(movielab.config, "DOTENV_PATH", tmp_path / "no-such.env", raising=False)
     for name in _ISOLATED_ENV:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
