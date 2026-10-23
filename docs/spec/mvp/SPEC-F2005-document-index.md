@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2005** 외부 문서 색인(RAG 2) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/index/doc_indexer.py`, `movielab/index/store.py`, `scripts/reindex_docs.py` |
 | 선행 SPEC | SPEC-F2002, SPEC-F2004 |
 | 관련 ISSUE | #9 |
@@ -105,7 +105,7 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-5 | 두 설정의 청크 수 비교 출력 캡처 + 설계문서에 표로 기록 | `docs/verification/screenshots/V4.2-5_chunk_settings.png` |
+| V4.2-5 | 실제 수집 원문 12건을 1000/200 · 500/100 · 1500/300으로 재색인한 청크 수(302 · 630 · 200) + 설계문서에 표로 기록 | `docs/verification/evidence/V4.2-5_chunk_settings.txt` |
 
 ## 8. 범위 밖
 
