@@ -10,6 +10,11 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+# 스크립트 근거 목록 (SPEC-F2006 V4.3-1)
+EVIDENCE_LIST_HEADER = "근거:"
+EVIDENCE_LIST_LINE = "[근거 {n}] {source_type} · {title}{score}"
+EVIDENCE_LIST_SCORE = " · 점수 {score:.3f}"
+
 TEMPLATES: dict[str, str] = {
     "API_KEY_MISSING": (
         "GMS API 키가 설정되지 않았습니다. .env 파일에 GMS_API_KEY와 GMS_BASE_URL을 "

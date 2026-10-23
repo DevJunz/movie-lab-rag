@@ -41,10 +41,18 @@ def _print_report(report) -> None:
 
 def _print_evidence(result) -> None:
     """근거 목록 (SPEC-F2006 V4.3-1): 번호 · 출처 유형 · 제목 · 점수."""
-    print("근거:")
+    print(messages.EVIDENCE_LIST_HEADER)
     for evidence in result.evidences:
-        score = "" if evidence.score is None else f" · 점수 {evidence.score:.3f}"
-        print(f"[근거 {evidence.n}] {evidence.source_type} · {evidence.title}{score}")
+        score = (
+            ""
+            if evidence.score is None
+            else messages.EVIDENCE_LIST_SCORE.format(score=evidence.score)
+        )
+        print(
+            messages.EVIDENCE_LIST_LINE.format(
+                n=evidence.n, source_type=evidence.source_type, title=evidence.title, score=score
+            )
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -93,12 +101,13 @@ def main(argv: list[str] | None = None) -> int:
         if item is None:
             print(messages.render("ITEM_NOT_FOUND", labels, item_id=args.movie_id))
             return 1
+        retriever = services.retriever(top_k=args.top_k) if args.show_evidence else None
+        if retriever is not None:
+            retriever.check(item.item_id)  # 색인이 비었으면 수집 전에 안내하고 끝낸다
         collector = services.make_collector(dry_run=args.dry_run)
         _print_report(collector.collect(item, args.question))
-        if args.show_evidence:
-            _print_evidence(
-                services.retriever(top_k=args.top_k).retrieve(item.item_id, args.question)
-            )
+        if retriever is not None:
+            _print_evidence(retriever.retrieve(item.item_id, args.question))
         return 0
     except MovieLabUserError as error:
         logger.warning("안내 오류: %s", error)

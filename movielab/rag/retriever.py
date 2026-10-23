@@ -60,7 +60,8 @@ def _meta_evidence(doc: Document, meta_title: Callable[[dict[str, Any]], str]) -
     )
 
 
-def _external_evidence(doc: Document, distance: float) -> Evidence:
+def _external_evidence(doc: Document, distance: float | None) -> Evidence:
+    """`distance`가 None이면(코사인이 아닌 컬렉션) 점수를 비운다."""
     meta: dict[str, Any] = doc.metadata
     return Evidence(
         n=0,
@@ -71,7 +72,7 @@ def _external_evidence(doc: Document, distance: float) -> Evidence:
         url=str(meta.get("url", "")),
         license=meta.get("license"),
         text=doc.page_content,
-        score=max(0.0, 1.0 - float(distance)),
+        score=None if distance is None else min(1.0, max(0.0, 1.0 - float(distance))),
         page=meta.get("page"),
     )
 
@@ -93,7 +94,7 @@ class Retriever:
         self.meta_collection = settings.collections.meta
         self.docs_collection = settings.collections.docs
         self.top_k = settings.retrieval.top_k if top_k is None else top_k
-        if not isinstance(self.top_k, int) or self.top_k < 1:
+        if isinstance(self.top_k, bool) or not isinstance(self.top_k, int) or self.top_k < 1:
             raise ValueError(f"top_k는 1 이상이어야 한다: {self.top_k!r}")
         self.meta_title = meta_title or default_meta_title
 
@@ -105,16 +106,29 @@ class Retriever:
             raise ItemNotIndexedError(f"항목 {item_id}의 메타 청크가 없다")
         return [_meta_evidence(docs[0], self.meta_title)]
 
-    def _external(self, item_id: str, query: str) -> list[Evidence]:
-        if not self.store.has_where(self.docs_collection, {ITEM_KEY: item_id}):
-            return []
-        results = self.store.collection(self.docs_collection).similarity_search_with_score(
-            query, k=self.top_k, filter={ITEM_KEY: item_id}
-        )
-        return [_external_evidence(doc, distance) for doc, distance in results]
+    def _merged(self, item_id: str, query: str, meta: list[Evidence]) -> list[Evidence]:
+        """메타 + 외부 Top-k를 병합한다. 중복 제거로 `top_k`보다 적어지면 더 가져온다."""
+        where = {ITEM_KEY: item_id}
+        if not self.store.has_where(self.docs_collection, where):
+            return merge_evidences(meta, [])
+        cosine = self.store.distance(self.docs_collection) == "cosine"
+        collection = self.store.collection(self.docs_collection)
+        k = self.top_k
+        while True:
+            results = collection.similarity_search_with_score(query, k=k, filter=where)
+            externals = [_external_evidence(doc, d if cosine else None) for doc, d in results]
+            merged = merge_evidences(meta, externals)
+            if len(merged) - len(meta) >= self.top_k or len(results) < k:
+                return merged[: len(meta) + self.top_k]
+            k *= 2
+
+    def check(self, item_id: str) -> None:
+        """메타 색인에 이 항목이 있는지만 확인한다 (없으면 안내 오류) — 수집 전 점검용."""
+        self._meta(str(item_id))
 
     def retrieve(self, item_id: str, query: str) -> RetrievalResult:
+        item_id = str(item_id)
         meta = self._meta(item_id)
-        evidences = merge_evidences(meta, self._external(item_id, query))
+        evidences = self._merged(item_id, query, meta)
         # 중복 제거 뒤 남은 외부 근거로 판단한다 (메타와 같은 본문뿐이면 '없음')
         return RetrievalResult(evidences=evidences, no_external=len(evidences) == len(meta))
