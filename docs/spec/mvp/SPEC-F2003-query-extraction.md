@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2003** 검색어 추출(프롬프트1) (프롬프트 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/collect/query_extractor.py`, `movielab/prompts.py`(P1), `movielab/core/jsonparse.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-F2001 |
 | 관련 ISSUE | #6 |
@@ -42,7 +42,7 @@
 예: ["블랙홀", "웜홀", "일반 상대성 이론"]
 ```
 
-`item_card`(영화): `인터스텔라 (2014) / 원제: Interstellar / 감독: 크리스토퍼 놀란 / 장르: 모험, 드라마, SF / 줄거리(앞부분): 세계 각국의 정부와 …(300자)`.
+`item_card`(영화, `data/domain_movie.py`): 줄거리는 `ItemRecord.index_text`의 `줄거리:` 줄에서 읽는다(메타데이터에 줄거리를 중복 저장하지 않기 위해). `인터스텔라 (2014) / 원제: Interstellar / 감독: 크리스토퍼 놀란 / 장르: 모험, 드라마, SF / 줄거리(앞부분): 세계 각국의 정부와 …(300자)`.
 영화 필드 이름을 프롬프트 템플릿에 직접 쓰지 않기 위해 프로필이 만든다(NF2005).
 
 ### 3.2 항목 자체 문서 검색어 (항상 포함)
@@ -121,7 +121,7 @@ class QueryExtractor:
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-1 | Q1의 검색어 목록 출력 캡처 (스크립트 또는 화면의 수집 상세) | `docs/verification/screenshots/V4.2-1_queries.png` |
+| V4.2-1 | Q1의 검색어 목록 (실제 GMS 결과 저장, 화면의 수집 상세 캡처는 F2012 이후) | `docs/verification/evidence/V4.2-1_queries.txt` |
 
 ## 8. 범위 밖
 
