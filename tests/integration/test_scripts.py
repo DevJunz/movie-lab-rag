@@ -273,3 +273,24 @@ def test_tc_f2005_20_reindex_docs_cleans_when_no_raw(tmp_settings, monkeypatch, 
     assert services.store.count("wiki_docs") == 0
     assert reindex_docs.main([]) == 1  # 원문도 색인도 없으면 안내
     assert "저장 원문이 없습니다" in capsys.readouterr().out
+
+
+def test_tc_f2005_25_reindex_movie_id_matches_int_in_raw(tmp_settings, monkeypatch, capsys):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    doc = dataclasses.replace(make_doc("1", "문서1"), movie_id=157336)  # 원문 JSON에 정수
+    services.raw_store.save(doc)
+    services.doc_indexer().index_document(doc)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    assert reindex_docs.main(["--movie-id", "157336"]) == 0
+    out = capsys.readouterr().out
+    assert "문서 1건" in out and "지웠습니다" not in out
+    assert services.store.count("wiki_docs") > 0

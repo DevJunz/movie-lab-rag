@@ -281,3 +281,31 @@ def test_tc_f2005_23_transient_error_retried(tmp_settings):
     report = reindex_documents([_doc()], _indexer(services.store), sleep=lambda s: None)
     assert report.failed == 0 and report.documents == 1
     assert emb.calls == 2
+
+
+def test_tc_f2005_23_permanent_error_not_retried(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    services = _services(tmp_settings)
+    waits = []
+    empty = dataclasses.replace(_doc(), text=" ")
+    report = reindex_documents([empty], _indexer(services.store), sleep=waits.append)
+    assert report.failed == 1 and waits == []
+
+
+def test_tc_f2005_24_pruned_movie_manifest_reset(tmp_settings):
+    from movielab.collect.manifest import Manifest
+    from movielab.services.indexing import reindex_documents
+
+    services = _services(tmp_settings)
+    indexer = _indexer(services.store)
+    manifest = Manifest(tmp_settings.path("manifest"))
+    kept, dropped = _doc(page_id="1"), _doc(page_id="2")
+    other = _doc(movie_id="27205", page_id="9")
+    for doc in (kept, dropped, other):
+        indexer.index_document(doc)
+        manifest.record_page(doc.movie_id, doc.page_id, doc.title, 1)
+    report = reindex_documents([kept, other], indexer, manifest=manifest)
+    assert report.removed == 1
+    assert not manifest.has_indexed_pages("157336")  # 지운 문서를 다시 수집할 수 있게
+    assert manifest.has_indexed_pages("27205")

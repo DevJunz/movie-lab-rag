@@ -46,3 +46,34 @@ def test_tc_f2005_19_bad_key_during_collect_shows_key_notice(tmp_settings):
     with pytest.raises(InvalidApiKeyError):
         services.collector.collect(services.catalog.get("157336"), QUESTION)
     assert emb.calls == 1  # 문서마다 임베딩을 반복 호출하지 않는다
+
+
+def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
+    from movielab.collect.collector import Collector
+    from movielab.collect.manifest import Manifest
+    from movielab.collect.query_extractor import QueryExtractor
+    from movielab.collect.selector import CandidateSelector
+    from movielab.data.domain_movie import MOVIE_PROFILE
+    from movielab.data.raw_store import RawStore
+    from tests.fakes.source import FakeSource, make_doc
+
+    source = FakeSource()  # 항목 자체 문서 없음
+    source.add(make_doc("2", "블랙홀"), queries=["블랙홀"])
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": "[]"})
+    collector = Collector(
+        api_source=source,
+        bundle_source=FakeSource("bundle"),
+        extractor=QueryExtractor(llm, MOVIE_PROFILE, tmp_settings),
+        selector=CandidateSelector(llm, MOVIE_PROFILE, tmp_settings),
+        raw_store=RawStore(tmp_settings.path("raw_dir")),
+        profile=MOVIE_PROFILE,
+        settings=tmp_settings,
+        manifest=Manifest(tmp_settings.path("manifest")),
+        indexer=lambda doc: 1,
+        has_chunks=lambda item_id: False,  # 색인한 문서가 없으니 청크도 없다
+    )
+    services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
+    item = services.catalog.get("157336")
+    first = collector.collect(item, QUESTION)
+    assert first.indexed_titles == []
+    assert "CACHE_HIT" in collector.collect(item, QUESTION).notices
