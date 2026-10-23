@@ -112,3 +112,14 @@ def test_tc_f2006_13_meta_title():
     meta = {"title": "인터스텔라", "year": 2014}
     assert MOVIE_PROFILE.meta_title(meta) == "인터스텔라 (2014)"
     assert default_meta_title(meta) == "인터스텔라"
+
+
+def test_tc_f2009_08_item_caption(movies_small_path):
+    items = {i.item_id: i for i in load_items(movies_small_path).items}
+    assert (
+        MOVIE_PROFILE.item_caption(items["157336"])
+        == "모험, 드라마, SF · 감독 크리스토퍼 놀란 · 169분"
+    )
+    assert (
+        MOVIE_PROFILE.item_caption(items["1084390"]) == "드라마 · 110분"
+    )  # 감독 '정보 없음'은 뺀다
