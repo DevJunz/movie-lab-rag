@@ -28,12 +28,11 @@ def item_doc_queries(item: ItemRecord) -> list[str]:
     return [f"{item.title} ({item.year}년 영화)", f"{item.title} (영화)", item.title]
 
 
-INTRO_CHARS = 300  # 괄호 없는 제목 문서를 영화 문서로 볼지 판단할 도입부 길이
-
-
 def _looks_like_film(item: ItemRecord, intro: str) -> bool:
-    """도입부에 '영화'가 있고, 개봉 연도나 감독 이름이 있으면 그 영화를 다룬 문서로 본다."""
-    intro = intro[:INTRO_CHARS]
+    """도입부에 '영화'가 있고, 개봉 연도나 감독 이름이 있으면 그 영화를 다룬 문서로 본다.
+
+    도입부 길이(`collect.intro_chars`)는 소스가 제목 조회 때 이미 맞춰 넘긴다(A-23).
+    """
     if "영화" not in intro:
         return False
     directors = [d.strip() for d in str(item.metadata.get("director", "")).split(",")]

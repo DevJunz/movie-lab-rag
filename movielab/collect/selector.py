@@ -17,8 +17,6 @@ from movielab.prompts import build_selection_prompt
 
 logger = logging.getLogger(__name__)
 
-SNIPPET_CHARS = 200
-
 
 @dataclass
 class SelectionResult:
@@ -43,8 +41,9 @@ class CandidateSelector:
         self.settings = settings
 
     def _prompt(self, item: ItemRecord, question: str, candidates: list[Candidate]) -> str:
+        snippet_chars = int(self.settings.collect.snippet_chars)  # A-23
         lines = "\n".join(
-            f"{i}. {c.title}: {' '.join(c.snippet.split())[:SNIPPET_CHARS]}"
+            f"{i}. {c.title}: {' '.join(c.snippet.split())[:snippet_chars]}"
             for i, c in enumerate(candidates)
         )
         return build_selection_prompt(

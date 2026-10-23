@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--source", choices=["api", "bundle", "auto"], help="수집 소스 (기본: 설정)"
     )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="색인 · 캐시 기록 없이 수집 결과만 확인"
+    )
     args = parser.parse_args(argv)
     configure_stdout()
 
@@ -60,7 +63,8 @@ def main(argv: list[str] | None = None) -> int:
         if item is None:
             print(messages.render("ITEM_NOT_FOUND", labels, item_id=args.movie_id))
             return 1
-        _print_report(services.collector.collect(item, args.question))
+        collector = services.make_collector(dry_run=args.dry_run)
+        _print_report(collector.collect(item, args.question))
         return 0
     except MovieLabUserError as error:
         logger.warning("안내 오류: %s", error)

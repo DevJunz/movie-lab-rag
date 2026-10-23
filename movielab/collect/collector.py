@@ -3,6 +3,7 @@
 검색어 추출(P1) → 항목 자체 문서 판별 → 검색 → 제외 규칙 → 후보 선별(P2) → 본문 수집 · 저장 → 색인.
 항목 자체 문서는 P2 · 개수 상한 · 길이 규칙과 상관없이 항상 수집한다.
 `auto` 모드에서 위키백과 API를 못 쓰면 그 수집의 남은 단계를 제공 묶음으로 바꾼다.
+문서 하나의 조회 · 색인 실패는 그 문서만 건너뛴다(사유를 남기고 계속).
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from movielab.collect.manifest import NullManifest
 from movielab.collect.query_extractor import QueryExtractor
 from movielab.collect.selector import CandidateSelector
 from movielab.core.domain import DomainProfile
-from movielab.core.errors import ExternalSourceUnavailableError
+from movielab.core.errors import ExternalSourceUnavailableError, MovieLabUserError
 from movielab.core.types import Candidate, CollectReport, ItemRecord, Rejection, SourceDocument
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class Collector:
         settings: Any,
         manifest: Any | None = None,
         indexer: Callable[[SourceDocument], int] | None = None,
+        clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.api_source = api_source
         self.bundle_source = bundle_source
@@ -48,6 +50,7 @@ class Collector:
         self.settings = settings
         self.manifest = manifest or NullManifest()
         self.indexer = indexer
+        self.clock = clock
 
     # --- 소스 선택 · 대체 (§3.2) ---
 
@@ -62,6 +65,12 @@ class Collector:
             return self.bundle_source
         return self.api_source
 
+    def _is_configured_source(self, source: Any) -> bool:
+        """설정한 소스로 처리했는가 — 대체 소스로 검색한 검색어는 캐시에 남기지 않는다."""
+        if self.settings.collect.source == "bundle":
+            return source is self.bundle_source
+        return source is self.api_source
+
     def _call(self, report: CollectReport, state: dict[str, Any], method: str, *args: Any) -> Any:
         source = state["source"]
         try:
@@ -74,6 +83,21 @@ class Collector:
             report.notices.append("SOURCE_FALLBACK")
             return getattr(self.bundle_source, method)(*args)
 
+    def _resolve_item_doc(
+        self, item: ItemRecord, report: CollectReport, state: dict[str, Any]
+    ) -> Candidate | None:
+        profile = self.profile
+        if profile.item_doc_queries is None or profile.pick_item_doc is None:
+            report.notices.append("ITEM_DOC_NOT_FOUND")
+            return None
+        resolved = self._call(report, state, "resolve_titles", profile.item_doc_queries(item))
+        item_doc = profile.pick_item_doc(item, resolved)
+        if item_doc is None:
+            report.notices.append("ITEM_DOC_NOT_FOUND")
+        else:
+            report.item_doc_title = item_doc.title
+        return item_doc
+
     # --- 수집 ---
 
     def collect(
@@ -83,7 +107,7 @@ class Collector:
             if on_progress is not None:
                 on_progress(stage, info)
 
-        started = time.perf_counter()
+        started = self.clock()
         report = CollectReport(item_id=item.item_id, question=question)
         state = {"source": self._initial_source(report)}
         collect_settings = self.settings.collect
@@ -103,16 +127,11 @@ class Collector:
 
         # 2. 항목 자체 문서
         progress("resolve_item_doc")
-        resolved = self._call(report, state, "resolve_titles", self.profile.item_doc_queries(item))
-        item_doc = self.profile.pick_item_doc(item, resolved)
-        if item_doc is None:
-            report.notices.append("ITEM_DOC_NOT_FOUND")
-        else:
-            report.item_doc_title = item_doc.title
+        item_doc = self._resolve_item_doc(item, report, state)
 
         # 3. 검색 — 후보를 page_id로 합친다. 항목 자체 문서는 후보에서 뺀다(강제 포함 대상)
         pool: dict[str, Candidate] = {}
-        searched: list[str] = []
+        searched: list[str] = []  # 설정한 소스로 검색을 마친 검색어 (캐시 기록 대상)
         todo = [q for q in queries if not self.manifest.has_keyword(item.item_id, q)]
         report.cached_queries = [q for q in queries if q not in todo]
         for number, query in enumerate(todo, start=1):
@@ -120,7 +139,8 @@ class Collector:
             results = self._call(
                 report, state, "search", query, int(collect_settings.search_limit), item.item_id
             )
-            searched.append(query)
+            if self._is_configured_source(state["source"]):
+                searched.append(query)
             for candidate in results:
                 if item_doc is not None and candidate.page_id == item_doc.page_id:
                     continue
@@ -148,7 +168,7 @@ class Collector:
         report.selected = selection.selected
         report.rejected.extend(selection.rejected)
 
-        # 6. 본문 수집 · 저장 — 항목 자체 문서가 먼저, 길이 규칙 면제
+        # 6. 본문 수집 · 저장 — 항목 자체 문서가 먼저, 길이 규칙 면제. 문서 단위로 실패를 격리
         targets: list[tuple[Candidate, bool]] = []
         if item_doc is not None and not self.manifest.has_page(item.item_id, item_doc.page_id):
             targets.append((item_doc, True))
@@ -156,7 +176,11 @@ class Collector:
         documents: list[SourceDocument] = []
         for number, (candidate, is_item_doc) in enumerate(targets, start=1):
             progress("fetch", title=candidate.title, current=number, total=len(targets))
-            doc = self._call(report, state, "fetch", candidate.page_id)
+            try:
+                doc = self._call(report, state, "fetch", candidate.page_id)
+            except Exception:
+                logger.exception("본문 조회 실패: %s", candidate.title)
+                doc = None
             if doc is None:
                 report.rejected.append(
                     Rejection(candidate.page_id, candidate.title, "fetch_failed")
@@ -175,10 +199,22 @@ class Collector:
             report.saved_paths.append(self.raw_store.save(doc))
             documents.append(doc)
 
-        # 7. 색인 (F2005 색인기가 연결되면)
+        # 7. 색인 (F2005 색인기가 연결되면) — 키 없음 같은 안내 오류는 모든 문서에 같으므로 알린다
         for doc in documents:
             progress("index", title=doc.title)
-            chunks = self.indexer(doc) if self.indexer is not None else 0
+            if self.indexer is None:
+                chunks = 0
+            else:
+                try:
+                    chunks = self.indexer(doc)
+                except MovieLabUserError:
+                    raise
+                except Exception:
+                    logger.exception("색인 실패: %s", doc.title)
+                    chunks = -1
+                if chunks <= 0:
+                    report.rejected.append(Rejection(doc.page_id, doc.title, "index_failed"))
+                    continue
             report.indexed_chunks += chunks
             report.indexed_titles.append(doc.title)
             self.manifest.record_page(item.item_id, doc.page_id, doc.title, chunks)
@@ -188,6 +224,6 @@ class Collector:
             self.manifest.record_keyword(item.item_id, query)
         self.manifest.record_question(item.item_id, question, queries)
         report.source_used = state["source"].kind
-        report.timings["collect"] = time.perf_counter() - started
+        report.timings["collect"] = self.clock() - started
         progress("done", titles=report.indexed_titles, rejected=len(report.rejected))
         return report

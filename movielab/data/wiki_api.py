@@ -243,10 +243,12 @@ class WikiApiSource:
 
     kind = "api"
 
-    def __init__(self, client: WikiHttpClient) -> None:
+    def __init__(self, client: WikiHttpClient, *, today: Callable[[], date] = date.today) -> None:
         self.client = client
+        self.today = today
 
     def search(self, query: str, limit: int, item_id: str | None = None) -> list[Candidate]:
+        """`list=search`(요약)와 `generator=search`(동음이의 `pageprops`)를 한 요청으로 받는다."""
         data = self.client.get(
             {
                 "action": "query",
@@ -255,9 +257,18 @@ class WikiApiSource:
                 "srlimit": limit,
                 "srnamespace": 0,
                 "srprop": "snippet|size",
+                "generator": "search",
+                "gsrsearch": query,
+                "gsrlimit": limit,
+                "gsrnamespace": 0,
+                "prop": "pageprops",
+                "ppprop": "disambiguation",
             }
         )
-        results = (data.get("query") or {}).get("search") or []
+        body = data.get("query") or {}
+        disambiguation = {
+            str(page.get("pageid")) for page in body.get("pages") or [] if _is_disambiguation(page)
+        }
         return [
             Candidate(
                 page_id=str(r["pageid"]),
@@ -265,9 +276,9 @@ class WikiApiSource:
                 snippet=_strip_html(r.get("snippet", "")),
                 size=int(r.get("size") or 0),
                 query=query,
-                disambiguation=_is_disambiguation(r),
+                disambiguation=_is_disambiguation(r) or str(r["pageid"]) in disambiguation,
             )
-            for r in results
+            for r in body.get("search") or []
         ]
 
     def resolve_titles(self, titles: list[str]) -> list[Candidate]:
@@ -282,7 +293,7 @@ class WikiApiSource:
                 "inprop": "url",
                 "exintro": 1,
                 "explaintext": 1,
-                "exchars": 300,
+                "exchars": int(self.client.settings.collect.intro_chars),
                 "exlimit": len(titles),
             }
         )
@@ -332,5 +343,5 @@ class WikiApiSource:
             movie_id="",
             related_movie="",
             search_query="",
-            collected_at=date.today().isoformat(),
+            collected_at=self.today().isoformat(),
         )
