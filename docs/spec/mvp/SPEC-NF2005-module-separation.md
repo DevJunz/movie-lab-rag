@@ -73,6 +73,9 @@
 `movielab/container.py`의 `build_services(settings, *, llm=None, embeddings=None, http=None, profile=None) -> Services`.
 인자를 주면 그것을 쓰고, 없으면 실제 구현을 만든다. UI · API · 스크립트 · 테스트 모두 이 함수로 서비스를 얻는다.
 
+- **단계적 구현**: 이 SPEC에서는 주입 경로만 만든다. 주입하지 않은 `llm` · `embeddings` · `http`는 `None`이다.
+  실제 구현(GMS 연결)을 만드는 동작은 SPEC-NF2003에서, HTTP 세션은 SPEC-NF2006에서 더한다.
+
 ## 4. 가정
 
 | ID | 내용 |
@@ -99,7 +102,7 @@
 | TC-NF2005-02 | 단위 | import 규칙 검사 | 위반 0 | 02 | 〃 |
 | TC-NF2005-03 | 단위 | 금지 단어 검사 (`data/` 밖) | 0건 | 03 | 〃 |
 | TC-NF2005-04 | 단위 | 규칙 검사기에 위반 예제 코드 입력 | 위반 검출 (검사기 자체 검증) | 02 | 〃 |
-| TC-NF2005-05 | 통합 | "도서" 테스트 프로필로 `DomainProfile.render` 문구 생성. **F2003 · F2007 구현 PR에서 P1 · P3 프롬프트 검사를 이 파일에 추가한다** | 문구에 "도서" 역할, "영화" 없음 | 04 | `tests/integration/test_domain_swap.py` |
+| TC-NF2005-05 | 통합 | "도서" 테스트 프로필로 `DomainProfile.render` 문구 생성. 프롬프트의 JSON 예시 중괄호(`{"verdict": …}`)와 모르는 자리표시자는 그대로 둔다. **F2003 · F2007 구현 PR에서 P1 · P3 프롬프트 검사를 이 파일에 추가한다** | 문구에 "도서" 역할, "영화" 없음 | 04 | `tests/integration/test_domain_swap.py` |
 | TC-NF2005-06 | 단위 | live 마커 없는 테스트에서 `socket.create_connection` (루프백은 허용 — Windows의 `socketpair`가 루프백 연결을 쓴다) | 외부 주소는 예외, 루프백은 통과 | 05 | `tests/unit/test_network_guard.py` |
 | TC-NF2005-07 | CI | 이 PR의 Actions 실행 | 린트 · 테스트 통과 | 06 | GitHub Actions |
 | TC-NF2005-08 | 단위 | 가짜 객체 동작: `FakeChatModel` 작업 분기 · 기록 · 예외, `FakeEmbeddings` 결정성 · 유사도 순서, `FakeHttpSession` 응답 순서 · 기록, `FakeClock` | 정의대로 동작 | 06 | `tests/unit/test_fakes.py` |

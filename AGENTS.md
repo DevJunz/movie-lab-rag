@@ -143,7 +143,7 @@ gh pr merge <PR번호> --squash --delete-branch
 
 ## 4. 커밋 · 브랜치 · PR 규칙
 
-- 커밋 메시지: `<종류>(<요구사항번호>): <한국어 설명> (#이슈)`. 종류 `docs` · `test` · `feat` · `fix` · `refactor` · `chore` · `ci`.
+- 커밋 메시지: `<종류>(<요구사항번호>): <한국어 설명> (#이슈)`. 종류 `docs` · `test` · `feat` · `fix` · `refactor` · `style`(포맷만) · `chore` · `ci`.
 - PR 하나에 SPEC 하나. 관련 없는 수정을 섞지 않는다. 리뷰하기 쉽게 변경을 작게 유지한다.
 - `main`에 직접 커밋하지 않는다(부트스트랩 제외). 강제 푸시는 자기 기능 브랜치에서만.
 
