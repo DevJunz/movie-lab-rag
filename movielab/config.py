@@ -142,6 +142,15 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("retries", _int_at_least(0)),
         ("retry_wait_sec", _number_at_least(0)),
     ],
+    "collect": [  # SPEC-F2003 · F2004
+        ("source", lambda v: v in ("api", "bundle", "auto")),
+        ("card_overview_chars", _int_at_least(1)),
+        ("min_queries", _int_at_least(0)),
+        ("max_queries", _int_at_least(1)),
+        ("search_limit", _int_at_least(1)),
+        ("max_selected_docs", _int_at_least(0)),
+        ("min_doc_chars", _int_at_least(0)),
+    ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),
         ("maxlag", _int_at_least(0)),
