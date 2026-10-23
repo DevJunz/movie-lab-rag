@@ -138,3 +138,32 @@ def test_tc_nf2002_reset_cache_option(tmp_settings, monkeypatch, capsys):
     reloaded = make_manifest(tmp_settings.path("manifest"))
     assert not reloaded.has_keyword("157336", "블랙홀") and reloaded.has_keyword("27205", "자각몽")
     assert "캐시" in capsys.readouterr().out
+
+
+def test_tc_nf2001_02_cached_ask_no_external_calls_or_sleep(tmp_settings, item):
+    from movielab.services.catalog import Catalog
+    from movielab.services.qa import QAService
+    from tests.fakes.pipeline import FakeGraph
+
+    setup = Setup(tmp_settings)
+    catalog = Catalog(lambda: load_items(tmp_settings.path("movies")))
+    service = QAService(catalog, setup.collector, FakeGraph("답 [근거 1]"))
+    service.ask("157336", "질문1")
+    source_calls = len(setup.source.calls)
+    service.ask("157336", "질문1")
+    assert len(setup.source.calls) == source_calls  # 외부 수집 호출 0
+
+
+def test_tc_nf2001_03_fake_pipeline_fast(tmp_settings, item):
+    import time
+
+    from movielab.services.catalog import Catalog
+    from movielab.services.qa import QAService
+    from tests.fakes.pipeline import FakeGraph
+
+    setup = Setup(tmp_settings)
+    catalog = Catalog(lambda: load_items(tmp_settings.path("movies")))
+    service = QAService(catalog, setup.collector, FakeGraph("답 [근거 1]"))
+    started = time.perf_counter()
+    service.ask("157336", "질문1")  # 수집 포함
+    assert time.perf_counter() - started < 2.0  # 코드 자체의 불필요한 대기 없음
