@@ -38,7 +38,7 @@ def test_tc_f2007_01_graph_has_exactly_two_nodes():
     assert edges == {("__start__", "retrieve"), ("retrieve", "generate"), ("generate", "__end__")}
 
 
-def test_tc_f2007_06_mermaid_output():
+def test_tc_f2007_08_mermaid_output():
     graph = build_graph(FakeRetriever(_evidences()), FakeChatModel(), MOVIE_PROFILE)
     mermaid = graph.get_graph().draw_mermaid()
     assert "retrieve" in mermaid and "generate" in mermaid
@@ -55,3 +55,32 @@ def test_tc_f2007_05_unknown_task_rejected():
     graph = build_graph(FakeRetriever(_evidences()), FakeChatModel(), MOVIE_PROFILE)
     with pytest.raises(ValueError):
         graph.invoke({"movie_id": "157336", "question": "q", "task": "없는작업"})
+
+
+def test_tc_f2007_09_not_found_tolerates_quotes_and_period():
+    core = NOT_FOUND.rstrip(".")
+    assert is_not_found(f'"{NOT_FOUND}"')
+    assert is_not_found(f"“{NOT_FOUND}”")
+    assert is_not_found(core)
+    assert not is_not_found(f'"{NOT_FOUND}" 다만 블랙홀은 천체다 [근거 2]')
+
+
+def test_tc_f2007_10_unknown_task_rejected_before_retrieval():
+    retriever = FakeRetriever(_evidences())
+    graph = build_graph(retriever, FakeChatModel(), MOVIE_PROFILE)
+    with pytest.raises(ValueError):
+        graph.invoke({"movie_id": "157336", "question": "q", "task": "없는작업"})
+    assert retriever.calls == []  # 검색 · 임베딩 호출 전에 거부
+
+
+def test_tc_f2007_10_prompts_injected_not_global():
+    retriever = FakeRetriever(_evidences())
+    llm = FakeChatModel(default="[합성] 다른 작업의 답")
+    prompts = {"qa": lambda profile, evidences, question: "[작업: 시험] " + question}
+    graph = build_graph(retriever, llm, MOVIE_PROFILE, prompts=prompts)
+    state = graph.invoke({"movie_id": "157336", "question": "q", "task": "qa"})
+    assert state["answer"] == "[합성] 다른 작업의 답"
+    assert llm.calls[0][1] == "[작업: 시험] q"
+    default = build_graph(retriever, FakeChatModel(), MOVIE_PROFILE)
+    with pytest.raises(ValueError):  # 주입이 다른 그래프로 새지 않는다
+        default.invoke({"movie_id": "157336", "question": "q", "task": "시험"})

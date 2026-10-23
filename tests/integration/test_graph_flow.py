@@ -28,3 +28,13 @@ def test_tc_f2007_02_invoke_fills_contexts_and_answer(tmp_settings):
     assert state["answer"].endswith("[근거 2].")
     assert len(llm.prompts_for("답변 생성")) == 1
     assert state["no_external"] is False
+
+
+def test_tc_f2007_11_services_rag_graph(tmp_settings):
+    llm = FakeChatModel(rules={"답변 생성": "[합성] 답 [근거 1]."})
+    services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
+    index_catalog(services.catalog, services.store, sleep=FakeClock().sleep)
+    state = services.rag_graph().invoke({"movie_id": "157336", "question": "q", "task": "qa"})
+    assert state["contexts"][0].source_kind == "meta"
+    assert state["answer"] == "[합성] 답 [근거 1]."
+    assert state["no_external"] is True
