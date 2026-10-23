@@ -4,14 +4,14 @@
 !.env.example
 
 # 대외비 문서 — 공개 저장소에 올리지 않는다
-prd.pdf
-rag_project_briefing.html
+/prd.pdf
+/rag_project_briefing.html
 
 # 제공 데이터 팩 · 실행 중 생성 데이터 (NF2007: 원본 재배포 안 함)
-영화도메인_데이터_배포용/
-data/
-logs/
-reports/
+/영화도메인_데이터_배포용/
+/data/
+/logs/
+/reports/
 
 # 제출 파일
 *.zip
