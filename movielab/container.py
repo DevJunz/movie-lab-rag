@@ -30,6 +30,8 @@ from movielab.index.store import VectorStore
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
 from movielab.services.catalog import Catalog
+from movielab.services.health import HealthStatus
+from movielab.services.health import check as check_health
 from movielab.services.qa import QAService
 
 
@@ -177,13 +179,9 @@ class Services:
             self._qa = QAService(self.catalog, self.collector, self.rag_graph())
         return self._qa
 
-    def index_counts(self) -> tuple[int, int] | None:
-        """(항목 메타 청크 수, 외부 문서 청크 수). 색인을 읽을 수 없으면 None (키 없이 동작)."""
-        try:
-            collections = self.settings.collections
-            return self.store.count(collections.meta), self.store.count(collections.docs)
-        except Exception:
-            return None
+    def health(self) -> HealthStatus:
+        """시작 점검 (F2012) — 키 유무 · 색인 건수. 키 없이도 동작한다."""
+        return check_health(self.settings, self.store)
 
     @property
     def collector(self) -> Collector:
