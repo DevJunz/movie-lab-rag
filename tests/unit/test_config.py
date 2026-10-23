@@ -178,3 +178,31 @@ def test_tc_f2002_17_indexing_types_checked(tmp_path: Path, indexing):
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(SettingsError):
         load_settings(path)
+
+
+# --- SPEC-NF2006 wiki 설정 검증 ---
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"max_retries": -1},
+        {"project_url": None},
+        {"project_url": ""},
+        {"timeout_sec": 0},
+        {"maxlag": "5"},
+        {"min_interval_sec": True},
+        {"max_retry_after_sec": -1},
+    ],
+)
+def test_tc_nf2006_18_invalid_wiki_settings_rejected(tmp_path: Path, change):
+    from movielab.config import SettingsError
+
+    raw = json.loads((REPO_ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    raw["wiki"].update(change)
+    if change.get("project_url") is None and "project_url" in change:
+        del raw["wiki"]["project_url"]
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(SettingsError):
+        load_settings(path)

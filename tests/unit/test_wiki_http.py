@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import email.utils
 import logging
-import time
 
 import pytest
 import requests
@@ -202,14 +201,22 @@ def test_tc_nf2006_13_body_errors_retried(tmp_settings, error):
     assert len(session.requests) == 2
 
 
-def test_tc_nf2006_14_retry_after_http_date(tmp_settings, monkeypatch):
-    when = email.utils.formatdate(time.time() + 10, usegmt=True)
+def test_tc_nf2006_14_retry_after_http_date(tmp_settings):
+    from datetime import datetime, timezone
+
+    fixed = datetime(2026, 10, 23, 12, 0, 0, tzinfo=timezone.utc)
+    when = email.utils.format_datetime(fixed.replace(second=10), usegmt=True)
     session = FakeHttpSession().add(
         {}, FakeResponse(status_code=503, headers={"Retry-After": when}), OK
     )
-    client, clock = _client(tmp_settings, session)
+    clock = FakeClock()
+    session.clock = clock
+    client = WikiHttpClient(
+        tmp_settings, CONTACT, session=session, throttle=_throttle(tmp_settings, clock),
+        clock=clock.monotonic, sleep=clock.sleep, now=lambda: fixed,
+    )  # fmt: skip
     client.get({"action": "query"})
-    assert len(clock.sleeps) == 1 and 8.0 <= clock.sleeps[0] <= 10.5
+    assert clock.sleeps == [10.0]
 
 
 @pytest.mark.parametrize("value", ["-5", "nan", "abc", "inf"])
@@ -280,3 +287,39 @@ def test_tc_nf2006_01_container_wires_wiki_client(tmp_settings, monkeypatch):
 def test_tc_nf2006_01_session_required():
     with pytest.raises(TypeError):
         WikiHttpClient(None, CONTACT)  # 세션은 container가 만들어 넘긴다
+
+
+@pytest.mark.parametrize(
+    "contact", ["홍길동 <dev@example.invalid>", "dev@example.invalid" + "\r\n" + "X: y"]
+)
+def test_tc_nf2006_17_header_unsafe_contact_never_sent(tmp_settings, contact):
+    session = FakeHttpSession().add({}, OK)
+    client, _ = _client(tmp_settings, session, contact=contact)
+    with pytest.raises(ExternalSourceUnavailableError):
+        client.get({"action": "query"})
+    assert session.requests == []
+
+
+def test_tc_nf2006_19_string_error_field_is_api_error(tmp_settings):
+    session = FakeHttpSession().add({}, {"error": "internal_api_error"})
+    client, _ = _client(tmp_settings, session)
+    with pytest.raises(ExternalSourceUnavailableError):
+        client.get({"action": "query"})
+    assert len(session.requests) == 1
+
+
+@pytest.mark.parametrize("payload", [[], None])
+def test_tc_nf2006_19_non_object_json_retried_then_unavailable(tmp_settings, payload):
+    session = FakeHttpSession().add({}, FakeResponse(payload=payload))
+    client, _ = _client(tmp_settings, session)
+    with pytest.raises(ExternalSourceUnavailableError):
+        client.get({"action": "query"})
+    assert len(session.requests) == 4
+
+
+@pytest.mark.parametrize("status", [501, 599])
+def test_tc_nf2006_20_all_5xx_retried(tmp_settings, status):
+    session = FakeHttpSession().add({}, FakeResponse(status_code=status), OK)
+    client, _ = _client(tmp_settings, session)
+    assert client.get({"action": "query"}) == OK
+    assert len(session.requests) == 2

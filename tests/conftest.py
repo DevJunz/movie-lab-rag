@@ -81,6 +81,14 @@ def _block_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPat
 
 
 @pytest.fixture(autouse=True)
+def _fresh_shared_throttles(monkeypatch: pytest.MonkeyPatch) -> None:
+    """프로세스 공용 위키 throttle이 테스트 사이에 남지 않게 한다 (NF2006)."""
+    import movielab.data.wiki_api
+
+    monkeypatch.setattr(movielab.data.wiki_api, "_SHARED", {})
+
+
+@pytest.fixture(autouse=True)
 def _isolate_env(
     request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
