@@ -25,25 +25,30 @@
 
 ## 3. 상세 명세
 
-### 3.1 동작 (`Retriever.retrieve(movie_id, query) -> list[Evidence]`)
+### 3.1 동작 (`Retriever.retrieve(movie_id, query) -> RetrievalResult`)
 
 1. **메타 청크**: `store.get_by_ids(meta, [movie_id])`. 없으면 `IndexEmptyError`(색인 0건) 또는 `ItemNotIndexedError`(해당 영화만 없음).
+   두 오류는 안내 문구(`INDEX_EMPTY` · `ITEM_NOT_INDEXED`: 색인 스크립트를 실행하라는 안내)로 보인다 — 다시 시도해도 풀리지 않으므로 일반 오류 문구를 쓰지 않는다.
 2. **외부 청크**: `wiki_docs`에서 `similarity_search_with_score(query, k=top_k, filter={"movie_id": movie_id})`.
+   그 영화 청크가 하나라도 있는지는 `has_where`(한 건만 읽기)로 먼저 본다.
    이 SPEC에서는 `search_type`으로 `"similarity"`만 허용한다(그 밖의 값은 시작할 때 `SettingsError`). MMR은 SPEC-F2014가 허용 값과 분기를 더한다.
 3. **병합**: `[메타 청크] + [외부 청크(점수 순)]`.
 4. **중복 제거**: ① 청크 ID가 같으면 하나만 남긴다. ② 공백을 정규화한 본문의 해시가 같으면(같은 내용이 다른 문서 ID로 들어온 경우) 먼저 나온 것만 남긴다.
 5. **번호 부여**: 남은 순서대로 `n = 1, 2, …`. 메타 청크는 항상 `[근거 1]`.
-6. 메타 근거의 제목은 `제목 (연도)`. 외부 근거의 `score`는 코사인 유사도(1 − 거리, 클수록 가깝다).
+6. 메타 근거의 제목은 `DomainProfile.meta_title(메타데이터)`가 만든다(영화: `제목 (연도)`) — `rag/`에 도메인 형식을 두지 않는다(NF2005).
+   외부 근거의 `score`는 코사인 유사도(1 − 거리, 클수록 가깝다).
 7. 결과 `Evidence`에는 `source_kind`, `source_type`, `title`, `url`, `license`, `score`를 채운다.
 
-- 근거 총수 = 메타 1 + 외부 최대 `top_k`. `top_k`는 `settings.retrieval.top_k`(기본 4)에서만 읽는다.
+- 근거 총수 = 메타 1 + 외부 최대 `top_k`. `top_k`는 `settings.retrieval.top_k`(기본 4)에서만 읽는다. 1보다 작으면 `ValueError`(설정 검증 · 스크립트 인자 검사와 같은 규칙).
 - 외부 청크가 0개여도 예외가 아니다. 결과에 `no_external=True` 표시를 남겨 UI가 "관련 외부 문서를 찾지 못했습니다" 안내를 띄운다(F2012).
+  `no_external`은 **중복 제거 뒤** 남은 외부 근거로 판단한다(외부 청크가 모두 메타와 같은 본문이라 빠진 경우도 '없음').
 
 ### 3.2 인터페이스
 
 ```python
 class Retriever:
-    def __init__(self, store: VectorStore, settings): ...
+    def __init__(self, store: VectorStore, *, top_k: int | None = None,
+                 meta_title: Callable[[dict], str] | None = None): ...   # 설정 · 컬렉션 이름은 store.settings
     def retrieve(self, movie_id: str, query: str) -> RetrievalResult: ...   # evidences, no_external
 ```
 
@@ -53,6 +58,8 @@ class Retriever:
 python -m scripts.collect --movie-id 157336 --question "<Q1>" --show-evidence [--top-k 2]
   → 근거 번호 · 출처 유형 · 제목 · 점수 목록 (V4.3-1 비교용. --top-k는 설정을 일시적으로 덮어씀)
 ```
+
+- `--top-k`는 `--show-evidence`와 함께만 쓴다. `--show-evidence`는 `--dry-run`과 함께 쓸 수 없다(색인하지 않은 수집 결과의 근거를 보여 줄 수 없다). 어기면 인자 오류.
 
 ## 4. 가정
 
@@ -70,6 +77,8 @@ python -m scripts.collect --movie-id 157336 --question "<Q1>" --show-evidence [-
 | AC-F2006-04 | 같은 청크 ID · 같은 본문은 한 번만 나온다 | — |
 | AC-F2006-05 | 설정 `top_k`를 바꾸면 외부 근거 수가 바뀐다(문서가 충분할 때 `top_k`개) | V4.3-1 |
 | AC-F2006-06 | 외부 청크가 없으면 메타 근거 1개만 반환하고 `no_external=True` | V4.4-5 |
+| AC-F2006-08 | 선택 영화의 메타 청크만 없으면 `ItemNotIndexedError`, 색인 0건과 함께 안내 문구로 보인다 | V4.4-5 |
+| AC-F2006-09 | `search_type`이 `similarity`가 아니면 시작할 때 `SettingsError`, `top_k`가 1보다 작으면 거부 | — |
 | AC-F2006-07 | 메타 색인이 비어 있으면 `IndexEmptyError` | V4.4-5 |
 
 ## 6. 테스트 케이스
@@ -83,7 +92,12 @@ python -m scripts.collect --movie-id 157336 --question "<Q1>" --show-evidence [-
 | TC-F2006-05 | 통합 | 외부 청크 10개, `top_k` 2 → 4 | 외부 근거 2개 → 4개 | 05 | `tests/integration/test_retriever.py` |
 | TC-F2006-06 | 통합 | 외부 청크 0개인 영화 | 근거 1개, `no_external` | 06 | 〃 |
 | TC-F2006-07 | 통합 | 빈 `movie_meta` | `IndexEmptyError` | 07 | 〃 |
-| TC-F2006-08 | 수동 | Q1을 `--top-k 2`와 `--top-k 6`으로 실행 | 근거 목록 차이 캡처, 설계문서에 기록 | 05 | 스크린샷 |
+| TC-F2006-08 | 통합 | `collect --show-evidence --top-k 2` (실제 색인 비교는 V4.3-1 증빙) | 근거 번호 · 출처 유형 · 제목 · 점수, 외부 근거 2개 | 05 | `tests/integration/test_scripts.py` |
+| TC-F2006-09 | 단위 | `search_type: "mmr"` 설정 로드 / `Retriever(top_k=0)` | `SettingsError` / `ValueError` | 09 | `tests/integration/test_retriever.py` |
+| TC-F2006-10 | 통합 | 메타 색인에 다른 영화만 있음 / 빈 메타로 `collect --show-evidence` | `ItemNotIndexedError` / 색인 스크립트 안내 문구(일반 오류 아님) | 07, 08 | 〃, `tests/integration/test_scripts.py` |
+| TC-F2006-11 | 통합 | 외부 청크가 메타와 같은 본문뿐 | 근거 1개, `no_external == True` | 06 | `tests/integration/test_retriever.py` |
+| TC-F2006-12 | 통합 | `collect --dry-run --show-evidence`, `--top-k`만 | 인자 오류(종료 코드 2) | 05 | `tests/integration/test_scripts.py` |
+| TC-F2006-13 | 단위 | `MOVIE_PROFILE.meta_title` · 프로필 없는 기본값 | `인터스텔라 (2014)` / `인터스텔라` | 01 | `tests/unit/test_domain_movie.py` |
 
 ## 7. 증빙
 
