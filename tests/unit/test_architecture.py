@@ -85,3 +85,11 @@ def test_tc_f2001_08_index_text_labels_only_in_data():
     violations = archcheck.scan_repo(checker)
     assert violations == [], "\n".join(map(str, violations))
     assert checker('LINE = "감독: 정보 없음"\n', "movielab/rag/x.py")
+
+
+def test_tc_f2005_08_no_hardcoded_chunk_numbers():
+    import re
+
+    source = (ROOT / "movielab" / "index" / "doc_indexer.py").read_text(encoding="utf-8")
+    code = "\n".join(line.split("#")[0] for line in source.splitlines())
+    assert not re.search(r"\b(1000|200)\b", code)

@@ -192,3 +192,36 @@ def test_tc_f2004_15_collect_script_unknown_movie(tmp_settings, monkeypatch, cap
     monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
     assert collect.main(["--movie-id", "0", "--question", "q"]) == 1
     assert "찾을 수 없" in capsys.readouterr().out
+
+
+# --- SPEC-F2005 재색인 스크립트 ---
+
+
+def test_tc_f2005_09_reindex_docs_reports_counts(tmp_settings, monkeypatch, capsys):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    long_text = ("[합성] 문단입니다. " * 30 + "\n\n") * 10
+    for page_id in ("1", "2"):
+        doc = dataclasses.replace(make_doc(page_id, f"문서{page_id}", text=long_text),
+                                  movie_id="157336", related_movie="인터스텔라")  # fmt: skip
+        services.raw_store.save(doc)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    assert reindex_docs.main([]) == 0
+    first = capsys.readouterr().out
+    assert "chunk_size=1000 overlap=200" in first and "문서 2건" in first
+    assert reindex_docs.main(["--chunk-size", "500", "--chunk-overlap", "100"]) == 0
+    second = capsys.readouterr().out
+    assert "chunk_size=500 overlap=100" in second
+
+    def chunks(text):
+        return int(text.split("청크 ")[1].split("개")[0])
+
+    assert chunks(second) > chunks(first)
