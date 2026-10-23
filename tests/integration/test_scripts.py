@@ -437,3 +437,23 @@ def test_tc_f2007_12_show_graph_does_not_open_chroma(tmp_settings, monkeypatch, 
     out = capsys.readouterr().out
     assert "retrieve" in out and "generate" in out
     assert not tmp_settings.path("chroma_dir").exists()
+
+
+def test_tc_f2014_04_compare_retrieval_writes_table(tmp_settings, tmp_path, monkeypatch, capsys):
+    from movielab.container import build_services
+    from scripts import compare_retrieval
+    from tests.fakes import FakeEmbeddings
+    from tests.integration.test_mmr import QUERY, index_mmr_fixture
+
+    services = build_services(tmp_settings, embeddings=FakeEmbeddings())
+    index_mmr_fixture(services)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(compare_retrieval, "build_services", lambda settings: services)
+    out_dir = tmp_path / "compare"
+    argv = ["--movie-id", "157336", "--question", QUERY, "--top-k", "3", "--out-dir", str(out_dir)]
+    assert compare_retrieval.main(argv) == 0
+    text = (out_dir / "157336.md").read_text(encoding="utf-8")
+    assert "| 순위 | 유사도 | MMR |" in text
+    for metric in ("서로 다른 문서 수", "평균 코사인 유사도", "겹침 수"):
+        assert metric in text
+    assert QUERY in text and "Traceback" not in capsys.readouterr().out

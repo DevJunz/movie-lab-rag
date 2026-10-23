@@ -137,9 +137,11 @@ class Services:
         """위키 문서 색인기 (F2005). 인자를 주면 청크 값을 이번 실행만 덮어쓴다."""
         return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
 
-    def retriever(self, top_k: int | None = None) -> Retriever:
-        """근거 검색기 (F2006). `top_k`를 주면 이번 검색만 설정 값을 덮어쓴다."""
-        return Retriever(self.store, top_k=top_k, meta_title=self.profile.meta_title)
+    def retriever(self, top_k: int | None = None, search_type: str | None = None) -> Retriever:
+        """근거 검색기 (F2006 · F2014). 인자를 주면 이번 검색만 설정 값을 덮어쓴다."""
+        return Retriever(
+            self.store, top_k=top_k, meta_title=self.profile.meta_title, search_type=search_type
+        )
 
     def rag_graph(self, *, llm: Any = None, top_k: int | None = None) -> Any:
         """retrieve → generate 그래프 (F2007). `llm`을 주면 그것을 쓴다(구조 출력 등)."""

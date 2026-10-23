@@ -241,3 +241,28 @@ def test_tc_nf2002_22_cache_settings_validated(tmp_path: Path, cache):
     path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(SettingsError):
         load_settings(path)
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "ok"),
+    [
+        ("search_type", "mmr", True),
+        ("search_type", "similarity", True),
+        ("search_type", "mrr", False),
+        ("mmr_fetch_k", 0, False),
+        ("mmr_lambda", 1.5, False),
+        ("mmr_lambda", "0.5", False),
+    ],
+)
+def test_tc_f2014_03_search_type_validated(tmp_settings, tmp_path, key, value, ok):
+    from movielab.config import SettingsError
+
+    raw = copy.deepcopy(tmp_settings.raw)
+    raw["retrieval"][key] = value
+    path = tmp_path / "s.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    if ok:
+        assert getattr(load_settings(path).retrieval, key) == value
+    else:
+        with pytest.raises(SettingsError):
+            load_settings(path)

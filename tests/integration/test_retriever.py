@@ -105,7 +105,7 @@ def test_tc_f2006_09_search_type_and_top_k_validated(tmp_settings, tmp_path):
     from movielab.config import SettingsError, load_settings
 
     raw = json.loads(json.dumps(tmp_settings.raw))
-    raw["retrieval"]["search_type"] = "mmr"
+    raw["retrieval"]["search_type"] = "mrr"  # 오타 (mmr은 F2014에서 허용)
     path = tmp_path / "mmr.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(SettingsError):
