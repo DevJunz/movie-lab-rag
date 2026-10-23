@@ -28,6 +28,7 @@ from movielab.core.types import CitedResult, ItemRecord
 from movielab.ui.components.evidence import render_evidence
 from movielab.ui.components.status import progress_line, render_collect_detail
 from movielab.ui.pages.explore import page_explore
+from movielab.ui.pages.features import page_factcheck, page_guide
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,8 @@ def _page_ask(services: Any, item: ItemRecord | None, *, ready: bool = True) -> 
 # 메뉴 이름 → 화면 `(services, item, *, ready)`. 다른 화면은 그 기능의 SPEC이 더한다.
 PAGES: dict[str, Callable[..., None]] = {
     messages.MENU_ASK: _page_ask,
+    messages.MENU_GUIDE: page_guide,  # F2010
+    messages.MENU_FACTCHECK: page_factcheck,  # F2010
     messages.MENU_EXPLORE: page_explore,  # F2011
 }
 

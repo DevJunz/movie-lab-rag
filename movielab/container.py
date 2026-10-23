@@ -30,10 +30,13 @@ from movielab.data.wiki_bundle import WikiBundleSource
 from movielab.index.doc_indexer import DocIndexer
 from movielab.index.pdf_indexer import PdfIndexer
 from movielab.index.store import VectorStore
+from movielab.prompts import build_factcheck_prompt, build_guide_prompt
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
 from movielab.services.catalog import Catalog
 from movielab.services.explore import ExploreService
+from movielab.services.factcheck import FactCheckService
+from movielab.services.guide import GuideService
 from movielab.services.health import HealthStatus
 from movielab.services.health import check as check_health
 from movielab.services.qa import QAService
@@ -194,7 +197,9 @@ class Services:
     def rag_graph(self, *, llm: Any = None, top_k: int | None = None) -> Any:
         """retrieve → generate 그래프 (F2007). `llm`을 주면 그것을 쓴다(구조 출력 등)."""
         chat = self.llm if llm is None else llm
-        return build_graph(self.retriever(top_k=top_k), chat, self.profile)
+        # 질의응답(P3) 기본 표에 관람 가이드(G1) · 사실 판정(C1)을 더한다 (F2010)
+        prompts = {"guide": build_guide_prompt, "factcheck": build_factcheck_prompt}
+        return build_graph(self.retriever(top_k=top_k), chat, self.profile, prompts=prompts)
 
     def rag_graph_outline(self) -> Any:
         """그래프 모양만 (F2007 V4.3-2) — 검색기 · LLM 없이, Chroma를 열지 않는다."""
@@ -228,6 +233,17 @@ class Services:
         if self._qa is None:
             self._qa = QAService(self.catalog, self.collector, self.rag_graph())
         return self._qa
+
+    @property
+    def guide(self) -> GuideService:
+        """관람 가이드 (F2010) — 여러 측면을 다루므로 Top-k는 설정 값의 2배."""
+        top_k = self.settings.retrieval.top_k * 2
+        return GuideService(self.catalog, self.collector, self.rag_graph(top_k=top_k))
+
+    @property
+    def factcheck(self) -> FactCheckService:
+        """사실 여부 판정 (F2010)."""
+        return FactCheckService(self.catalog, self.collector, self.rag_graph())
 
     @property
     def explore(self) -> ExploreService:

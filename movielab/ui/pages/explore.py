@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import logging
-import time
 from typing import Any
 
 import streamlit as st
 
 from movielab.core import messages
-from movielab.core.errors import MovieLabUserError
 from movielab.core.types import ExploreResult, ItemRecord
-from movielab.ui.components.status import progress_line
-
-logger = logging.getLogger(__name__)
+from movielab.ui.components.status import run_with_status
 
 
 def _choose(item_id: str) -> None:
@@ -23,32 +18,9 @@ def _choose(item_id: str) -> None:
 
 
 def _search(services: Any, condition: str) -> ExploreResult | None:
-    profile = services.profile
-    started = time.monotonic()
-    with st.status(messages.STATUS_RUNNING, expanded=True) as status:
-
-        def on_progress(stage: str, info: dict[str, Any]) -> None:
-            line = progress_line(stage, info, profile)
-            if line:
-                status.write(line)
-
-        try:
-            result = services.explore.search(condition, on_progress)
-        except MovieLabUserError as error:
-            logger.warning("안내 오류: %s", error)
-            status.update(label=messages.STATUS_FAILED, state="error", expanded=False)
-            st.error(messages.render(error.code, profile.labels()))
-            return None
-        except Exception:
-            logger.exception("조건 탐색 실패")
-            status.update(label=messages.STATUS_FAILED, state="error", expanded=False)
-            st.error(messages.render("GENERIC_ERROR", profile.labels()))
-            return None
-        seconds = time.monotonic() - started
-        status.update(
-            label=messages.STATUS_DONE.format(seconds=seconds), state="complete", expanded=False
-        )
-    return result
+    return run_with_status(
+        services.profile, lambda on_progress: services.explore.search(condition, on_progress)
+    )
 
 
 def _cards(services: Any, result: ExploreResult) -> None:

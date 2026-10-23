@@ -179,6 +179,29 @@ class ExploreResult:
 
 
 @dataclass(frozen=True)
+class GuideResult:
+    """관람 가이드 (F2010). `markdown`은 고정 소제목 3개를 가진다."""
+
+    markdown: str
+    evidences: list[Evidence]
+    cited: list[Evidence]
+    uncited: bool
+    collect: CollectReport
+
+
+@dataclass(frozen=True)
+class FactCheckResult:
+    """사실 판정 (F2010). `verdict`는 사실 · 거짓 · 확인 불가 중 하나."""
+
+    claim: str
+    verdict: str
+    reason: str
+    evidences: list[Evidence]
+    cited: list[Evidence]
+    collect: CollectReport
+
+
+@dataclass(frozen=True)
 class AnswerResult:
     """질문 하나의 결과 (F2009 `QAService.ask`).
 
