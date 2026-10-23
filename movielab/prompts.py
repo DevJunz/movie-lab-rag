@@ -118,6 +118,19 @@ def build_answer_prompt(profile: DomainProfile, evidences: list[Evidence], quest
     )
 
 
+# B1 직접 답변 — RAG 없는 비교 기준 (SPEC-F2015 §2.2). 근거 블록 · 확인 불가 규칙을 넣지 않는다.
+DIRECT_ANSWER = """[작업: 직접 답변]
+너는 {assistant_role}이다.
+{item_label}: {item_name}
+질문: {question}
+
+한국어로 답하라."""
+
+
+def build_direct_prompt(profile: DomainProfile, *, item_name: str, question: str) -> str:
+    return profile.render(DIRECT_ANSWER, item_name=item_name, question=question)
+
+
 # E1 조건 해석 (SPEC-F2011 §3.2) — 필드 설명은 DomainProfile.explore_filter_spec
 EXPLORE_PARSE = """[작업: 조건 해석]
 너는 {expert_role}이다. 사용자의 {item_label} 탐색 조건을 해석하라.

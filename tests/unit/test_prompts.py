@@ -89,3 +89,13 @@ def test_tc_f2010_11_guide_and_factcheck_prompts():
     assert (
         check.rstrip().endswith("주장: 블랙홀은 천체다") and "[근거 1] (영화 메타데이터)" in check
     )
+
+
+def test_tc_f2015_03_direct_answer_prompt_has_no_evidence():
+    from movielab.prompts import build_direct_prompt
+
+    prompt = build_direct_prompt(MOVIE_PROFILE, item_name="인터스텔라 (2014)", question="블랙홀은?")
+    assert prompt.startswith("[작업: 직접 답변]")
+    assert "인터스텔라 (2014)" in prompt and "블랙홀은?" in prompt
+    assert "[근거" not in prompt and "근거:" not in prompt
+    assert NOT_FOUND not in prompt

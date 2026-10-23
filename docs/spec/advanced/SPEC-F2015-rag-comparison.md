@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2015** RAG 전후 품질 비교 (품질 · 심화) |
 | 구분 | 심화 |
-| 상태 | Draft |
-| 담당 모듈 | `scripts/compare_rag.py`, `movielab/prompts.py`(B1: RAG 없는 답변), `docs/verification/questions.json` |
+| 상태 | Done |
+| 담당 모듈 | `scripts/compare_rag.py`, `movielab/services/baseline.py`(`DirectAnswerService`), `movielab/prompts.py`(B1: RAG 없는 답변), `docs/verification/questions.json` |
 | 선행 SPEC | SPEC-F2007, SPEC-F2008 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #21 |
 
 ## 1. 요구사항 원문
 
@@ -29,6 +29,7 @@
 
 [00-product-overview.md §3](../00-product-overview.md#3-대표-질문)의 Q1~Q6을 그대로 쓴다(5개 이상 + 확인 불가 질문 1개).
 각 항목에 `reference_facts`(위키 문서에서 확인한 정답 요지와 출처 URL)를 사람이 채워 넣는다 — 정확성 판정 기준.
+키는 모든 항목에 있어야 하고(빈 목록 허용 — Q6처럼 정답이 없는 질문), 항목마다 `fact` · `source_url`을 가진다.
 
 ```json
 [{"id": "Q2", "movie_id": "282631", "question": "명량 해전에서 조선 수군의 배는 실제로 몇 척이었나?",
@@ -42,7 +43,12 @@
 | RAG 없음 | 프롬프트 B1: `[작업: 직접 답변]` + 영화 제목 (연도) + 질문. 근거 블록 없음. 같은 모델 · `temperature=0` |
 | RAG 사용 | `QAService.ask`(수집 → 그래프 → 인용) 그대로 |
 
-- 원본 출력은 `reports/compare_rag/<날짜>.json`에 남기고(`.gitignore`), 표는 마크다운으로 쓴다.
+- 원본 출력은 `reports/compare_rag/<날짜시각>.json`에 남기고(`.gitignore`), 표는 마크다운으로 쓴다(`--raw-dir`로 바꿀 수 있다).
+- B1 프롬프트(`movielab/prompts.py` `DIRECT_ANSWER`)는 역할 · `{item_label}: 제목 (연도)` · 질문 · "한국어로 답하라"만 담는다. 근거 블록과 확인 불가 규칙을 넣지 않는다 — RAG 없는 기본 상태를 재기 위해서다.
+- 제목 (연도)는 `Catalog.get(movie_id).display_name`. 카탈로그에 없는 `movie_id`는 그 질문을 건너뛰고 표에 "항목 없음"으로 적는다.
+- 같은 모델 · 온도: 두 조건 모두 `services.llm`(설정 `models.chat` · `models.temperature`)을 쓴다. 실험 조건 절에 두 값을 적는다.
+- 답변 표 칸 안의 줄바꿈은 `<br>`, `|`는 `/`로 바꾼다.
+- 보고서 파일이 이미 있으면 덮어쓰지 않고 종료 코드 1로 끝낸다(사람이 채운 평가 보호). `--force`를 주면 덮어쓴다.
 - 평가 열은 스크립트가 빈칸으로 만들고 **사람이 채운다**: 사실 정확성(정확 / 부분 / 틀림), 근거 제시(있음 / 없음), 모르면 모른다고 답함(예 / 아니오 / 해당 없음).
 - 근거 제시 열은 자동 보조값을 제공한다: RAG 답변의 인용 수, RAG 없는 답변의 출처 언급 여부.
 
@@ -74,6 +80,7 @@
 |---|---|---|---|---|---|
 | TC-F2015-01 | 단위 | `questions.json` 검사 | 5개 이상, 필수 키 존재, `movie_id`가 `movies.json` 형식(문자열) | 01 | `tests/unit/test_questions.py` |
 | TC-F2015-02 | 통합 | 가짜 LLM으로 `compare_rag` 실행 | 질문 수만큼 행, 두 답변 열, 평가 열 3개(빈칸), 실험 조건 절 | 02, 03 | `tests/integration/test_compare_rag.py` |
+| TC-F2015-05 | 통합 | 보고서 파일이 이미 있을 때 `--force` 없이 / 있게 실행 | 없으면 파일 그대로 · 종료 코드 1, 있으면 덮어씀 | 03 | `tests/integration/test_compare_rag.py` |
 | TC-F2015-03 | 단위 | B1 프롬프트 | 근거 블록 없음, `[작업: 직접 답변]` | 05 | `tests/unit/test_prompts.py` |
 | TC-F2015-04 | live / 수동 | 실제 GMS로 실행 후 평가 기입 | 보고서 완성 | 03, 04 | `docs/deliverables/04_RAG_전후_비교.md` |
 

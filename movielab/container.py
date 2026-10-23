@@ -33,6 +33,7 @@ from movielab.index.store import VectorStore
 from movielab.prompts import build_factcheck_prompt, build_guide_prompt
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
+from movielab.services.baseline import DirectAnswerService
 from movielab.services.catalog import Catalog
 from movielab.services.explore import ExploreService
 from movielab.services.factcheck import FactCheckService
@@ -233,6 +234,11 @@ class Services:
         if self._qa is None:
             self._qa = QAService(self.catalog, self.collector, self.rag_graph())
         return self._qa
+
+    @property
+    def direct(self) -> DirectAnswerService:
+        """RAG 없는 직접 답변 (F2015 비교 기준선)."""
+        return DirectAnswerService(self.catalog, self.llm, self.profile)
 
     @property
     def guide(self) -> GuideService:
