@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2002** 메타데이터 색인(RAG 1) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | Done (live · 수동 검증 대기) |
+| 상태 | Done |
 | 담당 모듈 | `movielab/index/store.py`, `movielab/index/meta_indexer.py`, `scripts/index_meta.py` |
 | 선행 SPEC | SPEC-F2001 |
 | 관련 ISSUE | #4 |

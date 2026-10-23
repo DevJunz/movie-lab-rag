@@ -1,0 +1,7 @@
+$ python -m scripts.index_meta   # 1회차 (2026-10-23 11:44)
+로드 964건 / 색인 964건 / 건너뜀 0건
+
+real	1m13.387s
+user	0m0.000s
+sys	0m0.031s
+exit=0

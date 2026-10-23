@@ -20,5 +20,8 @@ def test_tc_f2002_07_real_embeddings_index_three(tmp_path, movies_small_path):
     }
     services = build_services(settings)
     items = services.catalog.items()[:3]
-    assert index_items(services.store, items, collection="movie_meta") == []
+    failed = index_items(
+        services.store, items, collection="movie_meta", batch_size=100, retries=1, retry_wait_sec=2
+    )
+    assert failed == []
     assert services.store.count("movie_meta") == 3
