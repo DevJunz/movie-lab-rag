@@ -396,3 +396,22 @@ def test_tc_f2006_12_evidence_flag_combinations_rejected(extra, capsys):
     with pytest.raises(SystemExit) as exc:
         collect.main(["--movie-id", "157336", "--question", "블랙홀", *extra])
     assert exc.value.code == 2
+
+
+def test_tc_f2006_16_show_evidence_checks_index_before_collecting(
+    tmp_settings, monkeypatch, capsys
+):
+    from movielab.container import build_services
+    from scripts import collect
+    from tests.fakes import FakeChatModel, FakeEmbeddings, pick_titles
+
+    tmp_settings.raw["collect"]["source"] = "bundle"
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(
+        collect, "build_services", lambda s: build_services(s, llm=llm, embeddings=FakeEmbeddings())
+    )
+    argv = ["--movie-id", "157336", "--question", "블랙홀", "--source", "bundle"]
+    assert collect.main([*argv, "--show-evidence"]) == 1
+    assert "scripts.index_meta" in capsys.readouterr().out
+    assert llm.calls == []  # 수집(LLM 호출)을 시작하지 않았다

@@ -65,7 +65,7 @@ def test_tc_f2006_03_external_sorted_by_similarity(services):
     externals = [e for e in result.evidences if e.source_kind == "wiki"]
     assert externals[0].title == "블랙홀"
     scores = [e.score for e in externals]
-    assert scores == sorted(scores, reverse=True) and all(0 <= s <= 1.0001 for s in scores)
+    assert scores == sorted(scores, reverse=True) and all(0 <= s <= 1 for s in scores)
     assert externals[0].license == "CC BY-SA 4.0" and externals[0].source_type == "위키백과"
 
 
@@ -113,8 +113,9 @@ def test_tc_f2006_09_search_type_and_top_k_validated(tmp_settings, tmp_path):
     from movielab.rag.retriever import Retriever
 
     store = build_services(tmp_settings, embeddings=FakeEmbeddings()).store
-    with pytest.raises(ValueError):
-        Retriever(store, top_k=0)
+    for bad in (0, True, "4"):
+        with pytest.raises(ValueError):
+            Retriever(store, top_k=bad)
 
 
 def test_tc_f2006_11_no_external_after_dedup(services):
@@ -135,3 +136,33 @@ def test_tc_f2006_11_no_external_after_dedup(services):
     result = services.retriever().retrieve("157336", "블랙홀")
     assert len(result.evidences) == 1
     assert result.no_external is True  # 중복 제거 뒤 외부 근거가 없다
+
+
+def test_tc_f2006_14_top_k_filled_after_dedup(services):
+    same = "[합성] 블랙홀 사건의 지평선 설명 " * 3
+    docs = [_doc("157336", str(n), f"같은{n}", same) for n in range(1, 4)]
+    docs += [
+        _doc("157336", str(n), f"다른{n}", f"[합성] 블랙홀 관련 다른 내용 {n}번 " * 3)
+        for n in range(10, 15)
+    ]
+    _index_wiki(services, *docs)
+    result = services.retriever(top_k=4).retrieve("157336", same)
+    externals = result.evidences[1:]
+    assert len(externals) == 4
+    assert len({" ".join(e.text.split()) for e in externals}) == 4
+
+
+def test_tc_f2006_15_int_movie_id_and_score_range(services):
+    _index_wiki(services, _doc("157336", "1", "블랙홀", "[합성] 블랙홀은 무거운 천체이다. " * 5))
+    result = services.retriever().retrieve(157336, "블랙홀")
+    assert result.evidences[0].title.startswith("인터스텔라")
+    assert len(result.evidences) == 2 and 0 <= result.evidences[1].score <= 1
+
+
+def test_tc_f2006_15_non_cosine_collection_has_no_score(tmp_settings):
+    services = build_services(tmp_settings, embeddings=FakeEmbeddings())
+    index_catalog(services.catalog, services.store, sleep=FakeClock().sleep)
+    services.store.client.create_collection("wiki_docs", metadata={"hnsw:space": "l2"})
+    _index_wiki(services, _doc("157336", "1", "블랙홀", "[합성] 블랙홀은 무거운 천체이다. " * 5))
+    result = services.retriever().retrieve("157336", "블랙홀")
+    assert result.evidences[1].score is None
