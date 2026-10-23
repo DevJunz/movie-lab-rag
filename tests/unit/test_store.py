@@ -32,8 +32,8 @@ def test_tc_f2002_15_duck_typed_embeddings_used_directly(tmp_path, tmp_settings)
     duck = DuckEmbeddings()
     store = VectorStore(_client(tmp_path), tmp_settings, embeddings=duck)
     assert store.embeddings is duck
-    store.collection("a")
-    store.collection("b")
+    store.collection("col_a")
+    store.collection("col_b")
     assert store.embeddings is duck
 
 
@@ -46,6 +46,6 @@ def test_tc_f2002_15_factory_called_once(tmp_path, tmp_settings):
 
     store = VectorStore(_client(tmp_path), tmp_settings, embeddings_factory=factory)
     first = store.embeddings
-    store.collection("a")
-    store.collection("b")
+    store.collection("col_a")
+    store.collection("col_b")
     assert store.embeddings is first and calls == [1]
