@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2007** 근거 기반 답변 생성(프롬프트3) (생성 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | Done |
 | 담당 모듈 | `movielab/rag/graph.py`, `movielab/prompts.py`(P3), `movielab/providers.py` |
 | 선행 SPEC | SPEC-F2006 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #11 |
 
 ## 1. 요구사항 원문
 
@@ -33,7 +33,8 @@
 START → retrieve → generate → END
 ```
 
-- `retrieve` 노드: `Retriever.retrieve(state["movie_id"], state["question"])` → `{"contexts": evidences}`.
+- `retrieve` 노드: 먼저 `task`가 등록된 작업인지 확인하고(아니면 `ValueError` — 검색 · 임베딩 호출 전에 거부),
+  `Retriever.retrieve(state["movie_id"], state["question"])` → `{"contexts": evidences, "no_external": …}`(F2006의 외부 근거 없음 표시를 그대로 전달, F2012 안내용).
 - `generate` 노드: `task`에 맞는 프롬프트(P3 / G1 / C1)를 만들어 LLM을 한 번 부른다 → `{"answer": text}`.
 - `python -m scripts.show_graph`는 `graph.get_graph().draw_mermaid()`를 출력한다 (V4.3-2 증빙).
 
@@ -71,7 +72,15 @@ START → retrieve → generate → END
 
 - 규칙 5는 위키 본문에 섞인 문장이 지시처럼 읽히는 경우(프롬프트 주입)를 막기 위한 것이다.
 - 모델: `settings.models.chat`(기본 `gpt-4o-mini`), `temperature = 0`, 타임아웃 `timeout_sec`.
-- `not_found` 판정: 답변을 정규화했을 때 `NOT_FOUND` 문장으로 시작하고 `[근거 n]`이 없으면 `AnswerResult.not_found = True`.
+- `not_found` 판정: `rag.graph.is_not_found(answer)` — 공백을 정규화하고 앞뒤 따옴표(`"` `'` `“ ”` `「 」`) · 강조 표시(`*`)를 뗀 뒤,
+  남은 답 **전체**가 `NOT_FOUND` 문장(끝 마침표는 있어도 없어도 됨)이면 참이다. 그 뒤에 다른 내용이 붙으면(인용이 없어도) 거짓 — 규칙 3은 "다른 말 없이"이다.
+  `generate` 노드가 상태에 `not_found`를 함께 채우고(AC-04), `AnswerResult.not_found`(F2009)도 이 함수를 쓴다.
+- LLM 응답의 `content`가 블록 목록이면(텍스트 블록들) 텍스트만 이어 붙여 답으로 쓴다.
+- `generate` 노드는 작업(`task`) → 프롬프트 생성 함수 표를 쓴다. 표는 `build_graph(..., prompts=…)`로 주입하고(모듈 전역 상태를 바꾸지 않는다),
+  주입한 표는 기본 표 `{"qa": P3}`에 **더해진다**(같은 이름이면 주입한 것이 이긴다). `guide`(G1) · `factcheck`(C1)는 SPEC-F2010이 container에서 표에 더한다. 등록되지 않은 작업은 `ValueError`.
+- 근거 블록에 넣는 제목 · 본문 안의 인용 비슷한 표기(`[근거`, `[ 근거`, `［근거`, `【근거`)는 `(근거`로 바꾼다 — 문서에 그런 문자열이 있어도
+  모델이 없는 근거 번호를 인용하지 않게 한다.
+- 구조 출력(`scripts.show_graph`)은 검색기 · LLM 없이 그래프 모양만 만든다(`Services.rag_graph_outline()`) — Chroma를 열지 않는다.
 
 ### 3.4 인터페이스
 
@@ -105,18 +114,38 @@ def format_context(evidences: list[Evidence]) -> str: ...
 | TC-F2007-01 | 단위 | `build_graph(...).get_graph().nodes` | `{__start__, retrieve, generate, __end__}` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-02 | 통합 | 가짜 LLM으로 `invoke` | `contexts`, `answer`가 채워지고 LLM 호출 1회 | 01 | `tests/integration/test_graph_flow.py` |
 | TC-F2007-03 | 단위 | 가짜 LLM이 받은 P3 프롬프트 검사 | 규칙 1~5, `[근거 1] (영화 메타데이터)`, `[근거 2] (위키백과)`, 질문 포함 | 02, 03 | `tests/unit/test_prompts.py` |
-| TC-F2007-04 | 단위 | 가짜 LLM이 `NOT_FOUND` 문장 반환 | `not_found == True`, 인용 0 | 04 | `tests/unit/test_qa_service.py` |
-| TC-F2007-05 | 단위 | `task="guide"` / `"factcheck"` | 각각 G1 / C1 머리표 프롬프트 사용 | 01 | `tests/unit/test_graph.py` |
+| TC-F2007-04 | 단위 | `is_not_found`: `NOT_FOUND` 문장 · 앞뒤 공백 · 인용이 붙은 답 · 일부만 확인되지 않은 답 | 참 · 참 · 거짓 · 거짓 | 04 | `tests/unit/test_graph.py` |
+| TC-F2007-05 | 단위 | 등록되지 않은 `task`로 실행 (G1 · C1 사용 검사는 SPEC-F2010 TC로) | `ValueError` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-06 | live | 실제 GMS로 Q6 | `not_found == True` 또는 답변에 "확인되지 않" 포함 | 05 | `tests/live/test_live_answer.py` |
-| TC-F2007-07 | live | 실제 GMS로 Q1 | `[근거 n]` 1개 이상 | 02 | 〃 |
-| TC-F2007-08 | 수동 | `python -m scripts.show_graph` | mermaid 출력 캡처 | 06 | 스크린샷 |
+| TC-F2007-07 | live | 실제 GMS로 Q4 (근거 문서에 답이 있는 질문) | `[근거 n]` 1개 이상 | 02 | 〃 |
+| TC-F2007-08 | 통합 | `python -m scripts.show_graph` (실제 출력은 V4.3-2 증빙) | mermaid에 `retrieve` · `generate` 노드와 간선 | 06 | `tests/integration/test_scripts.py`, `tests/unit/test_graph.py` |
+| TC-F2007-09 | 단위 | `is_not_found`: 따옴표로 감싼 문장 · 마침표 없는 문장 · 굵게 표시한 문장 / 문장 뒤에 인용 없는 내용 | 참 · 참 · 참 / 거짓 | 04 | `tests/unit/test_graph.py` |
+| TC-F2007-10 | 단위 | 등록되지 않은 작업이면 검색기 호출 0회 / 근거 본문의 `[근거 9]` | `ValueError`, 검색 없음 / 근거 블록에 `(근거 9]`로 들어감 | 01, 02 | `tests/unit/test_graph.py`, `tests/unit/test_prompts.py` |
+| TC-F2007-11 | 통합 | `Services.rag_graph()`(가짜 LLM · 임베딩)로 실행 | `contexts` · `answer` · `no_external` · `not_found` 채움, 프롬프트에 검색된 근거 본문 | 01, 02, 04 | `tests/integration/test_graph_flow.py` |
+| TC-F2007-12 | 단위 | 주입 표 `{"guide": …}`로 `qa` 실행 / 블록 목록 응답 / 변형 인용 표기 · 제목의 표기 / `rag_graph_outline` | 기본 `qa`가 그대로 동작 / 텍스트만 이어 붙임 / 모두 `(근거` / Chroma 폴더를 만들지 않음 | 01, 02, 06 | `tests/unit/test_graph.py`, `tests/unit/test_prompts.py`, `tests/integration/test_scripts.py` |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.3-2 | 그래프 mermaid 출력 (또는 `graph.py` 캡처) | `docs/verification/screenshots/V4.3-2_graph.png` |
-| V4.3-5 | Q6 답변 화면 | `docs/verification/screenshots/V4.3-5_not_found.png` |
+| V4.3-2 | 그래프 mermaid 출력 (`python -m scripts.show_graph`) | `docs/verification/evidence/V4.3-2_graph.txt` |
+| V4.3-5 | 실제 색인 · GMS로 Q1~Q6 답변 (Q6 확인 불가 포함). 화면 캡처는 UI(SPEC-F2009) 이후 추가 | `docs/verification/evidence/V4.3-5_answers.txt` |
+
+### 7.1 Q1 · Q2에 대한 관찰 (TC-07을 Q4로 둔 이유)
+
+실제 색인(2026-10-23)으로 P3를 돌리면 Q3 · Q4 · Q5는 근거 번호를 붙여 답하고 Q6은 확인 불가로 답한다.
+Q1 · Q2는 "제공된 문서에서 확인되지 않습니다."로 답했다.
+
+- Q1: 수집한 한국어 위키백과 문서에 '영화의 블랙홀 묘사와 실제 물리의 비교'를 다룬 문장이 없다. 유사도 Top-4는 모두 「블랙홀」
+  일반 물리 청크였고, 「인터스텔라」 문서(킵 손 과학 자문)는 Top-15 밖이었다. 근거만으로는 확인 불가가 맞는 답이다.
+- Q2: [근거 1](영화 메타데이터 줄거리)의 "12척"은 영화 속 설정이고, 역사 기록("배 13척", 「명량해협」)은 Top-4 밖이었다.
+  실행에 따라 "확인되지 않습니다" 대신 줄거리의 12척을 [근거 1]로 인용해 '실제로 12척'이라고 답하기도 했다(V4.3-5 증빙) —
+  영화 속 설정을 역사 사실처럼 쓰는 위험이다. 근거가 맞는 문서에 있도록 검색을 고치는 것(F2014)과, 메타 근거가 '영화 속 내용'임을 프롬프트에서
+  구분하는 것은 후속 과제로 남긴다(F2015 비교에서 다룬다).
+- 프롬프트 규칙 3 · 4 문구를 바꿔 인용을 유도해 보았으나(실험 3종) 근거에 없는 평가 문장이 섞이는 경우가 생겨 채택하지 않았다 (규칙 1 위반).
+- MMR(λ=0.5, fetch_k=20)로 검색하면 Q1에 「인터스텔라」 도입부, Q2에 「명량해협」 청크가 Top-4에 들어온다 → SPEC-F2014 비교 대상.
+
+따라서 TC-07(실제 모델이 `[근거 n]`을 붙이는지, AC-02)은 근거 문서에 답이 있는 Q4로 검증하고, Q1 · Q2는 증빙에 그대로 기록한다.
 
 ## 8. 범위 밖
 

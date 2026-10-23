@@ -415,3 +415,25 @@ def test_tc_f2006_16_show_evidence_checks_index_before_collecting(
     assert collect.main([*argv, "--show-evidence"]) == 1
     assert "scripts.index_meta" in capsys.readouterr().out
     assert llm.calls == []  # 수집(LLM 호출)을 시작하지 않았다
+
+
+# --- SPEC-F2007 그래프 구조 출력 ---
+
+
+def test_tc_f2007_08_show_graph_without_key(tmp_settings, monkeypatch, capsys):
+    from scripts import show_graph
+
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert show_graph.main([]) == 0
+    out = capsys.readouterr().out
+    assert "retrieve" in out and "generate" in out and "__start__" in out
+
+
+def test_tc_f2007_12_show_graph_does_not_open_chroma(tmp_settings, monkeypatch, capsys):
+    from scripts import show_graph
+
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert show_graph.main([]) == 0
+    out = capsys.readouterr().out
+    assert "retrieve" in out and "generate" in out
+    assert not tmp_settings.path("chroma_dir").exists()
