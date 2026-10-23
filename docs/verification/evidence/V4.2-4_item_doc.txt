@@ -1,0 +1,29 @@
+$ python -m scripts.collect --movie-id 321612 --question "원작 동화는 언제 누가 썼나?" --source api   # 동명 작품: 미녀와 야수(2017)
+소스: api
+검색어: 미녀와 야수 (2017년 영화), 미녀와 야수 (영화), 미녀와 야수, 샤를 페로, 원작 동화, 프랑스 동화
+후보: 22건
+수집 문서:
+  - 미녀와 야수 (2017년 영화) (항목 자체 문서)
+  - 미녀와 야수
+  - 벨 (디즈니 캐릭터)
+  - 샤를 페로
+버린 문서:
+  - 미녀와 야수 (동음이의) [disambiguation]
+  - 2017년 영화 [p2_not_selected]
+  - 미녀와 야수 (1991년 영화) [p2_not_selected]
+  - 미녀와 야수: 마법의 크리스마스 [p2_not_selected]
+  - 미녀와 야수 (1946년 영화) [p2_not_selected]
+  - 빨간 두건 [p2_not_selected]
+  - 신데렐라 [p2_not_selected]
+  - 신데렐라 (1950년 영화) [p2_not_selected]
+  - 당나귀 공주 (영화) [p2_not_selected]
+  - TV로 보는 원작동화 [p2_not_selected]
+  - 아기공룡 둘리 [p2_not_selected]
+  - 짱구는 못말려 [p2_not_selected]
+  - 캔디 캔디 [p2_not_selected]
+  - 곰돌이 푸 [p2_not_selected]
+  - 프랑스 [p2_not_selected]
+  - 한강 (작가) [p2_not_selected]
+  - 동화약품 [p2_not_selected]
+  - 그림 형제 [p2_not_selected]
+  - 방정환 [p2_not_selected]

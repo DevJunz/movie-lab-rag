@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2004** 외부 문서 수집(프롬프트2) (수집 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/collect/selector.py`, `movielab/collect/collector.py`, `movielab/data/wiki_api.py`, `movielab/data/wiki_bundle.py`, `movielab/data/raw_store.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-F2003, SPEC-NF2006 |
 | 관련 ISSUE | #7 |
@@ -84,7 +84,7 @@ class DocumentSource(Protocol):                      # movielab/core/types.py
 | 8 | `done` | 매니페스트 갱신(NF2002), `CollectReport` 반환 |
 
 - `on_progress(stage: str, info: dict)` 콜백은 UI에 독립적이다. UI는 이를 진행 상태 영역에 표시한다(F2012).
-- `CollectReport`에는 **색인된 문서와 버려진 문서를 사유와 함께** 남긴다. 사유: `p2_not_selected`, `too_short`, `disambiguation`, `already_collected`, `fetch_failed` (V4.2-2).
+- `CollectReport`에는 **색인된 문서와 버려진 문서를 사유와 함께** 남긴다. 사유: `p2_not_selected`, `over_limit`(P2가 상한보다 많이 고름), `too_short`, `disambiguation`, `already_collected`, `fetch_failed` (V4.2-2).
 - 수집 실패(본문 조회 실패 등)는 해당 문서만 건너뛰고 계속한다. 문서가 하나도 없어도 예외로 끝내지 않는다 → 답변은 메타 근거만으로 진행(F2006, F2012의 "검색 결과 없음" 안내).
 
 ### 3.4 항목 자체 문서 판별 (`DomainProfile.pick_item_doc`, `data/domain_movie.py`)
@@ -203,8 +203,8 @@ python -m scripts.collect --movie-id 157336 --question "<질문>" [--source api|
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.2-2 | Q1 수집 결과의 색인 / 버림 목록 캡처 | `docs/verification/screenshots/V4.2-2_selection.png` |
-| V4.2-4 | 항목 자체 문서(「인터스텔라」, 「미녀와 야수 (2017년 영화)」)가 색인된 결과 캡처 | `docs/verification/screenshots/V4.2-4_item_doc.png` |
+| V4.2-2 | Q1 실제 수집 결과의 수집 / 버림(사유) 목록 | `docs/verification/evidence/V4.2-2_selection.txt` |
+| V4.2-4 | 항목 자체 문서(「인터스텔라」 — V4.2-2 파일, 「미녀와 야수 (2017년 영화)」) 실제 수집 결과 | `docs/verification/evidence/V4.2-4_item_doc.txt` |
 
 ## 8. 범위 밖
 

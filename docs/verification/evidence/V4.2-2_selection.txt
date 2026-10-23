@@ -1,0 +1,31 @@
+$ python -m scripts.collect --movie-id 157336 --question "인터스텔라의 블랙홀 묘사는 실제 물리와 얼마나 다른가?" --source api   # 2026-10-23 12:14
+소스: api
+검색어: 인터스텔라 (2014년 영화), 인터스텔라 (영화), 인터스텔라, 블랙홀, 웜홀, 상대성 이론, 크리스토퍼 놀란
+후보: 24건
+수집 문서:
+  - 인터스텔라 (항목 자체 문서)
+  - 블랙홀
+  - 웜홀
+  - 블랙홀 열역학
+  - 일반 상대성이론
+  - 알베르트 아인슈타인
+버린 문서:
+  - 대한민국의 영화 흥행 기록 [p2_not_selected]
+  - 하정우 [p2_not_selected]
+  - 크리스토퍼 놀란 [p2_not_selected]
+  - 감우성 [p2_not_selected]
+  - 인터 스텔라 5555 [p2_not_selected]
+  - 한스 짐머 [p2_not_selected]
+  - 항성질량 블랙홀 [p2_not_selected]
+  - 초대질량 블랙홀 [p2_not_selected]
+  - 블랙홀 (밴드) [p2_not_selected]
+  - 비가향 웜홀 [p2_not_selected]
+  - ER=EPR [p2_not_selected]
+  - 존 아치볼드 휠러 [p2_not_selected]
+  - 화이트홀 [p2_not_selected]
+  - 상대성이론 [p2_not_selected]
+  - 특수 상대성이론 [p2_not_selected]
+  - 상대성 원리 [p2_not_selected]
+  - 오디세이 (영화) [p2_not_selected]
+  - 조너선 놀런 [p2_not_selected]
+  - 오펜하이머 (영화) [p2_not_selected]
