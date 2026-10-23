@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = "movielab"
 
-# 영역 → import 해도 되는 movielab 내부 영역
+# 영역 → import 해도 되는 movielab 내부 영역 (같은 영역 안의 import는 항상 허용)
 ALLOWED_INTERNAL: dict[str, set[str]] = {
     "core": {"core"},
     "config": {"core"},
@@ -104,7 +104,7 @@ def check_imports(source: str, rel_path: str) -> list[Violation]:
             continue
         target = _internal_target(module)
         if target is not None:
-            if "*" not in allowed and target not in allowed:
+            if "*" not in allowed and target != area and target not in allowed:
                 violations.append(
                     Violation(rel_path, line, f"'{area}'는 '{target}'를 import 할 수 없다")
                 )

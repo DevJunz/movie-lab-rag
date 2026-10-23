@@ -123,7 +123,7 @@ ai_project_02/                       # 저장소 루트 (GitHub: movie-lab-rag)
 
 ### 2.1 의존 규칙
 
-화살표 방향으로만 import 한다. `tests/unit/test_architecture.py`가 AST로 검사한다(SPEC-NF2005).
+화살표 방향으로만 import 한다. **같은 영역 안의 import는 항상 허용한다.** `tests/unit/test_architecture.py`가 AST로 검사한다(SPEC-NF2005).
 
 | 패키지 | import 허용 대상 |
 |---|---|

@@ -35,6 +35,8 @@ def test_tc_nf2005_04_checker_detects_violations():
     assert check_imports("from .. import container\n", "movielab/rag/graph.py")
     assert check_imports("from movielab import core, data\n", "movielab/rag/graph.py")
     assert not check_imports("from movielab import core\n", "movielab/rag/graph.py")
+    # 같은 영역 안의 import는 허용
+    assert not check_imports("from movielab.data import movies\n", "movielab/data/domain_movie.py")
     # ui는 index를 직접 import 할 수 없다
     assert check_imports("import movielab.index.store\n", "movielab/ui/streamlit_app.py")
     # core는 외부 패키지(chromadb)를 쓸 수 없다
