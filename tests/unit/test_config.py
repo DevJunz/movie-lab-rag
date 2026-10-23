@@ -206,3 +206,18 @@ def test_tc_nf2006_18_invalid_wiki_settings_rejected(tmp_path: Path, change):
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(SettingsError):
         load_settings(path)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [{"card_overview_chars": 0}, {"max_queries": "5"}, {"source": "wiki"}, {"search_limit": 0}],
+)
+def test_tc_f2003_11_invalid_collect_settings_rejected(tmp_path: Path, change):
+    from movielab.config import SettingsError
+
+    raw = json.loads((REPO_ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    raw["collect"].update(change)
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(SettingsError):
+        load_settings(path)
