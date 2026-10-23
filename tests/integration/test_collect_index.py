@@ -77,3 +77,44 @@ def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
     first = collector.collect(item, QUESTION)
     assert first.indexed_titles == []
     assert "CACHE_HIT" in collector.collect(item, QUESTION).notices
+
+
+def test_tc_f2005_29_blank_item_doc_rejected_and_cache_hits(tmp_settings):
+    from movielab.collect.collector import Collector
+    from movielab.collect.manifest import Manifest
+    from movielab.collect.query_extractor import QueryExtractor
+    from movielab.collect.selector import CandidateSelector
+    from movielab.data.domain_movie import MOVIE_PROFILE
+    from movielab.data.raw_store import RawStore
+    from tests.fakes.source import FakeSource, make_doc
+
+    source = FakeSource()
+    source.add(
+        make_doc("1", "인터스텔라", text="  "),
+        title_intro="[합성] 인터스텔라는 2014년 개봉한 크리스토퍼 놀란 감독의 SF 영화이다.",
+    )
+    source.add(make_doc("2", "블랙홀"), queries=["블랙홀"])
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
+
+    def indexer(doc):
+        if not doc.text.strip():
+            raise ValueError("본문이 비어 있다")
+        return 1
+
+    collector = Collector(
+        api_source=source,
+        bundle_source=FakeSource("bundle"),
+        extractor=QueryExtractor(llm, MOVIE_PROFILE, tmp_settings),
+        selector=CandidateSelector(llm, MOVIE_PROFILE, tmp_settings),
+        raw_store=RawStore(tmp_settings.path("raw_dir")),
+        profile=MOVIE_PROFILE,
+        settings=tmp_settings,
+        manifest=Manifest(tmp_settings.path("manifest")),
+        indexer=indexer,
+        has_chunks=lambda item_id: True,
+    )
+    services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
+    item = services.catalog.get("157336")
+    first = collector.collect(item, QUESTION)
+    assert ("1", "too_short") in {(r.page_id, r.reason) for r in first.rejected}
+    assert "CACHE_HIT" in collector.collect(item, QUESTION).notices

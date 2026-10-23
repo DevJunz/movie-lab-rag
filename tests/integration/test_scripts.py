@@ -294,3 +294,25 @@ def test_tc_f2005_25_reindex_movie_id_matches_int_in_raw(tmp_settings, monkeypat
     out = capsys.readouterr().out
     assert "문서 1건" in out and "지웠습니다" not in out
     assert services.store.count("wiki_docs") > 0
+
+
+def test_tc_f2005_30_empty_movie_id_and_override_notice(tmp_settings, monkeypatch, capsys):
+    import dataclasses
+
+    from movielab.container import build_services
+    from scripts import reindex_docs
+    from tests.fakes import FakeEmbeddings
+    from tests.fakes.source import make_doc
+
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, embeddings=emb)
+    for movie_id, page_id in (("157336", "1"), ("27205", "2")):
+        doc = dataclasses.replace(make_doc(page_id, f"문서{page_id}"), movie_id=movie_id)
+        services.raw_store.save(doc)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(reindex_docs, "build_services", lambda s: build_services(s, embeddings=emb))
+    assert reindex_docs.main(["--movie-id", ""]) == 0
+    out = capsys.readouterr().out
+    assert "문서 2건" in out and "되돌" not in out
+    assert reindex_docs.main(["--chunk-size", "500", "--chunk-overlap", "100"]) == 0
+    assert "되돌" in capsys.readouterr().out

@@ -309,3 +309,47 @@ def test_tc_f2005_24_pruned_movie_manifest_reset(tmp_settings):
     assert report.removed == 1
     assert not manifest.has_indexed_pages("157336")  # 지운 문서를 다시 수집할 수 있게
     assert manifest.has_indexed_pages("27205")
+
+
+def test_tc_f2005_27_retry_classification_matches_meta_index(tmp_settings):
+    import json
+
+    import httpx
+    import openai
+
+    from movielab.services.indexing import reindex_documents
+
+    state = {"fail": 1}
+
+    def truncated_once(texts):
+        state["fail"] -= 1
+        return state["fail"] >= 0
+
+    emb = FakeEmbeddings(
+        fail_when=truncated_once, error=lambda: json.JSONDecodeError("응답 잘림", "", 0)
+    )
+    services = _services(tmp_settings, emb)
+    report = reindex_documents([_doc()], _indexer(services.store), sleep=lambda s: None)
+    assert report.failed == 0 and emb.calls == 2  # 잘린 응답은 일시 오류 — 재시도
+
+    def bad_request():
+        request = httpx.Request("POST", "https://gms.example.invalid/v1/embeddings")
+        return openai.BadRequestError(
+            "bad", response=httpx.Response(400, request=request), body=None
+        )
+
+    emb2 = FakeEmbeddings(fail_when=lambda texts: True, error=bad_request)
+    other = _services(tmp_settings, emb2)
+    waits = []
+    report = reindex_documents([_doc(page_id="5")], _indexer(other.store), sleep=waits.append)
+    assert report.failed == 1 and emb2.calls == 1 and waits == []  # 확정 오류 — 재시도 없음
+
+
+def test_tc_f2005_28_prune_only_without_key(tmp_settings):
+    from movielab.services.indexing import reindex_documents
+
+    _indexer(_services(tmp_settings).store).index_document(_doc())  # 키가 있을 때 색인해 둔 청크
+    keyless = build_services(tmp_settings)  # 키 없음
+    report = reindex_documents([], _indexer(keyless.store))
+    assert report.removed == 1
+    assert keyless.store.count("wiki_docs") == 0
