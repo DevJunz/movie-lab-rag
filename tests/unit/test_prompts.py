@@ -72,3 +72,20 @@ def test_tc_f2011_09_explore_prompts():
     )
     assert select.startswith("[작업: 조건 선별]")
     assert "[0] id=900001 | 쉬리 (1999)" in select and "모두" in select
+
+
+def test_tc_f2010_11_guide_and_factcheck_prompts():
+    from movielab.prompts import build_factcheck_prompt, build_guide_prompt
+
+    guide = build_guide_prompt(MOVIE_PROFILE, _evidences(), "인터스텔라 (2014) 관람 가이드")
+    assert guide.startswith("[작업: 관람 가이드]")
+    for heading in ("## 한 줄 소개", "## 알고 보면 좋은 배경", "## 관람 포인트"):
+        assert heading in guide
+    assert "인터스텔라 (2014) 관람 가이드" in guide and "[근거 2] (위키백과) 블랙홀" in guide
+    check = build_factcheck_prompt(MOVIE_PROFILE, _evidences(), "블랙홀은 천체다")
+    assert check.startswith("[작업: 사실 판정]")
+    for label in ("사실", "거짓", "확인 불가"):
+        assert f'"{label}"' in check
+    assert (
+        check.rstrip().endswith("주장: 블랙홀은 천체다") and "[근거 1] (영화 메타데이터)" in check
+    )
