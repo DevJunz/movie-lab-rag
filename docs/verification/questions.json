@@ -3,36 +3,67 @@
     "id": "Q1",
     "movie_id": "157336",
     "question": "인터스텔라의 블랙홀 묘사는 실제 물리와 얼마나 다른가?",
-    "purpose": "과학 배경"
+    "purpose": "과학 배경",
+    "reference_facts": [
+      {
+        "fact": "영화의 블랙홀 가르강튀아는 킵 손의 일반 상대성 이론 계산으로 시각화했지만, 회전 블랙홀 근처 행성의 시간 지연 · 조석력 등은 극단적으로 설정되었다",
+        "source_url": "https://ko.wikipedia.org/wiki/인터스텔라_(영화)"
+      }
+    ]
   },
   {
     "id": "Q2",
     "movie_id": "282631",
     "question": "명량 해전에서 조선 수군의 배는 실제로 몇 척이었나?",
-    "purpose": "역사 사실"
+    "purpose": "역사 사실",
+    "reference_facts": [
+      {
+        "fact": "명량 해전(1597년)에서 이순신이 이끈 조선 수군은 판옥선 13척(기록에 따라 12척)으로 일본 수군을 막았다",
+        "source_url": "https://ko.wikipedia.org/wiki/명량_해전"
+      }
+    ]
   },
   {
     "id": "Q3",
     "movie_id": "437068",
     "question": "영화의 배경이 된 5·18 광주 민주화 운동은 언제 일어났나?",
-    "purpose": "역사 사실"
+    "purpose": "역사 사실",
+    "reference_facts": [
+      {
+        "fact": "5·18 광주 민주화 운동은 1980년 5월 18일부터 27일까지 광주에서 일어났다",
+        "source_url": "https://ko.wikipedia.org/wiki/5·18_민주화운동"
+      }
+    ]
   },
   {
     "id": "Q4",
     "movie_id": "872585",
     "question": "트리니티 핵 실험은 언제 어디서 진행되었나?",
-    "purpose": "역사 사실"
+    "purpose": "역사 사실",
+    "reference_facts": [
+      {
+        "fact": "트리니티 핵 실험은 1945년 7월 16일 미국 뉴멕시코주 호르나다 델 무에르토 사막(앨러모고도 인근)에서 진행되었다",
+        "source_url": "https://ko.wikipedia.org/wiki/트리니티_실험"
+      }
+    ]
   },
   {
     "id": "Q5",
     "movie_id": "27205",
     "question": "영화에 나오는 자각몽은 실제로 연구된 현상인가?",
-    "purpose": "과학 배경"
+    "purpose": "과학 배경",
+    "reference_facts": [
+      {
+        "fact": "자각몽은 꿈을 꾸면서 꿈인 줄 아는 상태로, 수면 실험(안구 운동 신호 등)으로 연구된 현상이다",
+        "source_url": "https://ko.wikipedia.org/wiki/자각몽"
+      }
+    ]
   },
   {
     "id": "Q6",
     "movie_id": "157336",
     "question": "이 영화 촬영에 쓴 카메라 렌즈의 모델명은 무엇인가?",
-    "purpose": "확인 불가 응답 검증"
+    "purpose": "확인 불가 응답 검증",
+    "reference_facts": []
   }
 ]
