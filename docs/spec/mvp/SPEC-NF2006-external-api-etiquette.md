@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2006** 외부 API 예절 (품질) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done (live 검증 대기) |
 | 담당 모듈 | `movielab/data/wiki_api.py` (`WikiHttpClient`) |
 | 선행 SPEC | SPEC-NF2005, SPEC-NF2003 |
 | 관련 ISSUE | #5 |
@@ -41,11 +41,12 @@ MovieLab/0.1 (+https://github.com/DevJunz/movie-lab-rag; contact: <WIKI_CONTACT>
 | 재시도 대상 | 연결 오류 · 타임아웃 · HTTP 429 · 500 · 502 · 503 · 504 · 응답 본문 `error.code == "maxlag"` | — |
 | 재시도 횟수 | 최대 3회 (첫 시도 포함 4번) | `wiki.max_retries` |
 | 대기 | `Retry-After` 헤더가 있으면 그 값(초, 최대 60), 없으면 `backoff_base × 2^시도` (1 · 2 · 4초) | `wiki.backoff_base_sec` |
-| 재시도 안 함 | 400 · 403 · 404 등 그 밖의 4xx → 즉시 `ExternalSourceUnavailableError`(403) 또는 빈 결과(404) | — |
+| 재시도 안 함 | 404 → 빈 결과 `{}`. 그 밖의 4xx(400 · 403 …) → 즉시 `ExternalSourceUnavailableError`. 응답 본문의 `maxlag` 외 API 오류 코드도 즉시 오류 | — |
 | 최종 실패 | `ExternalSourceUnavailableError`(안내 코드 `SOURCE_UNAVAILABLE`) → `auto`면 묶음 대체 | — |
 
 - 호출 간격은 **재시도를 포함한 모든 요청**에 적용한다(백오프 대기가 간격보다 길면 추가 대기 없음).
 - 시간 · 대기 함수(`clock`, `sleep`)는 생성자로 주입한다. 테스트는 `FakeClock` · `fake_sleep`으로 실제로 기다리지 않고 대기 시간을 검사한다.
+- `Services.wiki_client`(container)가 클라이언트를 한 번만 만든다. 주입한 `http` 세션이 있으면 그것을 쓴다.
 - 모든 요청은 `INFO` 로그에 `action`, 상태 코드, 소요 시간, 재시도 횟수를 남긴다(연락처는 남기지 않는다).
 
 ### 3.3 인터페이스
