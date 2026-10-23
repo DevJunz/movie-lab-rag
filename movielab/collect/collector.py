@@ -39,7 +39,7 @@ class Collector:
         settings: Any,
         manifest: Any | None = None,
         indexer: Callable[[SourceDocument], int] | None = None,
-        has_chunks: Callable[[str], bool] | None = None,
+        indexed_pages: Callable[[str], set[str]] | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.api_source = api_source
@@ -51,7 +51,8 @@ class Collector:
         self.settings = settings
         self.manifest = manifest or NullManifest()
         self.indexer = indexer
-        self.has_chunks = has_chunks  # 색인된 청크가 있는지 (NF2002: 없으면 캐시를 믿지 않는다)
+        # 그 영화의 색인에 청크가 있는 문서 (NF2002: 매니페스트 기록과 대조)
+        self.indexed_pages = indexed_pages
         self.clock = clock
 
     # --- 소스 선택 · 대체 (§3.2) ---
@@ -122,14 +123,16 @@ class Collector:
         collect_settings = self.settings.collect
         manifest = self.manifest
 
-        # 0. 캐시 (NF2002). 색인한 문서 기록이 있는데 청크가 없으면(chroma 삭제 등) 캐시를 비운다.
-        # 비우지 못하면(잠금 실패 등) 옛 기록을 믿지 않도록 이번 수집은 매니페스트를 쓰지 않는다
+        # 0. 캐시 (NF2002). 매니페스트는 힌트일 뿐 — 기록된 문서 중 색인에 없는 것이 있으면
+        # (chroma 삭제 · 일부 손실 · 이전 초기화 실패) 캐시를 비운다. 비우지 못하면 이번 수집은
+        # 옛 기록을 믿지 않도록 매니페스트를 읽지도 쓰지도 않는다
+        recorded = manifest.page_ids(item.item_id)
         if (
-            self.has_chunks is not None
-            and manifest.has_indexed_pages(item.item_id)
-            and not self.has_chunks(item.item_id)
+            self.indexed_pages is not None
+            and recorded
+            and not recorded <= {str(p) for p in self.indexed_pages(item.item_id)}
         ):
-            logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)
+            logger.warning("색인에 없는 문서 기록이 있어 %s의 수집 캐시를 비운다", item.item_id)
             if not manifest.reset(item.item_id):
                 logger.warning("수집 캐시를 비우지 못해 이번 수집은 캐시 없이 한다")
                 manifest = NullManifest()

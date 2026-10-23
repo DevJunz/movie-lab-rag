@@ -149,7 +149,7 @@ class Services:
             settings=settings,
             manifest=None if dry_run else self.manifest,
             indexer=None if dry_run else self.doc_indexer().index_document,
-            has_chunks=None if dry_run else self.doc_indexer().has_pages,
+            indexed_pages=None if dry_run else self.doc_indexer().page_ids,
         )
 
     @property

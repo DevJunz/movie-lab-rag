@@ -137,6 +137,9 @@ class NullManifest:
     def has_indexed_pages(self, item_id: str) -> bool:
         return False
 
+    def page_ids(self, item_id: str) -> set[str]:
+        return set()
+
     def item_doc_page_id(self, item_id: str) -> str | None:
         return None
 
@@ -440,8 +443,12 @@ class Manifest(NullManifest):
     def has_page(self, item_id: str, page_id: str) -> bool:
         return str(page_id) in (self._peek(item_id).get("page_ids") or [])
 
+    def page_ids(self, item_id: str) -> set[str]:
+        """색인했다고 기록된 문서 ID (NF2002 색인 확인에서 실제 색인과 대조한다)."""
+        return {str(p) for p in self._peek(item_id).get("page_ids") or []}
+
     def has_indexed_pages(self, item_id: str) -> bool:
-        """색인했다고 기록된 문서가 있는지 (NF2002 색인 확인용)."""
+        """색인했다고 기록된 문서가 있는지."""
         return bool(self._peek(item_id).get("page_ids"))
 
     def item_doc_page_id(self, item_id: str) -> str | None:
