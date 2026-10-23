@@ -238,7 +238,8 @@ class Collector:
             documents.append(doc)
 
         # 7. 색인 (F2005 색인기가 연결되면) — 키 없음 같은 안내 오류는 모든 문서에 같으므로 알린다
-        records_ok = True
+        recorded_pages: list[tuple[str, str, int]] = []
+        item_doc_page_id: str | None = None
         for doc in documents:
             progress("index", title=doc.title)
             if self.indexer is None:
@@ -258,18 +259,22 @@ class Collector:
             report.indexed_titles.append(doc.title)
             if self.indexer is None:
                 continue  # 색인하지 않은 문서는 수집됨으로 기록하지 않는다 (NF2002 §3.2)
-            records_ok &= manifest.record_page(item.item_id, doc.page_id, doc.title, chunks)
+            recorded_pages.append((doc.page_id, doc.title, chunks))
             if doc.is_item_doc:
-                records_ok &= manifest.record_item_doc(item.item_id, doc.page_id)
+                item_doc_page_id = doc.page_id
 
-        # 8. 기록 — 완전히 성공했을 때만 검색어 · 질문을 남긴다(실패한 문서는 다음 질문 때 재시도).
-        # 문서 기록이 실패했어도(잠금 실패 등) 남기지 않는다 — 다음에 그 문서를 다시 볼 수 있게
+        # 8. 기록 — 수집 한 번의 결과를 한 번에(전부 또는 하나도 안 되게) 남긴다.
+        # 검색어 · 질문은 완전히 성공했을 때만(실패한 문서는 다음 질문 때 재시도)
         failed = any(r.reason in ("fetch_failed", "index_failed") for r in report.rejected)
-        if self.indexer is not None and not failed and records_ok:
-            for query in searched:
-                manifest.record_keyword(item.item_id, query)
-            if len(searched) == len(todo):
-                manifest.record_question(item.item_id, question, queries)
+        if self.indexer is not None:
+            complete = not failed
+            manifest.record_collection(
+                item.item_id,
+                pages=recorded_pages,
+                item_doc_page_id=item_doc_page_id,
+                keywords=searched if complete else [],
+                question=(question, queries) if complete and len(searched) == len(todo) else None,
+            )
         report.source_used = state["source"].kind
         report.timings["collect"] = self.clock() - started
         progress("done", titles=report.indexed_titles, rejected=len(report.rejected))

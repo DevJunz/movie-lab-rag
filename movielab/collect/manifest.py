@@ -25,7 +25,7 @@ import os
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -35,6 +35,8 @@ from movielab.core.text import normalize_key
 logger = logging.getLogger(__name__)
 
 Signature = tuple[int, int, int]
+# stat을 못 읽어 서명을 알 수 없음 — '파일 없음'(None)과 구분하고, 조회할 때마다 다시 읽는다
+_UNKNOWN: Any = object()
 
 # 다른 쪽이 잠금을 쥐고 있을 때 나는 오류 — 이때만 기다린다. 그 밖(ENOLCK 등)은 바로 포기한다.
 _CONTENDED = {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLK}
@@ -155,6 +157,17 @@ class NullManifest:
     ) -> bool:
         return True
 
+    def record_collection(
+        self,
+        item_id: str,
+        *,
+        pages: Iterable[tuple[str, str, int]] = (),
+        item_doc_page_id: str | None = None,
+        keywords: Iterable[str] = (),
+        question: tuple[str, list[str]] | None = None,
+    ) -> bool:
+        return True
+
     def reset(self, item_id: str | None = None) -> bool:
         return True
 
@@ -224,14 +237,17 @@ class Manifest(NullManifest):
     # --- 파일 ---
 
     @staticmethod
-    def _signature_of(path: Path) -> Signature | None:
-        """수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 — 파일 ID · 크기도 본다."""
+    def _signature_of(path: Path) -> Any:
+        """수정 시각만 보면 같은 타이머 틱 안의 두 쓰기를 놓친다 — 파일 ID · 크기도 본다.
+
+        파일이 없으면 None, stat을 못 읽으면(접근 거부 등) `_UNKNOWN`.
+        """
         try:
             stat = path.stat()
-        except (
-            OSError
-        ):  # 없음 · 접근 거부 — 알 수 없는 서명으로 본다 (캐시로 수집을 실패시키지 않는다)
+        except FileNotFoundError:
             return None
+        except OSError:
+            return _UNKNOWN
         return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
     def _file_lock(self) -> FileLock:
@@ -265,7 +281,7 @@ class Manifest(NullManifest):
             return "broken", "구조가 맞지 않음"
         return "ok", data
 
-    def _remember(self, status: str, value: Any, signature: Signature | None) -> None:
+    def _remember(self, status: str, value: Any, signature: Any) -> None:
         """읽은 결과를 메모리에 둔다. 깨졌거나 없으면 빈 매니페스트."""
         self._data = value if status == "ok" else {}
         self._signature = signature
@@ -292,13 +308,13 @@ class Manifest(NullManifest):
         읽기에 실패하면 옛 내용을 믿지 않고 빈 매니페스트로 둔다 (다른 쪽의 초기화를 놓치지 않게).
         """
         signature = self._signature_of(self.path)
-        if self._valid_cache and signature == self._signature:
+        if self._valid_cache and signature is not _UNKNOWN and signature == self._signature:
             return False
         try:
             status, value = self._load()
         except OSError as exc:
             logger.warning("매니페스트를 읽지 못해 이번에는 캐시 없이 동작한다: %s", exc)
-            self._data, self._signature, self._valid_cache = {}, signature, True
+            self._remember("missing", None, signature)
             return False
         self._remember(status, value, signature)
         return status == "broken"
@@ -365,7 +381,12 @@ class Manifest(NullManifest):
                 if status == "broken" and not self._backup(value):
                     return False
                 self._remember(status, value, signature)
-                change()
+                try:
+                    change()
+                except Exception:
+                    logger.exception("매니페스트 기록 내용을 만들지 못해 건너뛴다")
+                    self._valid_cache = False
+                    return False
                 if self._write():
                     return True
                 self._valid_cache = False
@@ -456,6 +477,39 @@ class Manifest(NullManifest):
                 entry["page_ids"].append(page_id)
                 entry["titles"].append(title)
                 entry["chunks"] = int(entry.get("chunks") or 0) + int(chunks)
+
+        return self._update(item_id, change)
+
+    def record_collection(
+        self,
+        item_id: str,
+        *,
+        pages: Iterable[tuple[str, str, int]] = (),
+        item_doc_page_id: str | None = None,
+        keywords: Iterable[str] = (),
+        question: tuple[str, list[str]] | None = None,
+    ) -> bool:
+        """수집 한 번의 결과를 한 번에 기록한다 — 잠금 · 쓰기 한 번, 전부 기록되거나 하나도 안 된다.
+
+        `pages`는 `(page_id, 제목, 청크 수)`, `question`은 `(질문, 검색어 목록)`.
+        """
+        pages, keywords = list(pages), list(keywords)
+
+        def change(entry: dict[str, Any]) -> None:
+            for page_id, title, chunks in pages:
+                if str(page_id) not in entry["page_ids"]:
+                    entry["page_ids"].append(str(page_id))
+                    entry["titles"].append(title)
+                    entry["chunks"] = int(entry.get("chunks") or 0) + int(chunks)
+            if item_doc_page_id is not None:
+                entry["item_doc_page_id"] = str(item_doc_page_id)
+            known = {normalize_key(k) for k in entry["keywords"]}
+            for query in keywords:
+                if normalize_key(query) not in known:
+                    entry["keywords"].append(query)
+                    known.add(normalize_key(query))
+            if question is not None:
+                entry["questions"][normalize_key(question[0])] = list(question[1])
 
         return self._update(item_id, change)
 
