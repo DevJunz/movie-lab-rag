@@ -16,6 +16,7 @@ from chromadb.config import Settings as ChromaSettings
 
 from movielab import providers
 from movielab.collect.collector import Collector
+from movielab.collect.manifest import Manifest
 from movielab.collect.query_extractor import QueryExtractor
 from movielab.collect.selector import CandidateSelector
 from movielab.config import Settings
@@ -112,7 +113,7 @@ class Services:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
 
         `dry_run`이면 색인 · 캐시 기록을 하지 않는다(원문 저장까지만).
-        수집 캐시(NF2002)와 청크 색인기(F2005)는 해당 SPEC에서 연결한다.
+        수집 캐시(NF2002)는 파일 매니페스트를 쓴다. 청크 색인기(F2005)는 해당 SPEC에서 연결한다.
         """
         settings = self.settings
         api_source = WikiApiSource(self.wiki_client) if settings.secrets.wiki_contact else None
@@ -124,6 +125,7 @@ class Services:
             raw_store=RawStore(settings.path("raw_dir")),
             profile=self.profile,
             settings=settings,
+            manifest=None if dry_run else Manifest(settings.path("manifest")),
         )
 
     @property

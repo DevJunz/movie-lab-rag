@@ -41,8 +41,13 @@ def _print_report(report) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="외부 문서 수집")
-    parser.add_argument("--movie-id", required=True, help="항목 ID")
-    parser.add_argument("--question", required=True, help="질문")
+    parser.add_argument("--movie-id", help="항목 ID")
+    parser.add_argument("--question", help="질문")
+    parser.add_argument(
+        "--reset-cache",
+        action="store_true",
+        help="수집 캐시를 지운다 (--movie-id가 있으면 그 영화만)",
+    )
     parser.add_argument(
         "--source", choices=["api", "bundle", "auto"], help="수집 소스 (기본: 설정)"
     )
@@ -50,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
         "--dry-run", action="store_true", help="색인 · 캐시 기록 없이 수집 결과만 확인"
     )
     args = parser.parse_args(argv)
+    if not args.reset_cache and not (args.movie_id and args.question):
+        parser.error("--movie-id와 --question이 필요합니다 (또는 --reset-cache)")
     configure_stdout()
 
     labels = None
@@ -59,6 +66,10 @@ def main(argv: list[str] | None = None) -> int:
             settings.raw["collect"]["source"] = args.source
         services = build_services(settings)
         labels = services.profile.labels()
+        if args.reset_cache:
+            services.collector.manifest.reset(args.movie_id)
+            print(messages.render("CACHE_RESET", labels, target=args.movie_id or "전체"))
+            return 0
         item = services.catalog.get(args.movie_id)
         if item is None:
             print(messages.render("ITEM_NOT_FOUND", labels, item_id=args.movie_id))

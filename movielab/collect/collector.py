@@ -39,6 +39,7 @@ class Collector:
         settings: Any,
         manifest: Any | None = None,
         indexer: Callable[[SourceDocument], int] | None = None,
+        chunk_counter: Callable[[str], int] | None = None,
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         self.api_source = api_source
@@ -50,6 +51,7 @@ class Collector:
         self.settings = settings
         self.manifest = manifest or NullManifest()
         self.indexer = indexer
+        self.chunk_counter = chunk_counter  # 색인된 청크 수 (NF2002: 0이면 캐시를 믿지 않는다)
         self.clock = clock
 
     # --- 소스 선택 · 대체 (§3.2) ---
@@ -87,6 +89,10 @@ class Collector:
         self, item: ItemRecord, report: CollectReport, state: dict[str, Any]
     ) -> Candidate | None:
         profile = self.profile
+        known = self.manifest.item_doc_page_id(item.item_id)
+        if known is not None:  # 이미 수집한 항목 자체 문서 — 제목 조회 생략 (NF2002)
+            report.item_doc_title = self.manifest.title_of(item.item_id, known)
+            return None
         if profile.item_doc_queries is None or profile.pick_item_doc is None:
             report.notices.append("ITEM_DOC_NOT_FOUND")
             return None
@@ -109,12 +115,28 @@ class Collector:
 
         started = self.clock()
         report = CollectReport(item_id=item.item_id, question=question)
-        state = {"source": self._initial_source(report)}
         collect_settings = self.settings.collect
+
+        # 0. 캐시 (NF2002): 같은 질문 · 같은 검색어를 이미 수집했으면 외부 호출 없이 끝낸다
+        cached = self.manifest.cached_queries(item.item_id, question)
+        if cached is not None and self.chunk_counter is not None:
+            if self.chunk_counter(item.item_id) == 0:
+                logger.warning("캐시는 있지만 색인된 청크가 없어 %s를 다시 수집한다", item.item_id)
+                self.manifest.reset(item.item_id)
+                cached = None
+        if cached is not None and all(self.manifest.has_keyword(item.item_id, q) for q in cached):
+            progress("cache_hit", queries=cached)
+            report.queries = report.cached_queries = list(cached)
+            report.notices.append("CACHE_HIT")
+            report.source_used = "cache"
+            report.timings["collect"] = self.clock() - started
+            progress("done", titles=[], rejected=0)
+            return report
+
+        state = {"source": self._initial_source(report)}
 
         # 1. 검색어 추출 (질문 캐시 적중이면 P1 생략)
         progress("extract_queries")
-        cached = self.manifest.cached_queries(item.item_id, question)
         if cached is not None:
             queries = list(cached)
         else:
@@ -129,6 +151,12 @@ class Collector:
         progress("resolve_item_doc")
         item_doc = self._resolve_item_doc(item, report, state)
 
+        item_doc_id = (
+            item_doc.page_id
+            if item_doc is not None
+            else self.manifest.item_doc_page_id(item.item_id)
+        )
+
         # 3. 검색 — 후보를 page_id로 합친다. 항목 자체 문서는 후보에서 뺀다(강제 포함 대상)
         pool: dict[str, Candidate] = {}
         searched: list[str] = []  # 설정한 소스로 검색을 마친 검색어 (캐시 기록 대상)
@@ -142,7 +170,7 @@ class Collector:
             if self._is_configured_source(state["source"]):
                 searched.append(query)
             for candidate in results:
-                if item_doc is not None and candidate.page_id == item_doc.page_id:
+                if candidate.page_id == item_doc_id:
                     continue
                 pool.setdefault(candidate.page_id, candidate)
         report.candidates = list(pool.values())
@@ -218,6 +246,8 @@ class Collector:
             report.indexed_chunks += chunks
             report.indexed_titles.append(doc.title)
             self.manifest.record_page(item.item_id, doc.page_id, doc.title, chunks)
+            if doc.is_item_doc:
+                self.manifest.record_item_doc(item.item_id, doc.page_id)
 
         # 8. 기록
         for query in searched:
