@@ -125,3 +125,13 @@ def test_tc_nf2002_20_reset_cache_script_reports_failure(
         holder.release()
     assert "지우지 못했" in capsys.readouterr().out
     assert collect.main(["--reset-cache"]) == 0
+
+
+def test_tc_nf2002_24_failed_page_record_skips_keywords_and_question(
+    tmp_settings, item, monkeypatch
+):
+    collector, _, manifest = _setup(tmp_settings)
+    monkeypatch.setattr(manifest, "record_page", lambda *args, **kwargs: False)
+    collector.collect(item, "블랙홀은?")
+    assert manifest.cached_queries("157336", "블랙홀은?") is None
+    assert not manifest.has_keyword("157336", "블랙홀")

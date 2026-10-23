@@ -7,11 +7,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from movielab.collect.manifest import Manifest, NullManifest
+from movielab.config import load_settings
 from tests.fakes.clock import FakeClock
 
 _SETTINGS = Path(__file__).resolve().parents[2] / "config" / "settings.json"
@@ -33,8 +33,13 @@ class RecordingManifest(NullManifest):
         self.questions.append(question)
 
 
+_CACHE_KEYS = ("lock_timeout_sec", "lock_poll_sec", "io_retries", "io_retry_wait_sec")
+
+
 def cache_settings() -> dict[str, Any]:
-    return dict(json.loads(_SETTINGS.read_text(encoding="utf-8"))["cache"])
+    """기본 설정 파일의 `cache` 묶음 — `load_settings`로 읽어 설정 검증을 거친다."""
+    cache = load_settings(_SETTINGS).cache
+    return {key: getattr(cache, key) for key in _CACHE_KEYS}
 
 
 def make_manifest(path: Path, **overrides: Any) -> Manifest:

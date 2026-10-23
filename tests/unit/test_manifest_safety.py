@@ -67,13 +67,16 @@ def test_tc_nf2002_15_change_detected_with_same_mtime_and_size(tmp_path):
 
 
 def test_tc_nf2002_16_concurrent_instances_lose_no_records(tmp_path):
-    import math
     import threading
+    import time
 
     path = tmp_path / "manifest.json"
 
     def worker(prefix: str) -> None:
-        manifest = make_manifest(path, lock_timeout_sec=math.inf)
+        frozen = FakeClock()  # 시계가 멈춰 있어 시간 초과가 없다 — 결과가 타이밍과 무관
+        manifest = make_manifest(
+            path, clock=frozen.monotonic, sleep=lambda seconds: time.sleep(0.001)
+        )
         for n in range(40):
             manifest.record_keyword("1", f"{prefix}{n}")
 
@@ -315,3 +318,62 @@ def test_tc_nf2002_21_repeated_reads_do_not_retry_same_file(tmp_path, monkeypatc
     first = len(reads)
     reader.has_keyword("1", "b")
     assert first > 1 and len(reads) == first  # 같은 파일은 다시 시도하지 않는다
+
+
+# --- 네 번째 리뷰: stat 오류 · 읽기 실패 시 옛 내용 불신 · 쓰기 실패 후 재읽기 실패 ---
+
+
+def test_tc_nf2002_23_stat_permission_error_does_not_raise(tmp_path, monkeypatch):
+    import pathlib
+
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest(path)
+    manifest.record_keyword("1", "블랙홀")
+    original = pathlib.Path.stat
+
+    def deny(self, *args, **kwargs):
+        if self == path:
+            raise PermissionError("접근 거부")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "stat", deny)
+    manifest.has_keyword("1", "블랙홀")  # 예외 없이 동작
+    manifest.record_keyword("1", "웜홀")
+
+
+def test_tc_nf2002_23_read_failure_does_not_trust_old_data(tmp_path, monkeypatch):
+    import pathlib
+
+    path = tmp_path / "manifest.json"
+    app = make_manifest(path)
+    app.record_question("1", "블랙홀은?", ["블랙홀"])
+    app.record_keyword("1", "블랙홀")
+    assert app.cached_queries("1", "블랙홀은?") == ["블랙홀"]
+    make_manifest(path).reset()  # 다른 프로세스의 --reset-cache
+
+    def always_fail(self, *args, **kwargs):
+        raise PermissionError("공유 위반")
+
+    monkeypatch.setattr(pathlib.Path, "read_text", always_fail)
+    assert app.cached_queries("1", "블랙홀은?") is None  # 옛 기록으로 적중하지 않는다
+
+
+def test_tc_nf2002_23_failed_write_then_failed_read_no_phantom_hit(tmp_path, monkeypatch):
+    import os
+    import pathlib
+
+    path = tmp_path / "manifest.json"
+    manifest = make_manifest(path)
+    manifest.record_keyword("1", "블랙홀")
+
+    def deny(src, dst):
+        raise PermissionError("바꿔 넣기 실패")
+
+    monkeypatch.setattr(os, "replace", deny)
+    manifest.record_keyword("1", "웜홀")  # 저장되지 않는다
+
+    def always_fail(self, *args, **kwargs):
+        raise PermissionError("공유 위반")
+
+    monkeypatch.setattr(pathlib.Path, "read_text", always_fail)
+    assert not manifest.has_keyword("1", "웜홀")  # 저장 안 된 기록으로 적중하지 않는다
