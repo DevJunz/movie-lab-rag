@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2010** 도메인 특화 기능 (서비스 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/services/guide.py`, `movielab/services/factcheck.py`, `movielab/prompts.py`(G1, C1), `movielab/container.py`(그래프 프롬프트 표), `movielab/ui/pages/guide.py`, `movielab/ui/pages/factcheck.py` |
 | 선행 SPEC | SPEC-F2008, SPEC-F2009 |
 | 관련 ISSUE | #17 |
