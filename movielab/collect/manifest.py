@@ -162,6 +162,7 @@ class NullManifest:
         item_id: str,
         *,
         pages: Iterable[tuple[str, str, int]] = (),
+        rejected_pages: Iterable[str] = (),
         item_doc_page_id: str | None = None,
         keywords: Iterable[str] = (),
         question: tuple[str, list[str]] | None = None,
@@ -173,6 +174,7 @@ class NullManifest:
 
 
 _LIST_FIELDS = ("keywords", "titles", "page_ids", "rejected_page_ids")
+_TEXT_FIELDS = ("item_doc_page_id", "collected_at")
 
 
 def _empty_entry() -> dict[str, Any]:
@@ -197,6 +199,11 @@ def _valid(data: Any) -> bool:
         if any(not isinstance(entry.get(key, []), list) for key in _LIST_FIELDS):
             return False
         if not isinstance(entry.get("questions", {}), dict):
+            return False
+        chunks = entry.get("chunks", 0)
+        if isinstance(chunks, bool) or not isinstance(chunks, int):
+            return False
+        if any(not isinstance(entry.get(key), str | None) for key in _TEXT_FIELDS):
             return False
     return True
 
@@ -255,13 +262,14 @@ class Manifest(NullManifest):
             self.lock_path, poll_sec=self.lock_poll_sec, clock=self.clock, sleep=self.sleep
         )
 
-    def _load(self) -> tuple[str, Any]:
+    def _load(self, *, retries: int | None = None) -> tuple[str, Any]:
         """`("ok", 내용)` · `("missing", None)` · `("broken", 사유)`.
 
         일시 오류가 `io_retries`번 다시 해도 계속되면 OSError.
         """
+        retries = self.io_retries if retries is None else retries
         text = ""
-        for attempt in range(self.io_retries + 1):
+        for attempt in range(retries + 1):
             try:
                 text = self.path.read_text(encoding="utf-8")
                 break
@@ -270,7 +278,7 @@ class Manifest(NullManifest):
             except UnicodeDecodeError as exc:
                 return "broken", f"UTF-8이 아님: {exc}"
             except OSError:
-                if attempt == self.io_retries:
+                if attempt == retries:
                     raise
                 self.sleep(self.io_retry_wait_sec)
         try:
@@ -291,13 +299,20 @@ class Manifest(NullManifest):
         """깨진 파일을 옮겨 둔다(파일 잠금 안에서만). 옮기지 못하면 False — 덮어쓰지 않게."""
         stamp = f"{self.now():%Y%m%d%H%M%S%f}-{next(self._backup_counter)}"
         backup = self.path.with_name(f"{self.path.name}.broken-{stamp}")
-        try:
-            os.replace(self.path, backup)
-        except FileNotFoundError:
-            return True  # 그 사이 다른 쪽이 지웠다
-        except OSError as exc:
-            logger.warning("깨진 매니페스트를 옮기지 못했다: %s", exc)
-            return False
+        for attempt in range(self.io_retries + 1):
+            try:
+                os.replace(self.path, backup)
+                break
+            except FileNotFoundError:
+                return True  # 그 사이 다른 쪽이 지웠다
+            except PermissionError as exc:  # Windows: 다른 프로세스가 읽는 중
+                if attempt == self.io_retries:
+                    logger.warning("깨진 매니페스트를 옮기지 못했다: %s", exc)
+                    return False
+                self.sleep(self.io_retry_wait_sec)
+            except OSError as exc:
+                logger.warning("깨진 매니페스트를 옮기지 못했다: %s", exc)
+                return False
         logger.warning("매니페스트를 %s로 옮기고 새로 시작한다 (%s)", backup.name, reason)
         return True
 
@@ -311,7 +326,8 @@ class Manifest(NullManifest):
         if self._valid_cache and signature is not _UNKNOWN and signature == self._signature:
             return False
         try:
-            status, value = self._load()
+            # 서명을 알 수 없으면 조회마다 읽으므로 재시도 · 대기 없이 한 번만 (조회 비용 상한)
+            status, value = self._load(retries=0 if signature is _UNKNOWN else None)
         except OSError as exc:
             logger.warning("매니페스트를 읽지 못해 이번에는 캐시 없이 동작한다: %s", exc)
             self._remember("missing", None, signature)
@@ -445,46 +461,12 @@ class Manifest(NullManifest):
 
         return self._locked_update(apply)
 
-    def record_question(self, item_id: str, question: str, queries: list[str]) -> bool:
-        def change(entry: dict[str, Any]) -> None:
-            entry["questions"][normalize_key(question)] = list(queries)
-
-        return self._update(item_id, change)
-
-    def record_keyword(self, item_id: str, query: str) -> bool:
-        def change(entry: dict[str, Any]) -> None:
-            if normalize_key(query) not in {normalize_key(k) for k in entry["keywords"]}:
-                entry["keywords"].append(query)
-
-        return self._update(item_id, change)
-
-    def record_item_doc(self, item_id: str, page_id: str) -> bool:
-        def change(entry: dict[str, Any]) -> None:
-            entry["item_doc_page_id"] = str(page_id)
-
-        return self._update(item_id, change)
-
-    def record_page(
-        self, item_id: str, page_id: str, title: str, chunks: int, *, rejected: bool = False
-    ) -> bool:
-        page_id = str(page_id)
-
-        def change(entry: dict[str, Any]) -> None:
-            if rejected:
-                if page_id not in entry["rejected_page_ids"]:
-                    entry["rejected_page_ids"].append(page_id)
-            elif page_id not in entry["page_ids"]:
-                entry["page_ids"].append(page_id)
-                entry["titles"].append(title)
-                entry["chunks"] = int(entry.get("chunks") or 0) + int(chunks)
-
-        return self._update(item_id, change)
-
     def record_collection(
         self,
         item_id: str,
         *,
         pages: Iterable[tuple[str, str, int]] = (),
+        rejected_pages: Iterable[str] = (),
         item_doc_page_id: str | None = None,
         keywords: Iterable[str] = (),
         question: tuple[str, list[str]] | None = None,
@@ -492,8 +474,11 @@ class Manifest(NullManifest):
         """수집 한 번의 결과를 한 번에 기록한다 — 잠금 · 쓰기 한 번, 전부 기록되거나 하나도 안 된다.
 
         `pages`는 `(page_id, 제목, 청크 수)`, `question`은 `(질문, 검색어 목록)`.
+        기록할 것이 없으면 파일을 쓰지 않는다 (빈 항목을 만들지 않는다).
         """
-        pages, keywords = list(pages), list(keywords)
+        pages, rejected, keywords = list(pages), [str(p) for p in rejected_pages], list(keywords)
+        if not (pages or rejected or keywords or item_doc_page_id is not None or question):
+            return True
 
         def change(entry: dict[str, Any]) -> None:
             for page_id, title, chunks in pages:
@@ -501,6 +486,9 @@ class Manifest(NullManifest):
                     entry["page_ids"].append(str(page_id))
                     entry["titles"].append(title)
                     entry["chunks"] = int(entry.get("chunks") or 0) + int(chunks)
+            for page_id in rejected:
+                if page_id not in entry["rejected_page_ids"]:
+                    entry["rejected_page_ids"].append(page_id)
             if item_doc_page_id is not None:
                 entry["item_doc_page_id"] = str(item_doc_page_id)
             known = {normalize_key(k) for k in entry["keywords"]}
@@ -512,6 +500,22 @@ class Manifest(NullManifest):
                 entry["questions"][normalize_key(question[0])] = list(question[1])
 
         return self._update(item_id, change)
+
+    def record_question(self, item_id: str, question: str, queries: list[str]) -> bool:
+        return self.record_collection(item_id, question=(question, list(queries)))
+
+    def record_keyword(self, item_id: str, query: str) -> bool:
+        return self.record_collection(item_id, keywords=[query])
+
+    def record_item_doc(self, item_id: str, page_id: str) -> bool:
+        return self.record_collection(item_id, item_doc_page_id=page_id)
+
+    def record_page(
+        self, item_id: str, page_id: str, title: str, chunks: int, *, rejected: bool = False
+    ) -> bool:
+        if rejected:
+            return self.record_collection(item_id, rejected_pages=[page_id])
+        return self.record_collection(item_id, pages=[(page_id, title, chunks)])
 
     def reset(self, item_id: str | None = None) -> bool:
         """캐시를 지운다. 반환: 지웠는지 (잠금 · 읽기 · 쓰기 실패면 False)."""
