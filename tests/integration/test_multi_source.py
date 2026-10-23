@@ -158,3 +158,24 @@ def test_tc_f2016_05_index_pdf_script_without_manifest(tmp_settings, monkeypatch
     assert index_pdf.main([]) == 1
     out = capsys.readouterr().out
     assert "pdf_manifest" in out and "Traceback" not in out
+
+
+def test_tc_f2016_04_ui_evidence_line_shows_pdf():
+    from movielab.data.domain_movie import MOVIE_PROFILE
+    from movielab.ui.components.evidence import evidence_line
+
+    evidence = Evidence(
+        n=3,
+        chunk_id="157336:pdf:synth2014:12:0",
+        source_kind="pdf",
+        source_type=messages.PDF_SOURCE_LABEL,
+        title="합성 보고서",
+        url="https://example.invalid/synth.pdf",
+        license="공공누리 제1유형",
+        text="본문",
+        page=12,
+        file="synth.pdf",
+    )
+    line = evidence_line(evidence, MOVIE_PROFILE)
+    assert line.startswith("**[근거 3]** PDF · 합성 보고서 (synth.pdf, p.12) · [원문 ↗](")
+    assert line.endswith(" · 공공누리 제1유형")

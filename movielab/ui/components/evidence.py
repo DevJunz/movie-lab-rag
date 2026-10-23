@@ -27,7 +27,10 @@ def _link_label(evidence: Evidence, profile: DomainProfile) -> str:
 
 def evidence_line(evidence: Evidence, profile: DomainProfile) -> str:
     """`[근거 n] 출처 유형 · 제목 · 링크 ↗ (· 라이선스)` 한 줄 (마크다운)."""
-    parts = [f"**[근거 {evidence.n}]** {evidence.source_type}", _escape(evidence.title)]
+    parts = [
+        f"**[근거 {evidence.n}]** {evidence.source_type}",
+        _escape(messages.evidence_title(evidence)),
+    ]
     if evidence.url:
         # 마크다운 링크가 괄호 · 공백 · 꺾쇠에서 끊기지 않게 인코딩한다
         url = quote(evidence.url, safe=":/?#=&%@+,;!$'*~.-_")

@@ -64,8 +64,8 @@
 - **검색 결합 위치**: PDF 검색 · 병합은 `rag/pdf_search.py`의 함수로 두고 `Retriever.retrieve`는 위키 병합 결과에 그 함수를 한 번 부른다(MMR 작업(F2014)과 충돌을 줄이려고 `retriever.py` 변경을 최소화). 외부 근거(위키 + PDF)를 점수 내림차순으로 다시 세운 뒤 중복 제거 · 번호 부여를 다시 한다. 점수가 없는 근거(코사인이 아닌 컬렉션)는 뒤로 보낸다.
 - **설정**: `paths.pdf_manifest`(기본 `data/pdf/pdf_manifest.json`), `pdf.min_page_chars`(50, 텍스트가 거의 없는 쪽 기준), `pdf.repeat_line_min_pages`(3, 머리말 · 꼬리말 판정 쪽 수)를 `config/settings.json`에 더하고 `retrieval.pdf_top_k`(0 이상 정수, 0이면 PDF 검색 안 함)를 검증한다.
 - **근거 자료형**: `Evidence`에 `file`(PDF 파일명, 기본 `None`)을 더한다. `page`는 이미 있다. 메타데이터에는 `doc_id`, `file`, `page`, `title`, `url`(=`source_url`), `license`, `source_kind="pdf"`, `source_type="PDF"`를 둔다.
-- **출처 라벨 `PDF`**: 도메인과 무관한 라벨이라 `core/messages.py`의 `PDF_SOURCE_LABEL`에 둔다. 표시 형식 `{title} ({file}, p.{page})`도 messages의 함수(`evidence_title`)로 만들고, 스크립트 근거 목록(`scripts.collect`)과 프롬프트 근거 블록이 이 함수를 쓴다.
-- **화면 · API**: F2009(화면) · F2013(API)이 아직 없으므로 TC-F2016-04는 근거 표시 함수와 `scripts.collect` 근거 목록 출력으로 검증한다. 화면 표시는 F2009/F2013이 같은 함수를 쓰게 한다.
+- **출처 라벨 `PDF`**: 도메인과 무관한 라벨이라 `core/messages.py`의 `PDF_SOURCE_LABEL`에 둔다. 표시 형식 `{title} ({file}, p.{page})`도 messages의 함수(`evidence_title`)로 만들고, 스크립트 근거 목록(`scripts.collect`), 프롬프트 근거 블록, 화면 근거 목록 컴포넌트(F2008 `ui/components/evidence.py`)가 이 함수를 쓴다.
+- **화면 · API**: TC-F2016-04는 근거 표시 함수, `scripts.collect` 근거 목록, F2008 근거 목록 컴포넌트(`evidence_line`)로 검증한다. 화면 배치(F2009) · API(F2013)는 같은 함수를 쓴다.
 - **사용할 PDF**: 이 PR에서는 실제 PDF를 확정하지 않는다(저장소에 넣지 않음). 이용 조건이 명시된 공개 PDF(예: 영화진흥위원회 공개 보고서, 공공누리 제1유형)를 사용자가 `data/pdf/`에 두고 매니페스트에 기록한다 — TC-F2016-07(수동)에서 확정해 이 절에 적는다.
 - **합성 PDF 생성**: 테스트 실행 중 `tests/fakes/pdf.py`가 표준 Type1 글꼴(Helvetica)로 ASCII 텍스트 PDF를 바이트로 직접 만든다(새 의존성 없음). 바이너리 픽스처는 저장소에 넣지 않는다.
 
