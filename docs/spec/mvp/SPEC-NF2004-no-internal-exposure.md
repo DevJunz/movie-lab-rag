@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **NF2004** 내부 정보 비노출 (보안) |
 | 구분 | MVP (비기능) |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/ui/streamlit_app.py`, `movielab/api/server.py`(F2013), `movielab/core/messages.py`, `.streamlit/config.toml`, `movielab/core/logs.py`(로깅 설정) |
 | 선행 SPEC | SPEC-F2012, SPEC-NF2003 |
 | 관련 ISSUE | #15 |
