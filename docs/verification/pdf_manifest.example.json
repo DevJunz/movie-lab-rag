@@ -1,0 +1,11 @@
+[
+  {
+    "doc_id": "kofic2014",
+    "file": "kofic_2014_annual.pdf",
+    "title": "2014년 한국 영화산업 결산",
+    "source_url": "https://www.kofic.or.kr/ (실제 PDF 주소로 바꾼다)",
+    "license": "공공누리 제1유형 (출처표시)",
+    "movie_ids": ["282631", "396535"],
+    "pages": "all"
+  }
+]

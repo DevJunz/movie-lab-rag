@@ -50,7 +50,10 @@ def _print_evidence(result) -> None:
         )
         print(
             messages.EVIDENCE_LIST_LINE.format(
-                n=evidence.n, source_type=evidence.source_type, title=evidence.title, score=score
+                n=evidence.n,
+                source_type=evidence.source_type,
+                title=messages.evidence_title(evidence),
+                score=score,
             )
         )
 

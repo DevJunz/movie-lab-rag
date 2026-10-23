@@ -139,6 +139,7 @@ def tmp_settings(tmp_path: Path, movies_small_path: Path, wiki_small_dir: Path):
             "raw_dir": str(data_dir / "raw"),
             "manifest": str(data_dir / "manifest.json"),
             "pdf_dir": str(data_dir / "pdf"),
+            "pdf_manifest": str(data_dir / "pdf" / "pdf_manifest.json"),
             "log_file": str(tmp_path / "logs" / "movielab.log"),
         }
     )

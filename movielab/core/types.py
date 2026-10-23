@@ -60,6 +60,17 @@ class IndexReport:
         return self.loaded - self.skipped == self.indexed and not self.failed_batches
 
 
+@dataclass(frozen=True)
+class PdfIndexReport:
+    """PDF 1건 색인 결과 (F2016). `missing`이면 파일이 없어 건너뛰었다."""
+
+    file: str
+    pages: int = 0
+    chunks: int = 0
+    skipped_pages: list[int] = field(default_factory=list)
+    missing: bool = False
+
+
 # --- 외부 문서 수집 (SPEC-F2004) ---
 
 
@@ -140,6 +151,7 @@ class Evidence:
     text: str
     score: float | None = None  # 외부 근거: 코사인 유사도 (클수록 가깝다)
     page: int | None = None  # PDF 쪽 번호 (F2016)
+    file: str | None = None  # PDF 파일명 (F2016)
 
 
 @dataclass(frozen=True)
