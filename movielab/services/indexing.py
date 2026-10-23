@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -17,7 +18,7 @@ import openai
 from movielab.core.errors import DataEmptyError, InvalidApiKeyError, MovieLabUserError
 from movielab.core.types import IndexReport, ReindexReport, SourceDocument
 from movielab.index.doc_indexer import DocIndexer
-from movielab.index.meta_indexer import index_items
+from movielab.index.meta_indexer import UNRECOVERABLE, index_items
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -103,13 +104,16 @@ def reindex_documents(
 ) -> ReindexReport:
     """저장된 원문으로 외부 문서 컬렉션을 다시 만든다 (F2005 §3.3).
 
-    - 시작 전에 임베딩(키)을 준비한다. 안내 오류(키 없음 · 잘못된 키)는 바로 중단한다.
+    - 다시 색인할 원문이 있으면 시작 전에 임베딩(키)을 준비한다. 안내 오류(키 없음 · 잘못된 키)는
+      바로 중단한다. 원문이 없으면(고아 정리만) 키 없이 동작한다.
     - 그 밖의 오류는 설정 횟수만큼 다시 시도하고(A-21), 그래도 실패하면 그 문서만 실패로 센다
-      — 실패한 문서의 옛 청크는 남는다. 다시 해도 같은 `ValueError`(빈 본문 등)는 재시도하지 않는다.
+      — 실패한 문서의 옛 청크는 남는다. 재시도 분류는 메타 색인(F2002)과 같다: `UNRECOVERABLE`은
+      재시도하지 않고, 응답이 잘려 나는 `JSONDecodeError`는 일시 오류로 보고 재시도한다.
     - 원문이 없는 문서의 청크는 지운다. `movie_id`를 주면 그 항목 범위에서만.
       청크를 지운 영화는 수집 매니페스트(`manifest`)도 초기화해 다음 질문에서 다시 수집되게 한다.
     """
-    _ = indexer.store.embeddings  # 키가 없으면 여기서 안내 오류
+    if documents:
+        _ = indexer.store.embeddings  # 키가 없으면 여기서 안내 오류
     indexing = indexer.store.settings.indexing
     succeeded = chunks = failed = 0
     for doc in documents:
@@ -122,7 +126,12 @@ def reindex_documents(
                 break
             except MovieLabUserError:
                 raise
-            except ValueError:
+            except json.JSONDecodeError:  # 응답이 잘림 — 일시 오류
+                logger.exception("재색인 응답 해석 실패 (%d번째): %s", attempt + 1, doc.page_id)
+                if attempt < indexing.retries:
+                    sleep(indexing.retry_wait_sec)
+                continue
+            except UNRECOVERABLE:
                 logger.exception("재색인 실패 (재시도 안 함): %s/%s", doc.movie_id, doc.page_id)
                 break
             except Exception:

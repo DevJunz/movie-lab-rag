@@ -80,6 +80,12 @@ class DocIndexer:
             for chunk_id, meta in self.store.entries(self.collection, where)
         ]
 
+    def has_pages(self, item_id: str | None = None) -> bool:
+        """색인된 청크가 하나라도 있는지 (한 건만 읽는다)."""
+        if item_id is None:
+            return self.store.count(self.collection) > 0
+        return self.store.has_where(self.collection, {ITEM_KEY: str(item_id)})
+
     def indexed_pages(self, item_id: str | None = None) -> set[tuple[str, str]]:
         """색인된 `(항목 ID, 문서 ID)` 쌍. `item_id`를 주면 그 항목 범위만."""
         return {page for _, page in self._pages(item_id)}

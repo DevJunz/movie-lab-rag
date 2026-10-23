@@ -41,16 +41,19 @@ def main(argv: list[str] | None = None) -> int:
             )
         services = build_services(settings)
         labels = services.profile.labels()
-        documents = services.raw_store.iter_documents()
-        if args.movie_id:
-            documents = [d for d in documents if str(d.movie_id) == args.movie_id]
+        movie_id = args.movie_id or None  # 빈 값은 주지 않은 것과 같다 (재색인 · 정리 범위 일치)
+        documents = [
+            d
+            for d in services.raw_store.iter_documents(movie_id=movie_id)
+            if movie_id is None or str(d.movie_id) == movie_id
+        ]
         indexer = services.doc_indexer(chunk_size=size, chunk_overlap=overlap)
-        if not documents and not indexer.indexed_pages(args.movie_id):
+        if not documents and not indexer.has_pages(movie_id):
             print(messages.render("REINDEX_EMPTY", labels))
             return 1
         # 원문이 0건이어도 색인된 문서가 있으면 정리한다 (AC-F2005-12)
         report = reindex_documents(
-            documents, indexer, movie_id=args.movie_id, manifest=services.manifest
+            documents, indexer, movie_id=movie_id, manifest=services.manifest
         )
         print(
             messages.render(
@@ -64,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         if report.removed:
             print(messages.render("REINDEX_REMOVED", removed=report.removed))
+        if (size, overlap) != (chunking.chunk_size, chunking.chunk_overlap):
+            print(messages.render("REINDEX_OVERRIDE_NOTICE"))
         if report.failed:
             print(messages.render("REINDEX_FAILED", failed=report.failed))
             return 1

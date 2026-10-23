@@ -48,6 +48,10 @@ TEMPLATES: dict[str, str] = {
     ),
     "REINDEX_FAILED": "색인하지 못한 문서 {failed}건 — 로그(logs/)를 확인하고 다시 실행하세요.",
     "REINDEX_REMOVED": "저장 원문이 없는 문서 {removed}건의 청크를 지웠습니다.",
+    "REINDEX_OVERRIDE_NOTICE": (
+        "설정 파일과 다른 청크 값으로 색인했습니다. 이후 수집되는 문서는 설정 값으로 색인되어 "
+        "크기가 섞이니, 비교가 끝나면 인자 없이 다시 실행해 되돌리세요."
+    ),
     "REINDEX_BAD_CHUNKING": (
         "청크 크기는 1 이상, 청크 중복은 0 이상이고 크기보다 작아야 합니다 "
         "(크기 {chunk_size}, 중복 {chunk_overlap})."

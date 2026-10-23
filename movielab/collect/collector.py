@@ -218,7 +218,9 @@ class Collector:
                     Rejection(candidate.page_id, candidate.title, "fetch_failed")
                 )
                 continue
-            if not is_item_doc and len(doc.text) < int(collect_settings.min_doc_chars):
+            # 항목 자체 문서는 길이 규칙 면제 — 단 본문이 비어 있으면 색인할 수 없으므로 버린다
+            too_short = len(doc.text) < int(collect_settings.min_doc_chars)
+            if (too_short and not is_item_doc) or not doc.text.strip():
                 report.rejected.append(Rejection(candidate.page_id, candidate.title, "too_short"))
                 continue
             doc = dataclasses.replace(

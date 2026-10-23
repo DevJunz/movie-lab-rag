@@ -37,10 +37,14 @@ class RawStore:
         fields = {f.name for f in dataclasses.fields(SourceDocument)}
         return SourceDocument(**{k: v for k, v in data.items() if k in fields})
 
-    def iter_documents(self, kind: str = "wiki") -> list[SourceDocument]:
+    def iter_documents(
+        self, kind: str = "wiki", movie_id: str | None = None
+    ) -> list[SourceDocument]:
+        """저장된 원문. `movie_id`를 주면 그 영화의 파일만 읽는다."""
         folder = self.raw_dir / kind
+        pattern = f"{movie_id}_*.json" if movie_id else "*.json"
         docs = []
-        for path in sorted(folder.glob("*.json")):
+        for path in sorted(folder.glob(pattern)):
             movie_id, _, page_id = path.stem.partition("_")
             doc = self.load(movie_id, page_id, kind)
             if doc is not None:

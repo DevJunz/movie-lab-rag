@@ -125,7 +125,7 @@ class Services:
         return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
 
     def _has_chunks(self, item_id: str) -> bool:
-        return self.store.has_where(self.settings.collections.docs, {ITEM_KEY: item_id})
+        return self.store.has_where(self.settings.collections.docs, {ITEM_KEY: str(item_id)})
 
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
