@@ -52,3 +52,15 @@ class FakeChatModel(BaseChatModel):
             raise rule
         text = rule(prompt) if callable(rule) else str(rule)
         return ChatResult(generations=[ChatGeneration(message=AIMessage(content=text))])
+
+
+def pick_titles(*titles: str) -> Callable[[str], str]:
+    """P2 응답 함수: 프롬프트의 후보 줄(`번호. 제목: 요약`)에서 주어진 제목의 번호만 고른다."""
+    wanted = set(titles)
+    line = re.compile(r"^(\d+)\. (.+?): ", re.MULTILINE)
+
+    def respond(prompt: str) -> str:
+        picked = [int(n) for n, title in line.findall(prompt) if title in wanted]
+        return str(picked)
+
+    return respond

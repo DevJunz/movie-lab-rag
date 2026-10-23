@@ -164,3 +164,31 @@ def test_tc_f2002_11_invalid_key_message_and_index_kept(
     _use_fake_embeddings(monkeypatch, tmp_settings, tmp_path)
     assert index_meta.main(["--count"]) == 0
     assert "movie_meta: 12" in capsys.readouterr().out
+
+
+# --- SPEC-F2004 수집 스크립트 ---
+
+
+def test_tc_f2004_15_collect_script_reports_selection(tmp_settings, monkeypatch, capsys):
+    from movielab.container import build_services
+    from scripts import collect
+    from tests.fakes import FakeChatModel, pick_titles
+
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(collect, "build_services", lambda s: build_services(s, llm=llm))
+    code = collect.main(["--movie-id", "157336", "--question", "블랙홀은?", "--source", "bundle"])
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "소스: bundle" in out
+    assert "검색어:" in out and "블랙홀" in out
+    assert "수집 문서" in out and "인터스텔라 (항목 자체 문서)" in out
+    assert "버린 문서" in out and "p2_not_selected" in out
+
+
+def test_tc_f2004_15_collect_script_unknown_movie(tmp_settings, monkeypatch, capsys):
+    from scripts import collect
+
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert collect.main(["--movie-id", "0", "--question", "q"]) == 1
+    assert "찾을 수 없" in capsys.readouterr().out

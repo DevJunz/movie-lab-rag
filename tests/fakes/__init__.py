@@ -4,7 +4,7 @@ from tests.fakes.clock import FakeClock
 from tests.fakes.domain import BOOK_PROFILE
 from tests.fakes.embeddings import FakeEmbeddings
 from tests.fakes.http import FakeHttpSession, FakeResponse
-from tests.fakes.llm import FakeChatModel, task_of
+from tests.fakes.llm import FakeChatModel, pick_titles, task_of
 
 __all__ = [
     "BOOK_PROFILE",
@@ -13,5 +13,6 @@ __all__ = [
     "FakeEmbeddings",
     "FakeHttpSession",
     "FakeResponse",
+    "pick_titles",
     "task_of",
 ]

@@ -10,7 +10,7 @@ from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_bundle import WikiBundleSource
-from tests.fakes import FakeChatModel, FakeHttpSession
+from tests.fakes import FakeChatModel, FakeHttpSession, pick_titles
 from tests.fakes.source import FakeSource
 
 QUESTION = "블랙홀 묘사는 실제 물리와 얼마나 다른가?"
@@ -21,7 +21,7 @@ def _item(path):
 
 
 def _llm():
-    return FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": "[0]"})
+    return FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
 
 
 def test_tc_f2004_11_api_failure_switches_to_bundle(

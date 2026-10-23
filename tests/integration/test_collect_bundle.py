@@ -9,13 +9,15 @@ from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_bundle import WikiBundleSource
-from tests.fakes import FakeChatModel
+from tests.fakes import FakeChatModel, pick_titles
 
 
 def test_tc_f2004_10_bundle_source_full_procedure(tmp_settings, movies_small_path, wiki_small_dir):
     tmp_settings.raw["collect"]["source"] = "bundle"
     item = next(i for i in load_items(movies_small_path).items if i.item_id == "157336")
-    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀", "웜홀"]', "후보 선별": "[0, 1]"})
+    llm = FakeChatModel(
+        rules={"검색어 추출": '["블랙홀", "웜홀"]', "후보 선별": pick_titles("블랙홀", "웜홀")}
+    )
     indexed = []
     collector = Collector(
         api_source=None,

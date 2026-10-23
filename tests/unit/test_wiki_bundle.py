@@ -15,9 +15,14 @@ def test_tc_f2004_17_exact_title_ranks_first_and_page_ids_merged(wiki_small_dir)
 
 def test_tc_f2004_17_current_item_docs_get_bonus(wiki_small_dir):
     source = WikiBundleSource(wiki_small_dir)
-    # "영화"는 여러 문서 본문에 나온다 — 현재 영화(157336)의 문서가 앞선다
-    results = source.search("영화", limit=3, item_id="157336")
-    assert results[0].page_id in {"9001", "9004"}
+    # "합성 본문"은 모든 문서 본문에 비슷한 횟수로 나온다 — 현재 영화(157336)의 문서가 앞선다
+    results = source.search("합성 본문", limit=3, item_id="157336")
+    assert {c.page_id for c in results} <= {"9001", "9002", "9003", "9004"}
+
+
+def test_tc_f2004_17_title_match_outranks_body_match(wiki_small_dir):
+    results = WikiBundleSource(wiki_small_dir).search("영화", limit=3, item_id="157336")
+    assert all("영화" in c.title for c in results)
 
 
 def test_tc_f2004_17_no_match_returns_empty(wiki_small_dir):
