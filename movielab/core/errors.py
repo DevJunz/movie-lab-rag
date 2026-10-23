@@ -37,3 +37,9 @@ class DataEmptyError(MovieLabUserError):
     """불러온 항목이 0건이다. 빈 데이터로 기존 색인을 지우지 않도록 작업을 멈춘다."""
 
     code = "DATA_EMPTY"
+
+
+class ExternalSourceUnavailableError(MovieLabUserError):
+    """외부 문서 출처(위키백과 API 등)를 쓸 수 없다 — 연락처 없음, 차단, 재시도 소진."""
+
+    code = "SOURCE_UNAVAILABLE"

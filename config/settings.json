@@ -22,7 +22,8 @@
     "timeout_sec": 10,
     "maxlag": 5,
     "app_name": "MovieLab",
-    "app_version": "0.1"
+    "app_version": "0.1",
+    "project_url": "https://github.com/DevJunz/movie-lab-rag"
   },
   "explore": {"candidates": 20, "max_results": 10},
   "domain": {"disclaimer_enabled": false}
