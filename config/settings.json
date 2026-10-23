@@ -19,6 +19,7 @@
     "min_interval_sec": 1.0,
     "max_retries": 3,
     "backoff_base_sec": 1.0,
+    "max_retry_after_sec": 60,
     "timeout_sec": 10,
     "maxlag": 5,
     "app_name": "MovieLab",

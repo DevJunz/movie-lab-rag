@@ -7,16 +7,18 @@ UI · API · 스크립트 · 테스트는 모두 `build_services`로 서비스�
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import chromadb
+import requests
 from chromadb.config import Settings as ChromaSettings
 
 from movielab import providers
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
-from movielab.data.wiki_api import WikiHttpClient
+from movielab.data.wiki_api import WikiHttpClient, shared_throttle
 from movielab.index.store import VectorStore
 from movielab.services.catalog import Catalog
 
@@ -33,12 +35,13 @@ class Services:
     ) -> None:
         self.settings = settings
         self.profile = profile
-        self.http = http  # 주지 않으면 WikiHttpClient가 requests.Session을 만든다 (NF2006)
+        self.http = http  # 주지 않으면 wiki_client를 만들 때 requests.Session을 만든다 (NF2006)
         self._llm = llm
         self._embeddings = embeddings
         self.catalog = Catalog(lambda: self._load_items())
         self._store: VectorStore | None = None
         self._wiki_client: WikiHttpClient | None = None
+        self._lock = threading.Lock()
 
     def _load_items(self) -> Any:
         if self.profile.load_items is None:
@@ -73,10 +76,15 @@ class Services:
     @property
     def wiki_client(self) -> WikiHttpClient:
         """위키백과 API 클라이언트. 연락처(WIKI_CONTACT)가 없으면 요청 시 안내 오류 (NF2006)."""
-        if self._wiki_client is None:
-            self._wiki_client = WikiHttpClient(
-                self.settings, self.settings.secrets.wiki_contact, session=self.http
-            )
+        with self._lock:
+            if self._wiki_client is None:
+                wiki = self.settings.wiki
+                self._wiki_client = WikiHttpClient(
+                    self.settings,
+                    self.settings.secrets.wiki_contact,
+                    session=self.http if self.http is not None else requests.Session(),
+                    throttle=shared_throttle(wiki.api_url, wiki.min_interval_sec),
+                )
         return self._wiki_client
 
 
