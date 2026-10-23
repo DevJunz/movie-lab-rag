@@ -47,3 +47,15 @@ def test_tc_nf2002_14_collected_at_uses_injected_today(tmp_path):
     path = tmp_path / "manifest.json"
     Manifest(path, today=lambda: date(2026, 1, 2)).record_keyword("1", "a")
     assert json.loads(path.read_text(encoding="utf-8"))["1"]["collected_at"] == "2026-01-02"
+
+
+def test_tc_nf2002_15_change_detected_even_with_same_mtime(tmp_path):
+    import os
+
+    path = tmp_path / "manifest.json"
+    app = Manifest(path)
+    app.record_keyword("1", "블랙홀")
+    before = path.stat()
+    Manifest(path).reset()
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))  # 같은 타이머 틱 안의 쓰기 재현
+    assert not app.has_keyword("1", "블랙홀")
