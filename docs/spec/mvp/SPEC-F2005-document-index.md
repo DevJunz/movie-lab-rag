@@ -49,17 +49,19 @@
   - 청크 크기를 바꿔 청크 수가 줄어도 높은 순번의 옛 청크가 남지 않는다 (AC-06).
   - 임베딩(쓰기) 단계에서 실패하면 옛 청크가 그대로 남는다 — 문서가 색인에서 사라지지 않는다 (AC-09).
   - 새 청크는 `settings.indexing.batch_size`개씩 나눠 넣는다 — 청크 크기를 아주 작게 잡아도 Chroma 한 번 호출 한도를 넘지 않는다.
+    옛 청크 · 고아 청크 삭제도 같은 크기로 나눠 지운다.
     중간 묶음에서 실패하면 앞 묶음의 새 청크와 뒤쪽 옛 청크가 섞인 채 남는다(검색은 계속 된다). 다음 재색인 · 수집에서 바로잡힌다.
   - 본문이 비어 청크가 0개면 `ValueError`로 실패시킨다. 옛 청크는 지우지 않는다 (AC-14).
     수집기(F2004)는 길이 규칙을 면제받는 항목 자체 문서라도 본문이 비어 있으면 `too_short`로 버린다 —
     저장 · 색인하지 않으므로 같은 질문의 캐시 적중과 재색인이 빈 문서 때문에 실패하지 않는다 (AC-17).
+    이때도 항목 자체 문서 ID는 매니페스트에 기록해(`item_doc_page_id`) 다음 질문마다 제목 조회 · 본문 요청을 되풀이하지 않는다.
   - 임베딩 인증 오류(`openai.AuthenticationError` · `PermissionDeniedError`)는 `index_document`가 `InvalidApiKeyError`로 바꾼다 —
     수집기(F2004, `MovieLabUserError`는 다시 던진다)와 재색인 모두 키 안내 문구를 보여 준다 (AC-13).
 - `scripts.reindex_docs`는 `data/raw/wiki/`의 저장 원문으로 `wiki_docs`를 다시 만든다(외부 호출 없음).
   - `--chunk-size`, `--chunk-overlap` 인자는 **설정 파일 값을 일시적으로 덮어쓰는 실험용**이다.
     덮어쓴 결과에도 설정과 같은 검증 규칙(`config.chunking_ok(size, overlap)`: `size ≥ 1`, `0 ≤ overlap < size`)을 적용하고,
     어기면 색인 전에 인자 오류(`REINDEX_BAD_CHUNKING`, 종료 코드 2)로 끝낸다 (AC-10).
-  - 저장 원문 파일 하나가 깨져 있으면(JSON 오류 등) 그 파일만 건너뛰고 경고 로그를 남긴다. 그 문서는 실패로 세고,
+  - 저장 원문 파일 하나가 깨져 있으면(JSON 오류, 객체가 아닌 JSON, 필드 오류 등) 그 파일만 건너뛰고 경고 로그를 남긴다. 그 문서는 실패로 세고,
     **청크는 지우지 않는다**(원문 파일 이름의 `(movie_id, page_id)`를 정리 대상에서 뺀다).
   - `services.indexing.reindex_documents`는 다시 색인할 원문이 있으면 시작 전에 임베딩(키)을 준비한다(`VectorStore.ensure_embeddings()`) — 키가 없으면
     `MissingApiKeyError`로 바로 끝난다. 원문이 0건이면(고아 정리만) 키 없이 동작한다.
@@ -84,7 +86,9 @@
 
 - `Collector`(F2004)의 `indexer`로 `DocIndexer.index_document`를, `indexed_pages`(NF2002 색인 확인)로 `DocIndexer.page_ids(movie_id)`를 container에서 연결한다.
   매니페스트의 문서 기록과 실제 색인을 문서 단위로 대조한다 — 일부 문서 청크만 사라져도 감지한다 (AC-18).
-  `has_where`는 `limit=1`로 한 건만 확인한다 — 질문마다 그 영화의 청크 ID 전체를 읽지 않는다 (AC-08).
+  대조는 질문마다 그 영화 청크의 메타데이터(ID · `page_id`)를 한 번 읽는다 — 본문 · 벡터는 읽지 않는다. 영화당 청크 수백 개 수준이라
+  비용이 작고, '청크가 하나라도 있나'(`has_where`, `limit=1`)로는 일부 손실을 놓치므로 문서 단위 대조를 택했다 (AC-08, AC-18).
+  `has_where`(한 건만 읽기)는 재색인 스크립트의 빈 범위 확인(`DocIndexer.has_pages`)에 쓴다.
 - 계층 규칙상 `scripts.reindex_docs`는 `services/indexing.reindex_documents(documents, indexer)`를 쓰고, 저장 원문은 `Services.raw_store`(container)에서 얻는다.
 - 설정 검증: `chunk_size`는 1 이상 정수, `chunk_overlap`은 0 이상 정수이고 `chunk_size`보다 작아야 한다(PDF 값도 같은 규칙). 어기면 `SettingsError`.
 
@@ -128,7 +132,7 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | AC-F2005-05 | 설정 파일의 청크 크기 · 중복을 바꿔 재색인하면 청크 수가 달라진다. 코드는 바꾸지 않는다 | V4.2-5 |
 | AC-F2005-06 | 같은 문서를 더 큰 청크로 재색인해도 옛 청크가 남지 않는다 | V4.2-5 |
 | AC-F2005-07 | `chunk_overlap >= chunk_size` 설정은 시작 시 거부된다 | — |
-| AC-F2005-08 | container의 수집기는 수집 문서를 `wiki_docs`에 청크로 색인하고, 그 영화 청크가 없으면 캐시를 믿지 않는다 | V4.2-3 |
+| AC-F2005-08 | container의 수집기는 수집 문서를 `wiki_docs`에 청크로 색인하고, 기록된 문서가 색인에 없으면 캐시를 믿지 않는다 | V4.2-3 |
 | AC-F2005-09 | 재색인 중 임베딩이 실패해도 그 문서의 옛 청크는 남는다 | — |
 | AC-F2005-10 | `reindex_docs`의 청크 인자가 검증 규칙을 어기면 색인 전에 안내 문구로 거부한다 (라이브러리 원문 출력 없음) | — |
 | AC-F2005-11 | 재색인에서 잘못된 키는 키 안내로, 다른 문서 오류는 그 문서만 실패로 집계하고 나머지는 계속 색인한다 | — |
@@ -171,10 +175,10 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-25 | 통합 | 원문 JSON의 `movie_id`가 정수인 상태에서 `reindex_docs --movie-id 157336` | 그 문서를 재색인, 청크 삭제 없음 | 12 | `tests/integration/test_scripts.py` |
 | TC-F2005-27 | 통합 | 재색인 중 `JSONDecodeError` 한 번 / `openai.BadRequestError` | 재시도해 성공 / 재시도 없이 실패 1 | 15 | `tests/integration/test_doc_index.py` |
 | TC-F2005-28 | 통합 | 키 없는 설정 · 원문 0건 · 고아 청크만 있음 | 키 오류 없이 고아 정리 | 12 | 〃 |
-| TC-F2005-29 | 통합 | 본문이 빈 항목 자체 문서로 같은 질문 2회 | `too_short`로 버려짐, 두 번째는 캐시 적중 | 17 | `tests/integration/test_collect_index.py` |
+| TC-F2005-29 | 통합 | 본문이 빈 항목 자체 문서로 같은 질문 2회 · 다른 질문 1회 | `too_short`로 버려짐, 두 번째는 캐시 적중, 다른 질문에서 제목 조회 · 본문 요청 없음 | 17 | `tests/integration/test_collect_index.py` |
 | TC-F2005-30 | 통합 | `reindex_docs --movie-id ""` / `--chunk-size 500 --chunk-overlap 100` | 전체 범위로 재색인 · 정리 / 되돌리기 안내 출력 | 12, 05 | `tests/integration/test_scripts.py` |
-| TC-F2005-31 | 통합 | 원문 3건 중 1건 JSON이 깨진 상태로 전체 재색인 | 나머지 2건 재색인, 깨진 문서 청크 유지, `failed == 1` | 11, 12 | `tests/integration/test_scripts.py` |
-| TC-F2005-32 | 통합 | `batch_size=2` 설정에서 청크 5개 문서 색인 | `upsert` 3번, 청크 5개 | 01 | `tests/integration/test_doc_index.py` |
+| TC-F2005-31 | 통합 | 원문 4건 중 1건 JSON이 깨지고 1건은 `null`인 상태로 전체 재색인 | 나머지 2건 재색인, 두 문서 청크 유지, `failed == 2` | 11, 12 | `tests/integration/test_scripts.py` |
+| TC-F2005-32 | 통합 | `batch_size=2` 설정에서 청크 5개 문서 색인 · 3개 고아 정리 | `upsert` 3번, 청크 5개 / 삭제 호출마다 2개 이하 | 01, 12 | `tests/integration/test_doc_index.py` |
 | TC-F2005-33 | 통합 | 문서 2건을 수집 · 색인한 뒤 한 문서의 청크만 지우고 같은 질문 | 캐시 적중 없이 다시 수집, 지운 문서 다시 색인 | 18 | `tests/integration/test_collect_index.py` |
 | TC-F2005-34 | 통합 | 매니페스트 초기화가 실패(잠금)한 뒤, 잠금이 풀린 다음 질문 | 옛 기록으로 적중하지 않고 초기화 후 다시 수집 | 18 | 〃 |
 | TC-F2005-26 | 통합 | 문서가 하나도 색인되지 않은 영화(P2가 아무것도 안 고름)에 같은 질문 2회 | 두 번째는 캐시 적중 (청크가 없어도 '색인된 문서' 기록이 없으면 캐시를 비우지 않음) | 08 | `tests/integration/test_collect_index.py` |
