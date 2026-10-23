@@ -86,12 +86,16 @@ class Collector:
             return getattr(self.bundle_source, method)(*args)
 
     def _resolve_item_doc(
-        self, item: ItemRecord, report: CollectReport, state: dict[str, Any]
+        self,
+        manifest: NullManifest,
+        item: ItemRecord,
+        report: CollectReport,
+        state: dict[str, Any],
     ) -> Candidate | None:
         profile = self.profile
-        known = self.manifest.item_doc_page_id(item.item_id)
+        known = manifest.item_doc_page_id(item.item_id)
         if known is not None:  # 이미 수집한 항목 자체 문서 — 제목 조회 생략 (NF2002)
-            report.item_doc_title = self.manifest.title_of(item.item_id, known)
+            report.item_doc_title = manifest.title_of(item.item_id, known)
             return None
         if profile.item_doc_queries is None or profile.pick_item_doc is None:
             report.notices.append("ITEM_DOC_NOT_FOUND")
@@ -116,18 +120,22 @@ class Collector:
         started = self.clock()
         report = CollectReport(item_id=item.item_id, question=question)
         collect_settings = self.settings.collect
+        manifest = self.manifest
 
-        # 0. 캐시 (NF2002). 색인한 문서 기록이 있는데 청크가 없으면(chroma 삭제 등) 캐시를 비운다
+        # 0. 캐시 (NF2002). 색인한 문서 기록이 있는데 청크가 없으면(chroma 삭제 등) 캐시를 비운다.
+        # 비우지 못하면(잠금 실패 등) 옛 기록을 믿지 않도록 이번 수집은 매니페스트를 쓰지 않는다
         if (
             self.has_chunks is not None
-            and self.manifest.has_indexed_pages(item.item_id)
+            and manifest.has_indexed_pages(item.item_id)
             and not self.has_chunks(item.item_id)
         ):
             logger.warning("색인된 청크가 없어 %s의 수집 캐시를 비우고 다시 수집한다", item.item_id)
-            self.manifest.reset(item.item_id)
+            if not manifest.reset(item.item_id):
+                logger.warning("수집 캐시를 비우지 못해 이번 수집은 캐시 없이 한다")
+                manifest = NullManifest()
         # 같은 질문 · 같은 검색어를 이미 수집했으면 외부 호출 없이 끝낸다
-        cached = self.manifest.cached_queries(item.item_id, question)
-        if cached is not None and all(self.manifest.has_keyword(item.item_id, q) for q in cached):
+        cached = manifest.cached_queries(item.item_id, question)
+        if cached is not None and all(manifest.has_keyword(item.item_id, q) for q in cached):
             progress("cache_hit", queries=cached)
             report.queries = list(cached)
             report.cached_queries = list(cached)
@@ -153,18 +161,16 @@ class Collector:
 
         # 2. 항목 자체 문서
         progress("resolve_item_doc")
-        item_doc = self._resolve_item_doc(item, report, state)
+        item_doc = self._resolve_item_doc(manifest, item, report, state)
 
         item_doc_id = (
-            item_doc.page_id
-            if item_doc is not None
-            else self.manifest.item_doc_page_id(item.item_id)
+            item_doc.page_id if item_doc is not None else manifest.item_doc_page_id(item.item_id)
         )
 
         # 3. 검색 — 후보를 page_id로 합친다. 항목 자체 문서는 후보에서 뺀다(강제 포함 대상)
         pool: dict[str, Candidate] = {}
         searched: list[str] = []  # 설정한 소스로 검색을 마친 검색어 (캐시 기록 대상)
-        todo = [q for q in queries if not self.manifest.has_keyword(item.item_id, q)]
+        todo = [q for q in queries if not manifest.has_keyword(item.item_id, q)]
         report.cached_queries = [q for q in queries if q not in todo]
         for number, query in enumerate(todo, start=1):
             progress("search", query=query, current=number, total=len(todo))
@@ -183,7 +189,7 @@ class Collector:
         progress("filter")
         eligible: list[Candidate] = []
         for candidate in report.candidates:
-            if self.manifest.has_page(item.item_id, candidate.page_id):
+            if manifest.has_page(item.item_id, candidate.page_id):
                 report.rejected.append(
                     Rejection(candidate.page_id, candidate.title, "already_collected")
                 )
@@ -202,7 +208,7 @@ class Collector:
 
         # 6. 본문 수집 · 저장 — 항목 자체 문서가 먼저, 길이 규칙 면제. 문서 단위로 실패를 격리
         targets: list[tuple[Candidate, bool]] = []
-        if item_doc is not None and not self.manifest.has_page(item.item_id, item_doc.page_id):
+        if item_doc is not None and not manifest.has_page(item.item_id, item_doc.page_id):
             targets.append((item_doc, True))
         targets += [(c, False) for c in selection.selected]
         documents: list[SourceDocument] = []
@@ -234,6 +240,8 @@ class Collector:
             documents.append(doc)
 
         # 7. 색인 (F2005 색인기가 연결되면) — 키 없음 같은 안내 오류는 모든 문서에 같으므로 알린다
+        recorded_pages: list[tuple[str, str, int]] = []
+        item_doc_page_id: str | None = None
         for doc in documents:
             progress("index", title=doc.title)
             if self.indexer is None:
@@ -253,17 +261,22 @@ class Collector:
             report.indexed_titles.append(doc.title)
             if self.indexer is None:
                 continue  # 색인하지 않은 문서는 수집됨으로 기록하지 않는다 (NF2002 §3.2)
-            self.manifest.record_page(item.item_id, doc.page_id, doc.title, chunks)
+            recorded_pages.append((doc.page_id, doc.title, chunks))
             if doc.is_item_doc:
-                self.manifest.record_item_doc(item.item_id, doc.page_id)
+                item_doc_page_id = doc.page_id
 
-        # 8. 기록 — 완전히 성공했을 때만 검색어 · 질문을 남긴다(실패한 문서는 다음 질문 때 재시도)
+        # 8. 기록 — 수집 한 번의 결과를 한 번에(전부 또는 하나도 안 되게) 남긴다.
+        # 검색어 · 질문은 완전히 성공했을 때만(실패한 문서는 다음 질문 때 재시도)
         failed = any(r.reason in ("fetch_failed", "index_failed") for r in report.rejected)
-        if self.indexer is not None and not failed:
-            for query in searched:
-                self.manifest.record_keyword(item.item_id, query)
-            if len(searched) == len(todo):
-                self.manifest.record_question(item.item_id, question, queries)
+        if self.indexer is not None:
+            complete = not failed
+            manifest.record_collection(
+                item.item_id,
+                pages=recorded_pages,
+                item_doc_page_id=item_doc_page_id,
+                keywords=searched if complete else [],
+                question=(question, queries) if complete and len(searched) == len(todo) else None,
+            )
         report.source_used = state["source"].kind
         report.timings["collect"] = self.clock() - started
         progress("done", titles=report.indexed_titles, rejected=len(report.rejected))

@@ -113,7 +113,14 @@ class Services:
     @property
     def manifest(self) -> Manifest:
         """수집 캐시 (NF2002). LLM · 키 없이도 쓸 수 있다 (예: 캐시 초기화)."""
-        return Manifest(self.settings.path("manifest"))
+        cache = self.settings.cache
+        return Manifest(
+            self.settings.path("manifest"),
+            lock_timeout_sec=cache.lock_timeout_sec,
+            lock_poll_sec=cache.lock_poll_sec,
+            io_retries=cache.io_retries,
+            io_retry_wait_sec=cache.io_retry_wait_sec,
+        )
 
     @property
     def raw_store(self) -> RawStore:

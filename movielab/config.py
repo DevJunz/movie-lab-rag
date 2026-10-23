@@ -142,6 +142,12 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("retries", _int_at_least(0)),
         ("retry_wait_sec", _number_at_least(0)),
     ],
+    "cache": [  # SPEC-NF2002 (A-24)
+        ("lock_timeout_sec", _number_at_least(0)),
+        ("lock_poll_sec", _number_at_least(0, strict=True)),
+        ("io_retries", _int_at_least(0)),
+        ("io_retry_wait_sec", _number_at_least(0)),
+    ],
     "collect": [  # SPEC-F2003 · F2004
         ("source", lambda v: v in ("api", "bundle", "auto")),
         ("card_overview_chars", _int_at_least(1)),

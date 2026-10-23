@@ -5,13 +5,12 @@ from __future__ import annotations
 import pytest
 
 from movielab.collect.collector import Collector
-from movielab.collect.manifest import Manifest
 from movielab.collect.query_extractor import QueryExtractor
 from movielab.collect.selector import CandidateSelector
 from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.data.raw_store import RawStore
-from tests.fakes import FakeChatModel, pick_titles
+from tests.fakes import FakeChatModel, make_manifest, pick_titles
 from tests.fakes.source import FakeSource, make_doc
 
 ITEM_INTRO = "[합성] 인터스텔라는 2014년 개봉한 크리스토퍼 놀란 감독의 SF 영화이다."
@@ -30,7 +29,7 @@ def _setup(settings, *, indexer="default", has_chunks=None):
     llm = FakeChatModel(
         rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀", "웜홀")}
     )
-    manifest = Manifest(settings.path("manifest"))
+    manifest = make_manifest(settings.path("manifest"))
     collector = Collector(
         api_source=source,
         bundle_source=FakeSource("bundle"),
@@ -87,3 +86,76 @@ def test_tc_nf2002_12_empty_index_resets_movie_cache_for_new_question(tmp_settin
     report = collector.collect(item, "완전히 새로운 질문")
     assert "인터스텔라" in report.indexed_titles  # 항목 자체 문서까지 다시 수집
     assert source.fetched().count("1") == 2
+
+
+def test_tc_nf2002_20_failed_reset_distrusts_cache(tmp_settings, item):
+    from movielab.collect.manifest import FileLock
+
+    collector, source, manifest = _setup(tmp_settings, has_chunks=lambda i: False)
+    collector.collect(item, "블랙홀은?")
+    assert manifest.cached_queries("157336", "블랙홀은?") is not None
+    holder = FileLock(manifest.lock_path, poll_sec=0.01)
+    assert holder.acquire()  # 초기화를 못 하게 막는다
+    try:
+        again = collector.collect(item, "블랙홀은?")
+    finally:
+        holder.release()
+    assert "CACHE_HIT" not in again.notices  # 옛 기록을 믿지 않고 다시 수집
+    assert source.fetched().count("2") == 2
+
+
+def test_tc_nf2002_20_reset_cache_script_reports_failure(
+    tmp_settings, tmp_path, monkeypatch, capsys
+):
+    import json
+
+    from movielab.collect.manifest import FileLock
+    from scripts import collect
+
+    raw = json.loads(json.dumps(tmp_settings.raw))
+    raw["cache"]["lock_timeout_sec"] = 0
+    path = tmp_path / "settings_nowait.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(path))
+    holder = FileLock(tmp_settings.path("manifest").with_name("manifest.json.lock"), poll_sec=0.01)
+    assert holder.acquire()
+    try:
+        assert collect.main(["--reset-cache"]) == 1
+    finally:
+        holder.release()
+    assert "지우지 못했" in capsys.readouterr().out
+    assert collect.main(["--reset-cache"]) == 0
+
+
+def test_tc_nf2002_24_failed_record_leaves_nothing(tmp_settings, item):
+    from movielab.collect.manifest import FileLock
+
+    collector, _, manifest = _setup(tmp_settings)
+    holder = FileLock(manifest.lock_path, poll_sec=0.01)
+    assert holder.acquire()  # 끝의 기록이 잠금을 못 잡는다
+    try:
+        report = collector.collect(item, "블랙홀은?")
+    finally:
+        holder.release()
+    assert report.indexed_titles  # 수집 · 색인 자체는 성공
+    assert manifest.cached_queries("157336", "블랙홀은?") is None
+    assert not manifest.has_keyword("157336", "블랙홀")
+    assert not manifest.has_page("157336", "2")
+    assert manifest.item_doc_page_id("157336") is None
+
+
+def test_tc_nf2002_26_one_write_per_collection(tmp_settings, item, monkeypatch):
+    collector, _, manifest = _setup(tmp_settings)
+    writes = []
+    original = manifest._write
+
+    def counting_write():
+        writes.append(1)
+        return original()
+
+    monkeypatch.setattr(manifest, "_write", counting_write)
+    report = collector.collect(item, "블랙홀은?")
+    assert len(report.indexed_titles) >= 2
+    assert len(writes) == 1
+    assert manifest.item_doc_page_id("157336") == "1"
+    assert manifest.has_page("157336", "2") and manifest.has_keyword("157336", "블랙홀")

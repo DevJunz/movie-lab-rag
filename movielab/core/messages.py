@@ -59,6 +59,10 @@ TEMPLATES: dict[str, str] = {
     "REINDEX_EMPTY": (
         "다시 색인할 저장 원문이 없습니다. 먼저 문서를 수집하세요 (python -m scripts.collect)."
     ),
+    "CACHE_RESET_FAILED": (
+        "수집 캐시를 지우지 못했습니다. "
+        "다른 프로그램이 사용 중일 수 있으니 잠시 후 다시 시도하세요."
+    ),
     # 색인 스크립트 출력 (F2002)
     "INDEX_REPORT": "로드 {loaded}건 / 색인 {indexed}건 / 건너뜀 {skipped}건",
     "INDEX_FAILED_BATCHES": "실패한 배치: {batches} — 다시 실행하면 빠진 항목만 채워집니다.",

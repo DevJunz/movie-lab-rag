@@ -50,11 +50,11 @@ def test_tc_f2005_19_bad_key_during_collect_shows_key_notice(tmp_settings):
 
 def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
     from movielab.collect.collector import Collector
-    from movielab.collect.manifest import Manifest
     from movielab.collect.query_extractor import QueryExtractor
     from movielab.collect.selector import CandidateSelector
     from movielab.data.domain_movie import MOVIE_PROFILE
     from movielab.data.raw_store import RawStore
+    from tests.fakes import make_manifest
     from tests.fakes.source import FakeSource, make_doc
 
     source = FakeSource()  # 항목 자체 문서 없음
@@ -68,7 +68,7 @@ def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
         raw_store=RawStore(tmp_settings.path("raw_dir")),
         profile=MOVIE_PROFILE,
         settings=tmp_settings,
-        manifest=Manifest(tmp_settings.path("manifest")),
+        manifest=make_manifest(tmp_settings.path("manifest")),
         indexer=lambda doc: 1,
         has_chunks=lambda item_id: False,  # 색인한 문서가 없으니 청크도 없다
     )
@@ -81,11 +81,11 @@ def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
 
 def test_tc_f2005_29_blank_item_doc_rejected_and_cache_hits(tmp_settings):
     from movielab.collect.collector import Collector
-    from movielab.collect.manifest import Manifest
     from movielab.collect.query_extractor import QueryExtractor
     from movielab.collect.selector import CandidateSelector
     from movielab.data.domain_movie import MOVIE_PROFILE
     from movielab.data.raw_store import RawStore
+    from tests.fakes import make_manifest
     from tests.fakes.source import FakeSource, make_doc
 
     source = FakeSource()
@@ -109,7 +109,7 @@ def test_tc_f2005_29_blank_item_doc_rejected_and_cache_hits(tmp_settings):
         raw_store=RawStore(tmp_settings.path("raw_dir")),
         profile=MOVIE_PROFILE,
         settings=tmp_settings,
-        manifest=Manifest(tmp_settings.path("manifest")),
+        manifest=make_manifest(tmp_settings.path("manifest")),
         indexer=indexer,
         has_chunks=lambda item_id: True,
     )

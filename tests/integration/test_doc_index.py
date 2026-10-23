@@ -294,12 +294,12 @@ def test_tc_f2005_23_permanent_error_not_retried(tmp_settings):
 
 
 def test_tc_f2005_24_pruned_movie_manifest_reset(tmp_settings):
-    from movielab.collect.manifest import Manifest
     from movielab.services.indexing import reindex_documents
+    from tests.fakes import make_manifest
 
     services = _services(tmp_settings)
     indexer = _indexer(services.store)
-    manifest = Manifest(tmp_settings.path("manifest"))
+    manifest = make_manifest(tmp_settings.path("manifest"))
     kept, dropped = _doc(page_id="1"), _doc(page_id="2")
     other = _doc(movie_id="27205", page_id="9")
     for doc in (kept, dropped, other):

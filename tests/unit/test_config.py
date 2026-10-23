@@ -221,3 +221,23 @@ def test_tc_f2003_11_invalid_collect_settings_rejected(tmp_path: Path, change):
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(SettingsError):
         load_settings(path)
+
+
+@pytest.mark.parametrize(
+    "cache",
+    [
+        {"lock_poll_sec": 0},
+        {"io_retries": -1},
+        {"lock_timeout_sec": "10"},
+        {"io_retry_wait_sec": -1},
+    ],
+)
+def test_tc_nf2002_22_cache_settings_validated(tmp_path: Path, cache):
+    from movielab.config import SettingsError
+
+    raw = json.loads((REPO_ROOT / "config" / "settings.json").read_text(encoding="utf-8"))
+    raw["cache"].update(cache)
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(SettingsError):
+        load_settings(path)

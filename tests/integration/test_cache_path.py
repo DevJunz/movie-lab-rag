@@ -12,7 +12,7 @@ from movielab.core.errors import ExternalSourceUnavailableError
 from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.data.movies import load_items
 from movielab.data.raw_store import RawStore
-from tests.fakes import FakeChatModel, pick_titles
+from tests.fakes import FakeChatModel, make_manifest, pick_titles
 from tests.fakes.source import FakeSource, make_doc
 
 ITEM_INTRO = "[합성] 인터스텔라는 2014년 개봉한 크리스토퍼 놀란 감독의 SF 영화이다."
@@ -44,7 +44,7 @@ class Setup:
                 "후보 선별": pick_titles("블랙홀", "웜홀", "중력"),
             }
         )
-        self.manifest = Manifest(tmp_settings.path("manifest"))
+        self.manifest = make_manifest(tmp_settings.path("manifest"))
         self.collector = Collector(
             api_source=self.source,
             bundle_source=FakeSource("bundle"),
@@ -131,11 +131,11 @@ def test_tc_nf2002_06_container_collector_uses_file_manifest(tmp_settings):
 def test_tc_nf2002_reset_cache_option(tmp_settings, monkeypatch, capsys):
     from scripts import collect
 
-    manifest = Manifest(tmp_settings.path("manifest"))
+    manifest = make_manifest(tmp_settings.path("manifest"))
     manifest.record_keyword("157336", "블랙홀")
     manifest.record_keyword("27205", "자각몽")
     monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
     assert collect.main(["--reset-cache", "--movie-id", "157336"]) == 0
-    reloaded = Manifest(tmp_settings.path("manifest"))
+    reloaded = make_manifest(tmp_settings.path("manifest"))
     assert not reloaded.has_keyword("157336", "블랙홀") and reloaded.has_keyword("27205", "자각몽")
     assert "캐시" in capsys.readouterr().out
