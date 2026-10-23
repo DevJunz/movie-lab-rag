@@ -63,7 +63,19 @@ def to_item_record(movie: dict) -> ItemRecord: ...             # 메타데이터
 def load_items(path: Path) -> LoadResult:                      # items: list[ItemRecord], skipped: int
 ```
 
-- `python -m scripts.index_meta --show <movie_id>`는 해당 영화의 색인 텍스트를 출력한다 (V4.1-3 증빙).
+```python
+# movielab/services/catalog.py — 계층 규칙상 services · scripts · ui는 data를 직접 import 하지 않는다
+class Catalog:
+    def __init__(self, loader: Callable[[], LoadResult]): ...   # container가 data.movies.load_items를 주입
+    def items(self) -> list[ItemRecord]: ...                     # 처음 한 번만 로드
+    def get(self, item_id: str) -> ItemRecord | None: ...
+    @property
+    def skipped(self) -> int: ...
+```
+
+- `ItemRecord` · `LoadResult`는 `movielab/core/types.py`에 둔다.
+- `Services.catalog`(container)로 얻는다. 영화 데이터 팩이 없으면 `items()`가 `DataNotFoundError`(안내 코드 `DATA_MISSING`)를 던진다.
+- `python -m scripts.index_meta --show <movie_id>`는 해당 영화의 색인 텍스트를 출력한다 (V4.1-3 증빙). 색인(F2002) 기능은 SPEC-F2002에서 이 스크립트에 더한다.
 
 ## 4. 가정
 
@@ -93,6 +105,8 @@ def load_items(path: Path) -> LoadResult:                      # items: list[Ite
 | TC-F2001-05 | 단위 | `movie_id`가 숫자 `123`인 원소 | `item_id == "123"` | 05 | 〃 |
 | TC-F2001-06 | 통합 | 제공 `movies.json`이 있으면 로드 (없으면 `skip`) | 964건, `skipped == 0` | 01 | `tests/integration/test_movies_real.py` |
 | TC-F2001-07 | 수동 | `python -m scripts.index_meta --show 157336` | §3.2 예시와 같은 텍스트 출력 | 02 | 스크린샷 |
+| TC-F2001-09 | 단위 | `Catalog`에 가짜 로더 주입: `items()` 2번 · `get()` | 로더는 1번만 호출, 없는 ID는 `None` | 01 | `tests/unit/test_catalog.py` |
+| TC-F2001-10 | 통합 | `tmp_settings`로 `scripts.index_meta --show 157336` 실행 / 데이터 파일 없음 | 9줄 색인 텍스트 출력 / 안내 문구 · 종료 코드 1 | 02 | `tests/integration/test_scripts.py` |
 | TC-F2001-08 | 단위 | 색인 텍스트 라벨(`제목:`, `감독:` …)이 `movielab/data/` 밖에 없는지 검사 (TC-NF2005-03과 같은 검사기) | 0건 | 06 | `tests/unit/test_architecture.py` |
 
 > TC-F2001-06은 데이터 팩이 저장소에 없으므로 CI에서는 `skip`된다. 로컬 검증 결과를 검증 문서에 기록한다.
