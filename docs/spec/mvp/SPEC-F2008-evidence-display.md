@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2008** 근거 표시 (생성 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
-| 담당 모듈 | `movielab/rag/citations.py`, `movielab/services/qa.py`, `movielab/ui/streamlit_app.py` |
+| 상태 | In Progress |
+| 담당 모듈 | `movielab/rag/citations.py`, `movielab/core/types.py`(`CitedResult`), `movielab/ui/components/evidence.py` |
 | 선행 SPEC | SPEC-F2007 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #12 |
 
 ## 1. 요구사항 원문
 
@@ -30,13 +30,18 @@
 
 - 인식하는 표기: `[근거 3]`, `[근거3]`, `[근거 1, 3]`, `[근거 1,3]`, `[근거 1][근거 3]`. 정규식 예: `\[근거\s*(\d+(?:\s*,\s*\d+)*)\]`.
 - 결과는 중복 없이 처음 나온 순서. 범위 밖 번호(0, 근거 수 초과)는 버리고 `WARNING` 로그를 남긴다.
+  범위 판단에는 근거 수가 필요하므로 `extract_citations(answer, count=None)` — `count`를 주면 `1..count` 밖을 버린다.
 
 ### 3.2 인용 근거 선별 (`citations.select_cited(answer, evidences) -> CitedResult`)
 
 - `cited`: 인용된 번호의 `Evidence`만, **번호 오름차순**. 번호는 원래 번호를 그대로 쓴다(재번호 금지 — 본문 표기와 목록이 일치해야 한다).
 - `uncited`: 인용이 0개이면 `True`.
+- `CitedResult(cited: list[Evidence], uncited: bool)`는 `core/types.py`에 둔다 — UI(`ui/`)는 `rag/`를 import 하지 않으므로
+  서비스(F2009 `services/qa.py`)가 만든 결과를 받아 그리기만 한다 (NF2005 의존 규칙).
 
-### 3.3 화면 표시 (Streamlit, 답변 메시지 아래)
+### 3.3 화면 표시 (Streamlit 컴포넌트 `ui/components/evidence.render_evidence(result, profile)`, 답변 메시지 아래)
+
+질의응답 화면(F2009)이 아직 없으므로 이 SPEC은 **근거 목록 컴포넌트**까지 만든다. 화면 배치 · 서비스 연결은 SPEC-F2009가 한다.
 
 ```text
 근거
@@ -44,7 +49,8 @@
 [근거 3] 위키백과 · 블랙홀 · 원문 ↗ · CC BY-SA 4.0
 ```
 
-- 링크는 `Evidence.url`. 클릭하면 새 탭으로 연다.
+- 링크는 `Evidence.url`. 클릭하면 새 탭으로 연다. 링크 이름은 출처 종류별 라벨(`DomainProfile.meta_link_label` = `TMDB`, 외부 문서는 `원문`).
+- 라이선스는 `Evidence.license`가 있을 때만 붙인다 (위키백과 청크 메타데이터의 `license`, F2005).
 - 근거 본문 미리보기는 펼침(`st.expander`) 안에 200자까지만 보인다.
 - `uncited`이면 근거 목록 대신 안내 `이 답변에는 인용된 근거가 없습니다.`(`core/messages.UNCITED`)를 `st.info`로 보인다.
   `not_found`인 경우도 인용이 없으므로 같은 안내가 나온다.
@@ -73,16 +79,15 @@
 | TC-F2008-03 | 단위 | 근거 3개, 본문에 `[근거 7]`, `[근거 0]` | 무시되고 경고 로그 | 05 | 〃 |
 | TC-F2008-04 | 단위 | 근거 5개 중 2 · 4 인용 | `cited` 번호 `[2, 4]`, 원래 번호 유지 | 01, 02 | 〃 |
 | TC-F2008-05 | 단위 | 인용 없는 답변 | `uncited == True` | 04 | 〃 |
-| TC-F2008-06 | 통합 | Streamlit `AppTest` + 가짜 서비스: 근거 5개 중 1 · 3 인용 답변 | 화면에 `[근거 1]`, `[근거 3]`만, 링크 · 출처 유형 · `CC BY-SA 4.0` 표시 | 01, 02, 03 | `tests/integration/test_ui_answer.py` |
-| TC-F2008-07 | 통합 | `AppTest` + 인용 없는 답변 | `인용된 근거가 없습니다` 안내 표시, 근거 목록 없음 | 04 | 〃 |
-| TC-F2008-08 | 수동 | Q1 답변 화면 | 본문 번호와 근거 목록 일치 캡처 | 01, 03 | 스크린샷 |
+| TC-F2008-06 | 통합 | `AppTest.from_function`으로 컴포넌트 렌더: 근거 5개 중 1 · 3 인용 | 화면에 `[근거 1]`, `[근거 3]`만, 링크 · 출처 유형 · `CC BY-SA 4.0` 표시 | 01, 02, 03 | `tests/integration/test_ui_evidence.py` |
+| TC-F2008-07 | 통합 | `AppTest` + 인용 없는 결과 | `인용된 근거가 없습니다` 안내 표시, 근거 목록 없음 | 04 | 〃 |
+| TC-F2008-08 | 수동 | 실제 색인 · GMS로 Q4 · Q6 답변의 인용 선별 결과 출력 (화면 캡처는 F2009 이후) | 본문 번호 집합 == 목록 번호 집합 / 인용 없음 안내 | 01, 03, 04 | `docs/verification/evidence/V4.3-3_citations.txt` |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.3-3, V4.3-4 | Q1 답변과 근거 목록 캡처 | `docs/verification/screenshots/V4.3-3_citations.png` |
-| V4.3-6 | 인용 없는 답변 안내 캡처 (Q6) | `docs/verification/screenshots/V4.3-6_uncited.png` |
+| V4.3-3, V4.3-4, V4.3-6 | Q4(인용 있음) · Q6(인용 없음)의 답변과 선별된 근거 목록 텍스트 출력. Q1은 근거 문서에 답이 없어(SPEC-F2007 §7.1) Q4로 대신한다. 화면 캡처는 SPEC-F2009에서 추가 | `docs/verification/evidence/V4.3-3_citations.txt` |
 
 ## 8. 범위 밖
 
