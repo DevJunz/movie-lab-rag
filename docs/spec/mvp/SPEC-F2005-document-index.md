@@ -36,7 +36,7 @@
 
 ### 3.2 청크 ID · 메타데이터
 
-- ID: `f"{movie_id}:{page_id}:{seq}"`, `seq`는 0부터. `movie_id` · `page_id`는 문자열로 정규화한다.
+- ID: `f"{movie_id}:{page_id}:{seq}"`, `seq`는 0부터. `movie_id` · `page_id`는 ID와 메타데이터 모두 문자열로 정규화한다 (필터가 문자열로 걸리므로).
 - 메타데이터: [01-architecture.md §5.3 `wiki_docs`](../01-architecture.md#53-메타데이터-필드) 전부.
   필수: `movie_id`, `page_id`, `title`, `url`, `related_movie`, `search_query`, `collected_at`, `is_item_doc`,
   `chunk_index`, `chunk_size`, `chunk_overlap`, `source_kind="wiki"`, `source_type="위키백과"`, `license="CC BY-SA 4.0"`.
@@ -48,15 +48,19 @@
   (`where={"$and":[{"movie_id":…},{"page_id":…}]}`로 찾은 ID 가운데 새 ID 집합에 없는 것)만 지운다.
   - 청크 크기를 바꿔 청크 수가 줄어도 높은 순번의 옛 청크가 남지 않는다 (AC-06).
   - 임베딩(쓰기) 단계에서 실패하면 옛 청크가 그대로 남는다 — 문서가 색인에서 사라지지 않는다 (AC-09).
+  - 본문이 비어 청크가 0개면 `ValueError`로 실패시킨다. 옛 청크는 지우지 않는다 (AC-14).
+  - 임베딩 인증 오류(`openai.AuthenticationError` · `PermissionDeniedError`)는 `index_document`가 `InvalidApiKeyError`로 바꾼다 —
+    수집기(F2004, `MovieLabUserError`는 다시 던진다)와 재색인 모두 키 안내 문구를 보여 준다 (AC-13).
 - `scripts.reindex_docs`는 `data/raw/wiki/`의 저장 원문으로 `wiki_docs`를 다시 만든다(외부 호출 없음).
   - `--chunk-size`, `--chunk-overlap` 인자는 **설정 파일 값을 일시적으로 덮어쓰는 실험용**이다.
     덮어쓴 결과에도 설정과 같은 검증 규칙(`config.chunking_ok(size, overlap)`: `size ≥ 1`, `0 ≤ overlap < size`)을 적용하고,
     어기면 색인 전에 인자 오류(`REINDEX_BAD_CHUNKING`, 종료 코드 2)로 끝낸다 (AC-10).
-  - `services.indexing.reindex_documents`는 문서별로 실패를 격리한다: 잘못된 키(`openai.AuthenticationError` ·
-    `PermissionDeniedError`)는 `InvalidApiKeyError`로 바꿔 즉시 중단하고(키 안내 문구), 그 밖의 오류는 로그에 남기고
-    실패 문서 수로 집계한 뒤 다음 문서로 넘어간다 (AC-11).
-  - 전체 재색인이면 저장 원문이 없는 `(movie_id, page_id)`의 청크를 지운다. `--movie-id`를 주면 그 영화 범위에서만 지운다 (AC-12).
-  - 출력: 사용한 값, 문서 수, 이번에 색인한 청크 수, 지운 문서 수, 실패 문서 수, 재색인 후 컬렉션 전체 청크 수 (V4.2-5).
+  - `services.indexing.reindex_documents`는 시작 전에 임베딩(키)을 준비한다 — 키가 없으면 `MissingApiKeyError`로 바로 끝난다.
+    문서별로 실패를 격리한다: 안내 오류(`MovieLabUserError`, 잘못된 키 포함)는 즉시 중단하고, 그 밖의 오류는
+    `settings.indexing.retries`번까지 `retry_wait_sec` 간격으로 다시 시도한 뒤(A-21) 실패 문서 수로 집계하고 다음 문서로 넘어간다 (AC-11, AC-15).
+  - 저장 원문이 없는 `(movie_id, page_id)`의 청크를 지운다. `--movie-id`를 주면 그 영화 범위에서만 지운다.
+    원문이 0건이어도 범위 안에 색인된 문서가 있으면 정리를 수행한다. 원문도 색인도 없을 때만 `REINDEX_EMPTY` (AC-12).
+  - 출력: 사용한 값, 색인에 성공한 문서 수, 이번에 색인한 청크 수, 지운 문서 수, 실패 문서 수, 재색인 후 컬렉션 전체 청크 수 (V4.2-5).
   - 예외 원문은 화면에 내보내지 않는다 — 안내 문구만 출력하고 원문은 로그로 (NF2004).
 - 매니페스트(NF2002)의 `chunks`는 **수집 당시 색인한 청크 수의 기록**이다. 재색인은 매니페스트를 갱신하지 않는다
   (캐시 판단은 `chunks` 값이 아니라 `wiki_docs`에 그 영화 청크가 있는지로 한다).
@@ -80,7 +84,7 @@ class DocIndexer:
     def indexed_pages(self, movie_id: str | None = None) -> set[tuple[str, str]]: ...
 
 def reindex_documents(documents, indexer, *, movie_id: str | None = None) -> ReindexReport: ...
-    # ReindexReport(documents, chunks, failed, removed, total_chunks)
+    # ReindexReport(documents=성공 문서 수, chunks, failed, removed, total_chunks)
 ```
 
 ```text
@@ -110,7 +114,10 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | AC-F2005-09 | 재색인 중 임베딩이 실패해도 그 문서의 옛 청크는 남는다 | — |
 | AC-F2005-10 | `reindex_docs`의 청크 인자가 검증 규칙을 어기면 색인 전에 안내 문구로 거부한다 (라이브러리 원문 출력 없음) | — |
 | AC-F2005-11 | 재색인에서 잘못된 키는 키 안내로, 다른 문서 오류는 그 문서만 실패로 집계하고 나머지는 계속 색인한다 | — |
-| AC-F2005-12 | 전체 재색인 후 저장 원문이 없는 문서의 청크는 남지 않는다 | V4.2-5 |
+| AC-F2005-12 | 전체 재색인 후 저장 원문이 없는 문서의 청크는 남지 않는다 (원문이 0건이어도) | V4.2-5 |
+| AC-F2005-13 | 키가 없거나 잘못되면 수집 · 재색인 모두 키 안내 문구를 보여 주고, 문서마다 임베딩을 반복 호출하지 않는다 | — |
+| AC-F2005-14 | 본문이 빈 문서는 실패로 처리되고 그 문서의 옛 청크는 남는다 | — |
+| AC-F2005-15 | 재색인에서 일시 오류는 설정 횟수만큼 다시 시도한다 | — |
 
 ## 6. 테스트 케이스
 
@@ -133,6 +140,12 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-15 | 통합 | 원문 2건 색인 후 원문 1건을 지우고 전체 재색인 · `--movie-id` 범위 재색인 | 지운 문서 청크 없음, `removed == 1`; 다른 영화 청크는 범위 밖이면 유지 | 12 | 〃 |
 | TC-F2005-16 | 단위 | `VectorStore.has_where` | 청크가 있으면 참, 없거나 컬렉션이 없으면 거짓 | 08 | 〃 |
 | TC-F2005-17 | 단위 | `DocIndexer`에 `source_type` 없이 생성 | `TypeError` | — | 〃 |
+| TC-F2005-18 | 통합 | 키 없는 설정으로 `reindex_documents` | `MissingApiKeyError`, 실패 집계 없음 | 13 | 〃 |
+| TC-F2005-19 | 통합 | 임베딩이 인증 오류를 내는 수집기로 수집 | `collect`가 `InvalidApiKeyError`를 던지고 임베딩 호출 1회 | 13 | `tests/integration/test_collect_index.py` |
+| TC-F2005-20 | 통합 | 원문 0건 · 색인된 청크가 있는 상태에서 `reindex_docs` | 종료 코드 0, 청크 모두 정리, "지웠습니다" 출력 | 12 | `tests/integration/test_scripts.py` |
+| TC-F2005-21 | 통합 | 정수 `movie_id` 문서 색인 | 메타데이터 `movie_id`가 문자열, `has_where`로 찾힘, 재색인해도 청크가 쌓이지 않음 | 03 | `tests/integration/test_doc_index.py` |
+| TC-F2005-22 | 통합 | 색인된 문서를 빈 본문으로 재색인 / `reindex_documents`에 빈 본문 포함 | `ValueError`, 옛 청크 유지 / `failed == 1`, `documents`는 성공 수 | 14 | 〃 |
+| TC-F2005-23 | 통합 | 첫 시도만 일시 오류인 문서 재색인 (`retries=1`, 대기 0) | 성공, `failed == 0`, 임베딩 호출 2회 | 15 | 〃 |
 
 ## 7. 증빙
 
