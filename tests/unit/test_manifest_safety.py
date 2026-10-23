@@ -152,7 +152,7 @@ def test_tc_nf2002_18_transient_read_error_retried(tmp_path, monkeypatch):
     assert list(tmp_path.glob("manifest.json.broken-*")) == []
 
 
-def test_tc_nf2002_18_persistent_read_error_keeps_data(tmp_path, monkeypatch):
+def test_tc_nf2002_18_persistent_read_error_no_backup_no_stale(tmp_path, monkeypatch):
     import pathlib
 
     path = tmp_path / "manifest.json"
@@ -164,7 +164,7 @@ def test_tc_nf2002_18_persistent_read_error_keeps_data(tmp_path, monkeypatch):
         raise PermissionError("공유 위반")
 
     monkeypatch.setattr(pathlib.Path, "read_text", always_fail)
-    assert app.has_keyword("1", "블랙홀")  # 지금 내용을 유지
+    assert not app.has_keyword("1", "블랙홀")  # 읽지 못하면 옛 내용을 믿지 않는다 (캐시 없이)
     app.record_keyword("1", "중력")  # 잠금 안에서 읽지 못하면 기록을 건너뛴다
     monkeypatch.undo()
     assert make_manifest(path).has_keyword("1", "웜홀")  # 남의 기록을 덮어쓰지 않았다

@@ -138,7 +138,7 @@ class Manifest:
 | TC-NF2002-15 | 단위 | 다른 인스턴스가 **같은 크기**의 내용을 새 파일로 바꿔 넣고 수정 시각을 이전 값으로 되돌림 (파일 ID만 다름) | 다시 읽어 바뀐 내용을 본다 | 06 | `tests/unit/test_manifest_safety.py` |
 | TC-NF2002-16 | 단위 | 스레드 2개가 각자의 `Manifest` 인스턴스로 서로 다른 검색어를 번갈아 많이 기록 | 기록이 하나도 사라지지 않음, 임시 파일이 남지 않음 | 08 | 〃 |
 | TC-NF2002-17 | 단위 | 잠금 파일만 남아 있음(잡은 쪽 없음) / 다른 핸들이 잠금을 쥐고 있음(가짜 시계) / 쥔 쪽이 놓음 | 바로 기록 / 예외 없이 기록 건너뜀 · 경고, 대기 중에도 조회는 막히지 않음 / 다음 기록 성공 | 08 | 〃 |
-| TC-NF2002-18 | 단위 | 읽기가 `PermissionError` 한 번 / 계속 · `os.replace`가 `PermissionError` 계속 · 임시 파일 쓰기가 `OSError`(디스크 가득) | 다시 읽어 정상 / 백업 없이 기존 내용 유지 · 예외 없이 임시 파일 정리, 메모리도 기록 전으로 | 05, 08 | 〃 |
+| TC-NF2002-18 | 단위 | 읽기가 `PermissionError` 한 번 / 계속 · `os.replace`가 `PermissionError` 계속 · 임시 파일 쓰기가 `OSError`(디스크 가득) | 다시 읽어 정상 / 백업 없이 캐시 없이 동작(옛 내용 불신) · 남의 기록 보존 · 예외 없이 임시 파일 정리, 저장 안 된 기록으로 적중 없음 | 05, 08 | 〃 |
 | TC-NF2002-20 | 단위 | 잠금을 못 잡는 상태에서 `reset` / `--reset-cache` / 수집기 색인 확인 | `False` / `CACHE_RESET_FAILED` · 종료 코드 1 / 캐시 적중 없이 새로 수집 | 08 | `tests/unit/test_manifest_safety.py`, `tests/integration/test_cache_rules.py` |
 | TC-NF2002-21 | 단위 | 잠금이 `ENOLCK`로 실패 / 백업 `os.replace` 실패 / 같은 깨진 파일 · 읽기 실패 파일 반복 조회 | 기다리지 않고 포기 / 깨진 파일을 덮어쓰지 않음 / 두 번째 조회부터 재시도 · 잠금 시도 없음 | 05, 08 | `tests/unit/test_manifest_safety.py` |
 | TC-NF2002-22 | 단위 | `cache` 설정 값 검증: `lock_poll_sec: 0`, `io_retries: -1`, `lock_timeout_sec: "10"` | `SettingsError` | 08 | `tests/unit/test_config.py` |
