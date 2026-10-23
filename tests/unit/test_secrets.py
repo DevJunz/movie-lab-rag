@@ -52,3 +52,35 @@ def test_tc_nf2003_05_scanner_detects_keys():
     assert not scan_text("key = 'sk-test-abcdefghijklmnopqrstuvwxyz'")
     assert not scan_text('api_key = "short"')
     assert not scan_text("api_key=settings.secrets.gms_api_key")
+
+
+def test_tc_nf2003_10_unquoted_env_style_lines_detected():
+    assert scan_text("GMS_API_KEY=" + "Ab3" * 8)
+    assert scan_text("export OPENAI_SECRET=" + "z9" * 12)
+    assert not scan_text("GMS_API_KEY=")  # .env.example 형식
+    assert not scan_text("api_key=settings.secrets.gms_api_key")
+
+
+def test_tc_nf2003_10_allowlist_is_prefix_only():
+    assert not scan_text('api_key = "sk-test-' + "a" * 20 + '"')
+    assert scan_text('api_key = "live-sk-test-' + "a" * 20 + '"')
+    assert scan_text("token: 'xsk-test-" + "b" * 20 + "'")
+
+
+def test_tc_nf2003_10_finding_does_not_print_value():
+    secret = "sk-" + "Q" * 30
+    finding = scan_text("key = " + secret, "a.py")[0]
+    assert "Q" * 5 not in str(finding) and "sk-" not in str(finding)
+    assert "a.py:1" in str(finding)
+
+
+def test_tc_nf2003_10_fallback_without_git_skips_env_and_venv(tmp_path):
+    (tmp_path / ".env").write_text("GMS_API_KEY=" + "x" * 30, encoding="utf-8")
+    (tmp_path / ".env.local").write_text("x", encoding="utf-8")
+    (tmp_path / ".env.example").write_text("GMS_API_KEY=", encoding="utf-8")
+    for folder in ("venv", ".venv", "__pycache__", ".pytest_cache", "data"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "x.py").write_text("x", encoding="utf-8")
+    (tmp_path / "prd.pdf").write_text("x", encoding="utf-8")
+    (tmp_path / "app.py").write_text("x", encoding="utf-8")
+    assert sorted(tracked_files(tmp_path)) == [".env.example", "app.py"]

@@ -39,3 +39,11 @@ def test_tc_nf2003_01_models_use_settings_and_secrets(monkeypatch):
     emb = make_embeddings(settings)
     assert emb.model == "text-embedding-3-small"
     assert emb.openai_api_base == "https://gms.example.invalid/v1"
+
+
+def test_tc_nf2003_01_embeddings_timeout_and_no_tokenizer_download(monkeypatch):
+    monkeypatch.setenv("GMS_API_KEY", FAKE_KEY)
+    monkeypatch.setenv("GMS_BASE_URL", "https://gms.example.invalid/v1")
+    emb = make_embeddings(load_settings())
+    assert emb.request_timeout == 60
+    assert emb.check_embedding_ctx_length is False

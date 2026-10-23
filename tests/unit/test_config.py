@@ -110,3 +110,23 @@ def test_tc_nf2003_01_model_names_overridable_by_env(monkeypatch):
     settings = load_settings()
     assert settings.models.chat == "other-chat"
     assert settings.models.embedding == "other-embed"
+
+
+def test_tc_nf2003_09_load_settings_does_not_touch_environ(tmp_path: Path, monkeypatch):
+    import os
+
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(f"GMS_API_KEY={FAKE_KEY}\n", encoding="utf-8")
+    monkeypatch.setattr("movielab.config.DOTENV_PATH", dotenv)
+    before = dict(os.environ)
+    assert load_settings().secrets.gms_api_key == FAKE_KEY
+    assert dict(os.environ) == before
+
+
+def test_tc_nf2003_09_dotenv_changes_picked_up_on_reload(tmp_path: Path, monkeypatch):
+    dotenv = tmp_path / ".env"
+    monkeypatch.setattr("movielab.config.DOTENV_PATH", dotenv)
+    dotenv.write_text("GMS_API_KEY=\n", encoding="utf-8")
+    assert load_settings().secrets.gms_api_key is None
+    dotenv.write_text(f"GMS_API_KEY={FAKE_KEY}\n", encoding="utf-8")
+    assert load_settings().secrets.gms_api_key == FAKE_KEY
