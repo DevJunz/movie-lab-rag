@@ -109,15 +109,28 @@ def format_context(evidences: list[Evidence]) -> str: ...
 | TC-F2007-04 | 단위 | `is_not_found`: `NOT_FOUND` 문장 · 앞뒤 공백 · 인용이 붙은 답 · 일부만 확인되지 않은 답 | 참 · 참 · 거짓 · 거짓 | 04 | `tests/unit/test_graph.py` |
 | TC-F2007-05 | 단위 | 등록되지 않은 `task`로 실행 (G1 · C1 사용 검사는 SPEC-F2010 TC로) | `ValueError` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-06 | live | 실제 GMS로 Q6 | `not_found == True` 또는 답변에 "확인되지 않" 포함 | 05 | `tests/live/test_live_answer.py` |
-| TC-F2007-07 | live | 실제 GMS로 Q1 | `[근거 n]` 1개 이상 | 02 | 〃 |
+| TC-F2007-07 | live | 실제 GMS로 Q4 (근거 문서에 답이 있는 질문) | `[근거 n]` 1개 이상 | 02 | 〃 |
 | TC-F2007-08 | 수동 | `python -m scripts.show_graph` | mermaid 출력 캡처 | 06 | 스크린샷 |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.3-2 | 그래프 mermaid 출력 (또는 `graph.py` 캡처) | `docs/verification/screenshots/V4.3-2_graph.png` |
-| V4.3-5 | Q6 답변 화면 | `docs/verification/screenshots/V4.3-5_not_found.png` |
+| V4.3-2 | 그래프 mermaid 출력 (`python -m scripts.show_graph`) | `docs/verification/evidence/V4.3-2_graph.txt` |
+| V4.3-5 | 실제 색인 · GMS로 Q1~Q6 답변 (Q6 확인 불가 포함). 화면 캡처는 UI(SPEC-F2009) 이후 추가 | `docs/verification/evidence/V4.3-5_answers.txt` |
+
+### 7.1 Q1 · Q2에 대한 관찰 (TC-07을 Q4로 둔 이유)
+
+실제 색인(2026-10-23)으로 P3를 돌리면 Q3 · Q4 · Q5는 근거 번호를 붙여 답하고 Q6은 확인 불가로 답한다.
+Q1 · Q2는 "제공된 문서에서 확인되지 않습니다."로 답했다.
+
+- Q1: 수집한 한국어 위키백과 문서에 '영화의 블랙홀 묘사와 실제 물리의 비교'를 다룬 문장이 없다. 유사도 Top-4는 모두 「블랙홀」
+  일반 물리 청크였고, 「인터스텔라」 문서(킵 손 과학 자문)는 Top-15 밖이었다. 근거만으로는 확인 불가가 맞는 답이다.
+- Q2: [근거 1](영화 메타데이터 줄거리)의 "12척"은 영화 속 설정이고, 역사 기록("배 13척", 「명량해협」)은 Top-4 밖이었다.
+- 프롬프트 규칙 3 · 4 문구를 바꿔 인용을 유도해 보았으나(실험 3종) 근거에 없는 평가 문장이 섞이는 경우가 생겨 채택하지 않았다 (규칙 1 위반).
+- MMR(λ=0.5, fetch_k=20)로 검색하면 Q1에 「인터스텔라」 도입부, Q2에 「명량해협」 청크가 Top-4에 들어온다 → SPEC-F2014 비교 대상.
+
+따라서 TC-07(실제 모델이 `[근거 n]`을 붙이는지, AC-02)은 근거 문서에 답이 있는 Q4로 검증하고, Q1 · Q2는 증빙에 그대로 기록한다.
 
 ## 8. 범위 밖
 

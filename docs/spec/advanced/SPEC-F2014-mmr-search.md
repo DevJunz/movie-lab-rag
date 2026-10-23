@@ -64,6 +64,7 @@ python -m scripts.compare_retrieval --movie-id 157336 --question "<Q1>" [--top-k
 | TC-F2014-02 | 통합 | MMR 모드 | `evidences[0]`이 메타, 외부 근거 모두 해당 `movie_id` | 04 | 〃 |
 | TC-F2014-03 | 단위 | 설정 `search_type: "mmr"` / 오타 `"mrr"` | 로드 성공 / `SettingsError` | 01 | `tests/unit/test_config.py` |
 | TC-F2014-04 | 통합 | `compare_retrieval` 실행(가짜) | 표 파일 생성, 요약 지표 3종 포함 | 03 | `tests/integration/test_scripts.py` |
+| TC-F2014-06 | live | Q1 · Q2를 similarity / MMR로 검색 | MMR Top-4에 Q1 「인터스텔라」, Q2 「명량해협」 청크 포함 (SPEC-F2007 §7.1 관찰) | 05 | `tests/live/test_live_mmr.py` |
 | TC-F2014-05 | 수동 | Q1 · Q2 · Q4 비교 실행 | 표와 해석을 설계문서에 기록 | 05 | 문서 |
 
 ## 6. 증빙
