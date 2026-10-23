@@ -42,7 +42,7 @@
 예: ["블랙홀", "웜홀", "일반 상대성 이론"]
 ```
 
-`item_card`(영화, `data/domain_movie.py`): 줄거리는 `ItemRecord.index_text`의 `줄거리:` 줄에서 읽는다(메타데이터에 줄거리를 중복 저장하지 않기 위해). `인터스텔라 (2014) / 원제: Interstellar / 감독: 크리스토퍼 놀란 / 장르: 모험, 드라마, SF / 줄거리(앞부분): 세계 각국의 정부와 …(300자)`.
+`item_card`(영화, `data/domain_movie.py`): 줄거리는 `ItemRecord.index_text`의 줄거리 부분(라벨부터 끝까지, 여러 문단 포함)에서 읽는다(메타데이터에 줄거리를 중복 저장하지 않기 위해). 라벨은 `data/movies.py`의 상수 하나를 색인 텍스트 생성과 함께 쓴다. 앞부분 길이는 `settings.collect.card_overview_chars`(기본 300, 가정 A-22)에서 읽는다. 프로필에 `item_card` · `item_doc_queries`가 없어도 예외 없이 동작한다(카드는 `제목 (연도)`, 항목 자체 검색어는 없음). `인터스텔라 (2014) / 원제: Interstellar / 감독: 크리스토퍼 놀란 / 장르: 모험, 드라마, SF / 줄거리(앞부분): 세계 각국의 정부와 …(300자)`.
 영화 필드 이름을 프롬프트 템플릿에 직접 쓰지 않기 위해 프로필이 만든다(NF2005).
 
 ### 3.2 항목 자체 문서 검색어 (항상 포함)
@@ -100,7 +100,7 @@ class QueryExtractor:
 | AC-F2003-03 | LLM이 설명 문장 · 코드 펜스를 섞어도 배열을 읽는다 | — |
 | AC-F2003-04 | 파싱 실패 · LLM 오류 시 예외 없이 항목 자체 검색어만 반환하고 `fallback=True` | — |
 | AC-F2003-05 | 중복 · 빈 값 · 비문자열을 제거하고 `max_queries`를 넘지 않는다 | — |
-| AC-F2003-06 | 하나의 질문에 대해 뽑힌 검색어 목록을 스크립트 출력과 화면에서 확인할 수 있다 | V4.2-1 |
+| AC-F2003-06 | 하나의 질문에 대해 뽑힌 검색어 목록을 확인할 수 있다 — 이 SPEC에서는 실제 GMS 결과 증빙 파일, 스크립트 출력은 SPEC-F2004 `scripts.collect`, 화면은 SPEC-F2012 수집 상세 | V4.2-1 |
 
 ## 6. 테스트 케이스
 
@@ -113,9 +113,11 @@ class QueryExtractor:
 | TC-F2003-05 | 단위 | LLM이 예외를 던짐 | 예외 전파 없음, `fallback` | 04 | 〃 |
 | TC-F2003-06 | 단위 | 응답 `["웜홀"," 웜홀 ","",3,"인터스텔라","a","b","c","d","e"]` | 중복 · 빈 값 · 숫자 · 항목 제목 제거, 최대 5개 | 05 | 〃 |
 | TC-F2003-07 | 단위 | 동명 영화(합성 「미녀와 야수」 1991/2017) | 항목 검색어에 `(1991년 영화)` / `(2017년 영화)`가 각각 들어감 | 02 | `tests/unit/test_domain_movie.py` |
-| TC-F2003-08 | 단위 | `parse_json_array` 경계값 (빈 문자열, `[]`, 중첩 배열, 깨진 JSON) | 정의된 기본값 반환 | 03, 04 | `tests/unit/test_jsonparse.py` |
+| TC-F2003-08 | 단위 | `parse_json_array` · `parse_json_object` 경계값 (빈 문자열, `[]`, 중첩 배열, 깨진 JSON, 배열 뒤에 대괄호가 있는 설명, 앞에 JSON이 아닌 대괄호, 바깥 모양이 다른 JSON) | 처음 나온 올바른 JSON 값 · 모양이 다르면 기본값 | 03, 04 | `tests/unit/test_jsonparse.py` |
 | TC-F2003-09 | live | 실제 GMS로 Q1 검색어 추출 | 파싱 성공, 1~5개, `fallback == False` | 01, 03 | `tests/live/test_live_prompts.py` |
-| TC-F2003-10 | 수동 | `python -m scripts.collect --movie-id 157336 --question "<Q1>" --dry-run` | 검색어 목록 출력 | 06 | 스크린샷 |
+| TC-F2003-10 | 수동 | Q1 실제 검색어 추출 결과 저장 (스크립트 출력은 F2004에서) | 검색어 목록 | 06 | `docs/verification/evidence/V4.2-1_queries.txt` |
+| TC-F2003-11 | 단위 | `item_card`: 여러 문단 줄거리 / `card_overview_chars` 설정 | 둘째 문단까지 이어 읽음 / 설정 길이로 자름 | 01 | `tests/unit/test_domain_movie.py` |
+| TC-F2003-12 | 단위 | `item_card` · `item_doc_queries`가 없는 프로필로 `extract` | 예외 없음, 카드 `제목 (연도)`, 항목 검색어 없음 | 04 | `tests/unit/test_query_extractor.py` |
 
 ## 7. 증빙
 
