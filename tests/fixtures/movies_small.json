@@ -1,0 +1,323 @@
+[
+ {
+  "movie_id": "157336",
+  "title": "인터스텔라",
+  "original_title": "Interstellar",
+  "release_date": "2014-06-01",
+  "year": 2014,
+  "genres": [
+   "모험",
+   "드라마",
+   "SF"
+  ],
+  "director": [
+   "크리스토퍼 놀란"
+  ],
+  "cast": [
+   "배우 갑",
+   "배우 을"
+  ],
+  "overview": "[합성] 식량난에 빠진 지구를 떠나 우주 비행사가 웜홀을 지나 새 행성을 찾는다.",
+  "runtime": 169,
+  "original_language": "en",
+  "production_countries": [
+   "United Kingdom",
+   "United States of America"
+  ],
+  "vote_average": 8.5,
+  "vote_count": 40000,
+  "tmdb_url": "https://www.themoviedb.org/movie/157336"
+ },
+ {
+  "movie_id": "27205",
+  "title": "인셉션",
+  "original_title": "Inception",
+  "release_date": "2010-06-01",
+  "year": 2010,
+  "genres": [
+   "액션",
+   "SF",
+   "모험"
+  ],
+  "director": [
+   "크리스토퍼 놀란"
+  ],
+  "cast": [
+   "배우 병"
+  ],
+  "overview": "[합성] 꿈속에 들어가 생각을 훔치는 기술자가 마지막 임무를 맡는다.",
+  "runtime": 148,
+  "original_language": "en",
+  "production_countries": [
+   "United States of America"
+  ],
+  "vote_average": 8.4,
+  "vote_count": 37000,
+  "tmdb_url": "https://www.themoviedb.org/movie/27205"
+ },
+ {
+  "movie_id": "282631",
+  "title": "명량",
+  "original_title": "The Admiral: Roaring Currents",
+  "release_date": "2014-06-01",
+  "year": 2014,
+  "genres": [
+   "액션",
+   "드라마",
+   "역사"
+  ],
+  "director": [
+   "김한민"
+  ],
+  "cast": [
+   "배우 정"
+  ],
+  "overview": "[합성] 정유재란 때 열두 척의 배로 대군에 맞선 해전을 그린다.",
+  "runtime": 128,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 7.5,
+  "vote_count": 900,
+  "tmdb_url": "https://www.themoviedb.org/movie/282631"
+ },
+ {
+  "movie_id": "496243",
+  "title": "기생충",
+  "original_title": "Parasite",
+  "release_date": "2019-06-01",
+  "year": 2019,
+  "genres": [
+   "코미디",
+   "스릴러",
+   "드라마"
+  ],
+  "director": [
+   "봉준호"
+  ],
+  "cast": [
+   "배우 무"
+  ],
+  "overview": "[합성] 반지하에 사는 가족이 부잣집에 하나씩 들어가며 벌어지는 이야기.",
+  "runtime": 132,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 8.5,
+  "vote_count": 19000,
+  "tmdb_url": "https://www.themoviedb.org/movie/496243"
+ },
+ {
+  "movie_id": "1255",
+  "title": "괴물",
+  "original_title": "The Host",
+  "release_date": "2006-06-01",
+  "year": 2006,
+  "genres": [
+   "호러",
+   "드라마",
+   "SF"
+  ],
+  "director": [
+   "봉준호"
+  ],
+  "cast": [
+   "배우 기"
+  ],
+  "overview": "[합성] 한강에 나타난 괴생명체에게 딸을 빼앗긴 가족이 딸을 찾아 나선다.",
+  "runtime": 119,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 7.0,
+  "vote_count": 3000,
+  "tmdb_url": "https://www.themoviedb.org/movie/1255"
+ },
+ {
+  "movie_id": "1091",
+  "title": "괴물",
+  "original_title": "The Thing",
+  "release_date": "1982-06-01",
+  "year": 1982,
+  "genres": [
+   "호러",
+   "SF",
+   "미스터리"
+  ],
+  "director": [
+   "존 카펜터"
+  ],
+  "cast": [
+   "배우 경"
+  ],
+  "overview": "[합성] 남극 기지 대원들이 모습을 바꾸는 외계 생명체와 맞선다.",
+  "runtime": 109,
+  "original_language": "en",
+  "production_countries": [
+   "United States of America"
+  ],
+  "vote_average": 8.1,
+  "vote_count": 7000,
+  "tmdb_url": "https://www.themoviedb.org/movie/1091"
+ },
+ {
+  "movie_id": "10020",
+  "title": "미녀와 야수",
+  "original_title": "Beauty and the Beast",
+  "release_date": "1991-06-01",
+  "year": 1991,
+  "genres": [
+   "로맨스",
+   "가족",
+   "애니메이션"
+  ],
+  "director": [
+   "게리 트루스데일"
+  ],
+  "cast": [
+   "배우 신"
+  ],
+  "overview": "[합성] 저주에 걸린 야수와 책을 좋아하는 아가씨의 이야기를 그린 애니메이션.",
+  "runtime": 84,
+  "original_language": "en",
+  "production_countries": [
+   "United States of America"
+  ],
+  "vote_average": 7.7,
+  "vote_count": 10000,
+  "tmdb_url": "https://www.themoviedb.org/movie/10020"
+ },
+ {
+  "movie_id": "321612",
+  "title": "미녀와 야수",
+  "original_title": "Beauty and the Beast",
+  "release_date": "2017-06-01",
+  "year": 2017,
+  "genres": [
+   "가족",
+   "판타지",
+   "로맨스"
+  ],
+  "director": [
+   "빌 콘돈"
+  ],
+  "cast": [
+   "배우 임"
+  ],
+  "overview": "[합성] 고전 애니메이션을 실사로 다시 만든 판타지 로맨스.",
+  "runtime": 129,
+  "original_language": "en",
+  "production_countries": [
+   "United States of America"
+  ],
+  "vote_average": 7.0,
+  "vote_count": 15000,
+  "tmdb_url": "https://www.themoviedb.org/movie/321612"
+ },
+ {
+  "movie_id": "670",
+  "title": "올드보이",
+  "original_title": "Oldboy",
+  "release_date": "2003-06-01",
+  "year": 2003,
+  "genres": [
+   "드라마",
+   "스릴러",
+   "미스터리"
+  ],
+  "director": [
+   "박찬욱"
+  ],
+  "cast": [
+   "배우 계"
+  ],
+  "overview": "[합성] 이유도 모른 채 십오 년 동안 갇혀 있던 남자가 풀려나 복수를 시작한다.",
+  "runtime": 120,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 8.2,
+  "vote_count": 9000,
+  "tmdb_url": "https://www.themoviedb.org/movie/670"
+ },
+ {
+  "movie_id": "1084390",
+  "title": "소주전쟁",
+  "original_title": "Soju War",
+  "release_date": "2025-06-01",
+  "year": 2025,
+  "genres": [
+   "드라마"
+  ],
+  "director": [],
+  "cast": [
+   "배우 갑"
+  ],
+  "overview": "[합성] 외환 위기 시절 소주 회사를 지키려는 사람들의 이야기.",
+  "runtime": 110,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 6.5,
+  "vote_count": 50,
+  "tmdb_url": "https://www.themoviedb.org/movie/1084390"
+ },
+ {
+  "movie_id": "597",
+  "title": "타이타닉",
+  "original_title": "Titanic",
+  "release_date": "1997-06-01",
+  "year": 1997,
+  "genres": [
+   "드라마",
+   "로맨스"
+  ],
+  "director": [
+   "제임스 카메론"
+  ],
+  "cast": [
+   "배우 을"
+  ],
+  "overview": "[합성] 처녀 항해에 나선 거대한 여객선에서 만난 두 사람의 사랑 이야기.",
+  "runtime": 194,
+  "original_language": "en",
+  "production_countries": [
+   "United States of America"
+  ],
+  "vote_average": 7.9,
+  "vote_count": 25000,
+  "tmdb_url": "https://www.themoviedb.org/movie/597"
+ },
+ {
+  "movie_id": "900001",
+  "title": "쉬리",
+  "original_title": "Shiri",
+  "release_date": "1999-06-01",
+  "year": 1999,
+  "genres": [
+   "액션",
+   "스릴러",
+   "드라마"
+  ],
+  "director": [
+   "강제규"
+  ],
+  "cast": [
+   "배우 병"
+  ],
+  "overview": "[합성] 북한 특수부대 요원과 남한 정보요원의 대결을 그린 첩보 영화.",
+  "runtime": 125,
+  "original_language": "ko",
+  "production_countries": [
+   "South Korea"
+  ],
+  "vote_average": 6.9,
+  "vote_count": 200,
+  "tmdb_url": "https://www.themoviedb.org/movie/900001"
+ }
+]
