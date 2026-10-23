@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2006** 근거 검색 및 병합 (검색 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/rag/retriever.py` |
 | 선행 SPEC | SPEC-F2002, SPEC-F2005 |
 | 관련 ISSUE | #10 |
@@ -89,7 +89,7 @@ python -m scripts.collect --movie-id 157336 --question "<Q1>" --show-evidence [-
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.3-1 | Top-k 2 / 4 / 6 근거 목록 비교 | `docs/verification/screenshots/V4.3-1_topk.png` |
+| V4.3-1 | 실제 색인으로 Q1의 Top-k 2 / 4 / 6 근거 목록 비교 (유사도 검색이 같은 문서 「블랙홀」 청크에 몰리는 것도 관찰 → F2014 MMR의 동기) | `docs/verification/evidence/V4.3-1_topk.txt` |
 
 ## 8. 범위 밖
 
