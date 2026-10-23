@@ -27,6 +27,7 @@ from movielab.core.errors import MovieLabUserError
 from movielab.core.types import CitedResult, ItemRecord
 from movielab.ui.components.evidence import render_evidence
 from movielab.ui.components.status import progress_line, render_collect_detail
+from movielab.ui.pages.explore import page_explore
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +204,10 @@ def _page_ask(services: Any, item: ItemRecord | None, *, ready: bool = True) -> 
 
 
 # 메뉴 이름 → 화면 `(services, item, *, ready)`. 다른 화면은 그 기능의 SPEC이 더한다.
-PAGES: dict[str, Callable[..., None]] = {messages.MENU_ASK: _page_ask}
+PAGES: dict[str, Callable[..., None]] = {
+    messages.MENU_ASK: _page_ask,
+    messages.MENU_EXPLORE: page_explore,  # F2011
+}
 
 
 def main(services: Any) -> None:

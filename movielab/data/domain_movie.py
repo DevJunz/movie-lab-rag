@@ -42,6 +42,31 @@ def item_caption(item: ItemRecord) -> str:
     return " · ".join(parts)
 
 
+EXPLORE_FILTER_SPEC = """필드: "year_min": 정수|null, "year_max": 정수|null,
+"korean_only": true|false|null
+- 연도 · 연대가 명시된 경우에만 year_min/year_max를 채운다. ("90년대" → 1990, 1999)
+- "한국 영화", "국내 영화"가 명시된 경우에만 korean_only=true."""
+
+
+def _year(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def explore_where(parsed: dict) -> dict | None:
+    """E1 해석 결과 → Chroma `where` (SPEC-F2011 §3.1-2). 확실한 구조 조건만, 없으면 None."""
+    parts: list[dict] = []
+    year_min, year_max = _year(parsed.get("year_min")), _year(parsed.get("year_max"))
+    if year_min is not None:
+        parts.append({"year": {"$gte": year_min}})
+    if year_max is not None:
+        parts.append({"year": {"$lte": year_max}})
+    if parsed.get("korean_only") is True:
+        parts.append({"original_language": {"$eq": "ko"}})
+    if not parts:
+        return None
+    return parts[0] if len(parts) == 1 else {"$and": parts}
+
+
 def item_doc_queries(item: ItemRecord) -> list[str]:
     """영화 자체를 다룬 위키백과 문서의 제목 후보. 동명 작품 표제 형식이 먼저 (SPEC-F2003 §3.2)."""
     return [f"{item.title} ({item.year}년 영화)", f"{item.title} (영화)", item.title]
@@ -95,4 +120,6 @@ MOVIE_PROFILE = DomainProfile(
     item_caption=item_caption,
     item_doc_queries=item_doc_queries,
     pick_item_doc=pick_item_doc,
+    explore_filter_spec=EXPLORE_FILTER_SPEC,
+    explore_where=explore_where,
 )
