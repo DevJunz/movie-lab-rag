@@ -342,3 +342,29 @@ def test_tc_f2005_31_broken_raw_file_skipped_and_kept(tmp_settings, monkeypatch,
     assert "문서 2건" in out and "색인하지 못한 문서 2건" in out
     for page_id in ("2", "4"):  # 읽지 못한 원문의 청크는 유지
         assert services.store.count_where("wiki_docs", {"page_id": page_id}) > 0
+
+
+# --- SPEC-F2006 근거 목록 출력 ---
+
+
+def test_tc_f2006_08_show_evidence_with_top_k(tmp_settings, monkeypatch, capsys):
+    from movielab.container import build_services
+    from movielab.services.indexing import index_catalog
+    from scripts import collect
+    from tests.fakes import FakeChatModel, FakeClock, FakeEmbeddings, pick_titles
+
+    tmp_settings.raw["collect"]["source"] = "bundle"
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
+    emb = FakeEmbeddings()
+    services = build_services(tmp_settings, llm=llm, embeddings=emb)
+    index_catalog(services.catalog, services.store, sleep=FakeClock().sleep)
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(
+        collect, "build_services", lambda s: build_services(s, llm=llm, embeddings=emb)
+    )
+    argv = ["--movie-id", "157336", "--question", "블랙홀", "--source", "bundle"]
+    assert collect.main([*argv, "--show-evidence", "--top-k", "2"]) == 0
+    out = capsys.readouterr().out
+    lines = [ln for ln in out.splitlines() if ln.startswith("[근거 ")]
+    assert lines[0].startswith("[근거 1] 영화 메타데이터 · 인터스텔라 (2014)")
+    assert len(lines) == 3 and "위키백과" in lines[1] and "점수" in lines[1]
