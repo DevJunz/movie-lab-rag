@@ -139,7 +139,8 @@ class Services:
 
     def rag_graph(self, *, llm: Any = None, top_k: int | None = None) -> Any:
         """retrieve → generate 그래프 (F2007). `llm`을 주면 그것을 쓴다(구조 출력 등)."""
-        return build_graph(self.retriever(top_k=top_k), llm or self.llm, self.profile)
+        chat = self.llm if llm is None else llm
+        return build_graph(self.retriever(top_k=top_k), chat, self.profile)
 
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.

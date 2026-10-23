@@ -89,8 +89,14 @@ ANSWER_GENERATION = """[작업: 답변 생성]
 
 
 def format_context(evidences: list[Evidence]) -> str:
-    """`[근거 n] (출처 유형) 제목` 머리줄 + 본문. 번호는 Evidence.n을 그대로 쓴다."""
-    return "\n\n".join(f"[근거 {e.n}] ({e.source_type}) {e.title}\n{e.text}" for e in evidences)
+    """`[근거 n] (출처 유형) 제목` 머리줄 + 본문. 번호는 Evidence.n을 그대로 쓴다.
+
+    본문 안의 `[근거` 표기는 `(근거`로 바꾼다 — 모델이 없는 근거 번호를 인용하지 않게.
+    """
+    return "\n\n".join(
+        f"[근거 {e.n}] ({e.source_type}) {e.title}\n{e.text.replace('[근거', '(근거')}"
+        for e in evidences
+    )
 
 
 def build_answer_prompt(profile: DomainProfile, evidences: list[Evidence], question: str) -> str:
