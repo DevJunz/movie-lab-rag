@@ -48,6 +48,8 @@
   (`where={"$and":[{"movie_id":…},{"page_id":…}]}`로 찾은 ID 가운데 새 ID 집합에 없는 것)만 지운다.
   - 청크 크기를 바꿔 청크 수가 줄어도 높은 순번의 옛 청크가 남지 않는다 (AC-06).
   - 임베딩(쓰기) 단계에서 실패하면 옛 청크가 그대로 남는다 — 문서가 색인에서 사라지지 않는다 (AC-09).
+  - 새 청크는 `settings.indexing.batch_size`개씩 나눠 넣는다 — 청크 크기를 아주 작게 잡아도 Chroma 한 번 호출 한도를 넘지 않는다.
+    중간 묶음에서 실패하면 앞 묶음의 새 청크와 뒤쪽 옛 청크가 섞인 채 남는다(검색은 계속 된다). 다음 재색인 · 수집에서 바로잡힌다.
   - 본문이 비어 청크가 0개면 `ValueError`로 실패시킨다. 옛 청크는 지우지 않는다 (AC-14).
     수집기(F2004)는 길이 규칙을 면제받는 항목 자체 문서라도 본문이 비어 있으면 `too_short`로 버린다 —
     저장 · 색인하지 않으므로 같은 질문의 캐시 적중과 재색인이 빈 문서 때문에 실패하지 않는다 (AC-17).
@@ -57,7 +59,9 @@
   - `--chunk-size`, `--chunk-overlap` 인자는 **설정 파일 값을 일시적으로 덮어쓰는 실험용**이다.
     덮어쓴 결과에도 설정과 같은 검증 규칙(`config.chunking_ok(size, overlap)`: `size ≥ 1`, `0 ≤ overlap < size`)을 적용하고,
     어기면 색인 전에 인자 오류(`REINDEX_BAD_CHUNKING`, 종료 코드 2)로 끝낸다 (AC-10).
-  - `services.indexing.reindex_documents`는 다시 색인할 원문이 있으면 시작 전에 임베딩(키)을 준비한다 — 키가 없으면
+  - 저장 원문 파일 하나가 깨져 있으면(JSON 오류 등) 그 파일만 건너뛰고 경고 로그를 남긴다. 그 문서는 실패로 세고,
+    **청크는 지우지 않는다**(원문 파일 이름의 `(movie_id, page_id)`를 정리 대상에서 뺀다).
+  - `services.indexing.reindex_documents`는 다시 색인할 원문이 있으면 시작 전에 임베딩(키)을 준비한다(`VectorStore.ensure_embeddings()`) — 키가 없으면
     `MissingApiKeyError`로 바로 끝난다. 원문이 0건이면(고아 정리만) 키 없이 동작한다.
     문서별로 실패를 격리한다: 안내 오류(`MovieLabUserError`, 잘못된 키 포함)는 즉시 중단하고, 그 밖의 오류는
     `settings.indexing.retries`번까지 `retry_wait_sec` 간격으로 다시 시도한 뒤(A-21) 실패 문서 수로 집계하고 다음 문서로 넘어간다 (AC-11, AC-15).
@@ -167,6 +171,8 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-28 | 통합 | 키 없는 설정 · 원문 0건 · 고아 청크만 있음 | 키 오류 없이 고아 정리 | 12 | 〃 |
 | TC-F2005-29 | 통합 | 본문이 빈 항목 자체 문서로 같은 질문 2회 | `too_short`로 버려짐, 두 번째는 캐시 적중 | 17 | `tests/integration/test_collect_index.py` |
 | TC-F2005-30 | 통합 | `reindex_docs --movie-id ""` / `--chunk-size 500 --chunk-overlap 100` | 전체 범위로 재색인 · 정리 / 되돌리기 안내 출력 | 12, 05 | `tests/integration/test_scripts.py` |
+| TC-F2005-31 | 통합 | 원문 3건 중 1건 JSON이 깨진 상태로 전체 재색인 | 나머지 2건 재색인, 깨진 문서 청크 유지, `failed == 1` | 11, 12 | `tests/integration/test_scripts.py` |
+| TC-F2005-32 | 통합 | `batch_size=2` 설정에서 청크 5개 문서 색인 | `upsert` 3번, 청크 5개 | 01 | `tests/integration/test_doc_index.py` |
 | TC-F2005-26 | 통합 | 문서가 하나도 색인되지 않은 영화(P2가 아무것도 안 고름)에 같은 질문 2회 | 두 번째는 캐시 적중 (청크가 없어도 '색인된 문서' 기록이 없으면 캐시를 비우지 않음) | 08 | `tests/integration/test_collect_index.py` |
 
 ## 7. 증빙
