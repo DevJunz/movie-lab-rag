@@ -58,3 +58,20 @@ def test_tc_f2008_07_uncited_notice():
     at = _run(CitedResult(cited=[], uncited=True))
     assert [i.value for i in at.info] == ["이 답변에는 인용된 근거가 없습니다."]
     assert "[근거" not in _texts(at)
+
+
+def test_tc_f2008_06_link_with_parentheses_kept_whole():
+    from movielab.ui.components.evidence import evidence_line
+
+    evidence = Evidence(
+        n=2,
+        chunk_id="c2",
+        source_kind="wiki",
+        source_type="위키백과",
+        title="트리니티 (핵 실험)",
+        url="https://ko.wikipedia.org/wiki/트리니티_(핵_실험)",
+        license="CC BY-SA 4.0",
+        text="[합성]",
+    )
+    line = evidence_line(evidence, MOVIE_PROFILE)
+    assert "(https://ko.wikipedia.org/wiki/트리니티_%28핵_실험%29)" in line
