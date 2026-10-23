@@ -180,3 +180,21 @@ def test_tc_nf2006_10_requests_are_serialized(tmp_settings):
     for t in threads:
         t.join()
     assert session.max_in_flight == 1
+
+
+def test_tc_nf2006_01_container_wires_wiki_client(tmp_settings, monkeypatch):
+    from movielab.config import load_settings
+    from movielab.container import build_services
+
+    session = FakeHttpSession().add({}, OK)
+    services = build_services(tmp_settings, http=session)
+    with pytest.raises(ExternalSourceUnavailableError):  # tmp_settings에는 연락처가 없다
+        services.wiki_client.get({"action": "query"})
+    assert session.requests == []
+
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setenv("WIKI_CONTACT", CONTACT)
+    services = build_services(load_settings(), http=session)
+    assert services.wiki_client is services.wiki_client
+    assert CONTACT in services.wiki_client.user_agent
+    assert services.wiki_client.session is session
