@@ -370,12 +370,14 @@ class RAGState(TypedDict, total=False):
     question: str          # task가 factcheck이면 주장, guide이면 고정 질문
     task: str              # "qa" | "guide" | "factcheck"
     contexts: list         # list[Evidence] — retrieve가 채움
+    no_external: bool      # 외부 근거가 하나도 없음 — retrieve가 채움 (F2006 → F2012 안내)
     answer: str            # generate가 채움 (factcheck은 JSON 문자열)
 ```
 
 - 노드는 정확히 `retrieve`, `generate` 두 개. 간선 `START → retrieve → generate → END`.
 - `generate`는 `task`에 따라 P3 · G1 · C1 중 하나를 고른다. 특화 기능(F2010)도 같은 두 노드 그래프를 쓴다.
-- 그래프는 `rag.graph.build_graph(retriever, llm, profile)`로 만들고, 테스트에서는 가짜 LLM과 임시 Chroma를 주입한다.
+- 그래프는 `rag.graph.build_graph(retriever, llm, profile, prompts)`로 만든다. `prompts`는 작업 → 프롬프트 생성 함수 표이고 container가 조립한다(F2010이 항목을 더한다).
+  테스트에서는 가짜 LLM과 임시 Chroma를 주입한다.
 
 ## 9. 오류 처리와 로그 (F2012, NF2004)
 

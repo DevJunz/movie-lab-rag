@@ -33,7 +33,8 @@
 START → retrieve → generate → END
 ```
 
-- `retrieve` 노드: `Retriever.retrieve(state["movie_id"], state["question"])` → `{"contexts": evidences}`.
+- `retrieve` 노드: 먼저 `task`가 등록된 작업인지 확인하고(아니면 `ValueError` — 검색 · 임베딩 호출 전에 거부),
+  `Retriever.retrieve(state["movie_id"], state["question"])` → `{"contexts": evidences, "no_external": …}`(F2006의 외부 근거 없음 표시를 그대로 전달, F2012 안내용).
 - `generate` 노드: `task`에 맞는 프롬프트(P3 / G1 / C1)를 만들어 LLM을 한 번 부른다 → `{"answer": text}`.
 - `python -m scripts.show_graph`는 `graph.get_graph().draw_mermaid()`를 출력한다 (V4.3-2 증빙).
 
@@ -71,8 +72,11 @@ START → retrieve → generate → END
 
 - 규칙 5는 위키 본문에 섞인 문장이 지시처럼 읽히는 경우(프롬프트 주입)를 막기 위한 것이다.
 - 모델: `settings.models.chat`(기본 `gpt-4o-mini`), `temperature = 0`, 타임아웃 `timeout_sec`.
-- `not_found` 판정: `rag.graph.is_not_found(answer)` — 답변을 정규화했을 때 `NOT_FOUND` 문장으로 시작하고 `[근거 n]`이 없으면 참. `AnswerResult.not_found`(F2009)가 이 함수를 쓴다.
-- `generate` 노드는 작업(`task`) → 프롬프트 생성 함수 표를 쓴다. 이 SPEC은 `qa`(P3)만 등록하고, `guide`(G1) · `factcheck`(C1)는 SPEC-F2010이 같은 표에 더한다. 등록되지 않은 작업은 `ValueError`.
+- `not_found` 판정: `rag.graph.is_not_found(answer)` — 공백을 정규화하고 앞뒤 따옴표(`"` `'` `“ ”` `「 」`)를 뗀 뒤,
+  `NOT_FOUND` 문장(끝 마침표는 있어도 없어도 됨)으로 시작하고 `[근거 n]`이 없으면 참. `AnswerResult.not_found`(F2009)가 이 함수를 쓴다.
+- `generate` 노드는 작업(`task`) → 프롬프트 생성 함수 표를 쓴다. 표는 `build_graph(..., prompts=…)`로 주입하고(모듈 전역 상태를 바꾸지 않는다),
+  기본값은 `{"qa": P3}`이다. `guide`(G1) · `factcheck`(C1)는 SPEC-F2010이 container에서 표에 더한다. 등록되지 않은 작업은 `ValueError`.
+- 근거 블록에 넣는 본문 안의 `[근거` 표기는 `(근거`로 바꾼다 — 문서 본문에 그런 문자열이 있어도 모델이 없는 근거 번호를 인용하지 않게 한다.
 
 ### 3.4 인터페이스
 
@@ -110,7 +114,10 @@ def format_context(evidences: list[Evidence]) -> str: ...
 | TC-F2007-05 | 단위 | 등록되지 않은 `task`로 실행 (G1 · C1 사용 검사는 SPEC-F2010 TC로) | `ValueError` | 01 | `tests/unit/test_graph.py` |
 | TC-F2007-06 | live | 실제 GMS로 Q6 | `not_found == True` 또는 답변에 "확인되지 않" 포함 | 05 | `tests/live/test_live_answer.py` |
 | TC-F2007-07 | live | 실제 GMS로 Q4 (근거 문서에 답이 있는 질문) | `[근거 n]` 1개 이상 | 02 | 〃 |
-| TC-F2007-08 | 수동 | `python -m scripts.show_graph` | mermaid 출력 캡처 | 06 | 스크린샷 |
+| TC-F2007-08 | 통합 | `python -m scripts.show_graph` (실제 출력은 V4.3-2 증빙) | mermaid에 `retrieve` · `generate` 노드와 간선 | 06 | `tests/integration/test_scripts.py`, `tests/unit/test_graph.py` |
+| TC-F2007-09 | 단위 | `is_not_found`: 따옴표로 감싼 문장 · 마침표 없는 문장 | 참 · 참 | 04 | `tests/unit/test_graph.py` |
+| TC-F2007-10 | 단위 | 등록되지 않은 작업이면 검색기 호출 0회 / 근거 본문의 `[근거 9]` | `ValueError`, 검색 없음 / 근거 블록에 `(근거 9]`로 들어감 | 01, 02 | `tests/unit/test_graph.py`, `tests/unit/test_prompts.py` |
+| TC-F2007-11 | 통합 | `Services.rag_graph()`(가짜 LLM · 임베딩)로 실행 | `contexts` · `answer` · `no_external` 채움 | 01 | `tests/integration/test_graph_flow.py` |
 
 ## 7. 증빙
 
