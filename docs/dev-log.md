@@ -9,3 +9,4 @@ RAG 파이프라인 설계문서의 "겪은 문제, 해결 과정" 절의 원본
 | 2026-10-23 | SPEC-NF2005 (#1) | `ruff format .`이 SPEC 마크다운 안의 Python 코드 블록까지 다시 정렬했다 | ruff 0.17은 마크다운의 코드 블록도 포맷 대상으로 본다 | `pyproject.toml`에 `include = ["*.py", "*.pyi"]`로 대상을 한정하고 문서 변경은 되돌림 | A-13 |
 | 2026-10-23 | SPEC-NF2005 (#1) | 네트워크 차단 픽스처가 Windows의 `socket.socketpair()`까지 막을 수 있다 | Windows는 `socketpair`를 루프백 TCP 연결로 구현한다 | 루프백 주소는 허용하고 외부 주소 · DNS 조회만 막음 (TC-NF2005-06) | — |
 | 2026-10-23 | SPEC-NF2005 (#24) | 로컬(Windows)에서는 통과한 ruff import 정렬이 CI(리눅스)에서 실패했다 | `extend-exclude = ["data"]`가 이름이 `data`인 모든 폴더에 걸려 CI에서 `movielab/data/`가 1st-party로 인식되지 않았다 | 제외 항목에서 `data`를 빼고(루트 `data/`에는 `.py`가 없음) `known-first-party`를 명시 | A-13 |
+| 2026-10-23 | SPEC-NF2005 (#24) | CI에서 `movielab.data`를 import 하지 못했다. 로컬에는 있는데 저장소에 `movielab/data/`가 커밋되지 않았다 | `.gitignore`의 `data/`가 루트 `data/`뿐 아니라 `movielab/data/`까지 무시했다 | 데이터 · 산출물 경로를 `/data/`처럼 루트 기준으로 고정, 무시된 소스 파일을 잡는 회귀 테스트 TC-NF2005-11 추가 | NF2003 |

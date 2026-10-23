@@ -105,6 +105,7 @@
 | TC-NF2005-08 | 단위 | 가짜 객체 동작: `FakeChatModel` 작업 분기 · 기록 · 예외, `FakeEmbeddings` 결정성 · 유사도 순서, `FakeHttpSession` 응답 순서 · 기록, `FakeClock` | 정의대로 동작 | 06 | `tests/unit/test_fakes.py` |
 | TC-NF2005-09 | 단위 | `load_settings()` 기본 파일 · `MOVIELAB_SETTINGS` 지정 파일 · `tmp_settings` 픽스처 | 값 · 경로가 정확, 임시 경로는 `tmp_path` 아래 | 06 | `tests/unit/test_config.py` |
 | TC-NF2005-10 | 단위 | `build_services(..., llm=가짜, embeddings=가짜, profile=도서)` | 주입한 객체를 그대로 담는다 | 04 | `tests/unit/test_container.py` |
+| TC-NF2005-11 | 단위 | `movielab/` · `scripts/` · `tests/`의 `.py` 파일이 `.gitignore`에 걸리지 않는지 `git check-ignore`로 검사 (Git이 없으면 skip) | 무시되는 소스 파일 0개 | 06 | `tests/unit/test_architecture.py` |
 
 ## 7. 증빙
 
