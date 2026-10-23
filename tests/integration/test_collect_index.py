@@ -70,7 +70,7 @@ def test_tc_f2005_26_movie_without_indexed_docs_still_hits_cache(tmp_settings):
         settings=tmp_settings,
         manifest=make_manifest(tmp_settings.path("manifest")),
         indexer=lambda doc: 1,
-        has_chunks=lambda item_id: False,  # 색인한 문서가 없으니 청크도 없다
+        indexed_pages=lambda item_id: set(),  # 색인한 문서가 없으니 청크도 없다
     )
     services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
     item = services.catalog.get("157336")
@@ -111,10 +111,29 @@ def test_tc_f2005_29_blank_item_doc_rejected_and_cache_hits(tmp_settings):
         settings=tmp_settings,
         manifest=make_manifest(tmp_settings.path("manifest")),
         indexer=indexer,
-        has_chunks=lambda item_id: True,
+        indexed_pages=lambda item_id: {"2"},
     )
     services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
     item = services.catalog.get("157336")
     first = collector.collect(item, QUESTION)
     assert ("1", "too_short") in {(r.page_id, r.reason) for r in first.rejected}
     assert "CACHE_HIT" in collector.collect(item, QUESTION).notices
+
+
+def test_tc_f2005_33_partial_chunk_loss_detected(tmp_settings):
+    tmp_settings.raw["collect"]["source"] = "bundle"
+    llm = FakeChatModel(
+        rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀", "웜홀")}
+    )
+    services = build_services(tmp_settings, llm=llm, embeddings=FakeEmbeddings())
+    item = services.catalog.get("157336")
+    first = services.collector.collect(item, QUESTION)
+    assert len(first.indexed_titles) >= 2
+    assert "CACHE_HIT" in services.collector.collect(item, QUESTION).notices
+    store = services.store
+    pages = services.doc_indexer().page_ids("157336")
+    lost = sorted(pages)[0]
+    store.delete_where("wiki_docs", {"$and": [{"movie_id": "157336"}, {"page_id": lost}]})
+    again = services.collector.collect(item, QUESTION)  # 한 문서 청크만 사라짐
+    assert "CACHE_HIT" not in again.notices
+    assert lost in services.doc_indexer().page_ids("157336")

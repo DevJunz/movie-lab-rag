@@ -33,7 +33,7 @@ def _source():
 
 
 class Setup:
-    def __init__(self, tmp_settings, *, has_chunks=None, mode="auto"):
+    def __init__(self, tmp_settings, *, indexed_pages=None, mode="auto"):
         tmp_settings.raw["collect"]["source"] = mode
         self.source = _source()
         self.indexed: list[str] = []
@@ -55,7 +55,7 @@ class Setup:
             settings=tmp_settings,
             manifest=self.manifest,
             indexer=lambda doc: self.indexed.append(doc.title) or 1,
-            has_chunks=has_chunks,
+            indexed_pages=indexed_pages,
         )
 
 
@@ -106,8 +106,7 @@ def test_tc_nf2002_04_failed_search_not_recorded(tmp_settings, item):
 
 
 def test_tc_nf2002_08_cache_ignored_when_no_chunks(tmp_settings, item):
-    counts = {"157336": 0}
-    setup = Setup(tmp_settings, has_chunks=lambda item_id: counts[item_id] > 0)
+    setup = Setup(tmp_settings, indexed_pages=lambda item_id: set())  # 색인이 비었다
     setup.collector.collect(item, "질문1")
     report = setup.collector.collect(item, "질문1")  # 매니페스트는 있지만 색인이 비었다
     assert "CACHE_HIT" not in report.notices and report.indexed_titles
