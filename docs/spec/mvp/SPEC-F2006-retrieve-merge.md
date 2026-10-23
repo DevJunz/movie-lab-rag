@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2006** 근거 검색 및 병합 (검색 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/rag/retriever.py` |
 | 선행 SPEC | SPEC-F2002, SPEC-F2005 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #10 |
 
 ## 1. 요구사항 원문
 
@@ -29,11 +29,12 @@
 
 1. **메타 청크**: `store.get_by_ids(meta, [movie_id])`. 없으면 `IndexEmptyError`(색인 0건) 또는 `ItemNotIndexedError`(해당 영화만 없음).
 2. **외부 청크**: `wiki_docs`에서 `similarity_search_with_score(query, k=top_k, filter={"movie_id": movie_id})`.
-   `search_type == "mmr"`이면 SPEC-F2014의 MMR 검색으로 바뀐다(이 SPEC에서는 분기 지점만 둔다).
+   이 SPEC에서는 `search_type`으로 `"similarity"`만 허용한다(그 밖의 값은 시작할 때 `SettingsError`). MMR은 SPEC-F2014가 허용 값과 분기를 더한다.
 3. **병합**: `[메타 청크] + [외부 청크(점수 순)]`.
 4. **중복 제거**: ① 청크 ID가 같으면 하나만 남긴다. ② 공백을 정규화한 본문의 해시가 같으면(같은 내용이 다른 문서 ID로 들어온 경우) 먼저 나온 것만 남긴다.
 5. **번호 부여**: 남은 순서대로 `n = 1, 2, …`. 메타 청크는 항상 `[근거 1]`.
-6. 결과 `Evidence`에는 `source_kind`, `source_type`, `title`, `url`, `license`, `score`를 채운다.
+6. 메타 근거의 제목은 `제목 (연도)`. 외부 근거의 `score`는 코사인 유사도(1 − 거리, 클수록 가깝다).
+7. 결과 `Evidence`에는 `source_kind`, `source_type`, `title`, `url`, `license`, `score`를 채운다.
 
 - 근거 총수 = 메타 1 + 외부 최대 `top_k`. `top_k`는 `settings.retrieval.top_k`(기본 4)에서만 읽는다.
 - 외부 청크가 0개여도 예외가 아니다. 결과에 `no_external=True` 표시를 남겨 UI가 "관련 외부 문서를 찾지 못했습니다" 안내를 띄운다(F2012).
@@ -45,6 +46,8 @@ class Retriever:
     def __init__(self, store: VectorStore, settings): ...
     def retrieve(self, movie_id: str, query: str) -> RetrievalResult: ...   # evidences, no_external
 ```
+
+- 계층 규칙상 스크립트는 `Services.retriever(top_k=…)`(container)로 얻는다.
 
 ```text
 python -m scripts.collect --movie-id 157336 --question "<Q1>" --show-evidence [--top-k 2]
