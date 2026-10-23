@@ -14,34 +14,34 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 
 | 요구사항 | 분류 | 이름 | SPEC | 주 모듈 | AC 수 | 4장 검증 항목 | 구현 순서 | 이슈 | 상태 |
 |---|---|---|---|---|---|---|---|---|---|
-| F2001 | 데이터 | 항목 메타데이터 적재 | [SPEC-F2001](mvp/SPEC-F2001-movie-metadata-load.md) | `data/movies.py` | 6 | V4.1-1, V4.1-3 | 3 | — | Draft |
-| F2002 | 색인 | 메타데이터 색인(RAG 1) | [SPEC-F2002](mvp/SPEC-F2002-metadata-index.md) | `index/meta_indexer.py` | 6 | V4.1-1, V4.1-2 | 4 | — | Draft |
-| F2003 | 프롬프트 | 검색어 추출(프롬프트 1) | [SPEC-F2003](mvp/SPEC-F2003-query-extraction.md) | `collect/query_extractor.py` | 6 | V4.2-1, V4.2-4 | 6 | — | Draft |
-| F2004 | 수집 | 외부 문서 수집(프롬프트 2) | [SPEC-F2004](mvp/SPEC-F2004-document-collection.md) | `collect/`, `data/wiki_*.py` | 11 | V4.2-2, V4.2-3, V4.2-4, V4.4-4 | 7 | — | Draft |
-| F2005 | 색인 | 외부 문서 색인(RAG 2) | [SPEC-F2005](mvp/SPEC-F2005-document-index.md) | `index/doc_indexer.py` | 7 | V4.2-5 | 9 | — | Draft |
-| F2006 | 검색 | 근거 검색 및 병합 | [SPEC-F2006](mvp/SPEC-F2006-retrieve-merge.md) | `rag/retriever.py` | 7 | V4.3-1, V4.3-4, V4.4-5 | 10 | — | Draft |
-| F2007 | 생성 | 근거 기반 답변 생성(프롬프트 3) | [SPEC-F2007](mvp/SPEC-F2007-grounded-generation.md) | `rag/graph.py` | 6 | V4.3-2, V4.3-4, V4.3-5 | 11 | — | Draft |
-| F2008 | 생성 | 근거 표시 | [SPEC-F2008](mvp/SPEC-F2008-evidence-display.md) | `rag/citations.py` | 5 | V4.3-3, V4.3-4, V4.3-6 | 12 | — | Draft |
-| F2009 | UI | 항목 선택 및 질의응답 | [SPEC-F2009](mvp/SPEC-F2009-movie-select-chat.md) | `ui/streamlit_app.py` | 5 | V4.4-1 | 13 | — | Draft |
-| F2010 | 서비스 | 도메인 특화 기능 | [SPEC-F2010](mvp/SPEC-F2010-domain-features.md) | `services/guide.py`, `factcheck.py` | 7 | V4.4-3 | 17 | — | Draft |
-| F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | — | Draft |
-| F2012 | UI | 진행 상태 및 안내 | [SPEC-F2012](mvp/SPEC-F2012-progress-notices.md) | `core/messages.py`, `services/health.py` | 6 | V4.4-4, V4.4-5, V4.4-6 | 14 | — | Draft |
-| NF2001 | 성능 | 응답 시간 | [SPEC-NF2001](mvp/SPEC-NF2001-response-time.md) | `services/qa.py` | 4 | V4.7-1 | 18 | — | Draft |
-| NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 7 | V4.2-3, V4.7-2 | 8 | — | Draft |
-| NF2003 | 보안 | API 키 관리 | [SPEC-NF2003](mvp/SPEC-NF2003-api-key-management.md) | `config.py`, `providers.py` | 5 | V4.7-3 | 2 | — | Draft |
-| NF2004 | 보안 | 내부 정보 비노출 | [SPEC-NF2004](mvp/SPEC-NF2004-no-internal-exposure.md) | `ui/`, `core/messages.py` | 5 | V4.7-4 | 15 | — | Draft |
-| NF2005 | 확장성 | 모듈 분리 | [SPEC-NF2005](mvp/SPEC-NF2005-module-separation.md) | 골격 · `tests/` · CI | 6 | V4.7-5 | **1** | — | Draft |
-| NF2006 | 품질 | 외부 API 예절 | [SPEC-NF2006](mvp/SPEC-NF2006-external-api-etiquette.md) | `data/wiki_api.py` | 7 | V4.7-6 | 5 | — | Draft |
-| NF2007 | 법 · 윤리 | 출처와 이용 조건 | [SPEC-NF2007](mvp/SPEC-NF2007-source-license.md) | `README.md`, `ui/` | 5 | V4.7-7 | 19 | — | Draft |
+| F2001 | 데이터 | 항목 메타데이터 적재 | [SPEC-F2001](mvp/SPEC-F2001-movie-metadata-load.md) | `data/movies.py` | 6 | V4.1-1, V4.1-3 | 3 | #3 | Draft |
+| F2002 | 색인 | 메타데이터 색인(RAG 1) | [SPEC-F2002](mvp/SPEC-F2002-metadata-index.md) | `index/meta_indexer.py` | 6 | V4.1-1, V4.1-2 | 4 | #4 | Draft |
+| F2003 | 프롬프트 | 검색어 추출(프롬프트 1) | [SPEC-F2003](mvp/SPEC-F2003-query-extraction.md) | `collect/query_extractor.py` | 6 | V4.2-1, V4.2-4 | 6 | #6 | Draft |
+| F2004 | 수집 | 외부 문서 수집(프롬프트 2) | [SPEC-F2004](mvp/SPEC-F2004-document-collection.md) | `collect/`, `data/wiki_*.py` | 11 | V4.2-2, V4.2-3, V4.2-4, V4.4-4 | 7 | #7 | Draft |
+| F2005 | 색인 | 외부 문서 색인(RAG 2) | [SPEC-F2005](mvp/SPEC-F2005-document-index.md) | `index/doc_indexer.py` | 7 | V4.2-5 | 9 | #9 | Draft |
+| F2006 | 검색 | 근거 검색 및 병합 | [SPEC-F2006](mvp/SPEC-F2006-retrieve-merge.md) | `rag/retriever.py` | 7 | V4.3-1, V4.3-4, V4.4-5 | 10 | #10 | Draft |
+| F2007 | 생성 | 근거 기반 답변 생성(프롬프트 3) | [SPEC-F2007](mvp/SPEC-F2007-grounded-generation.md) | `rag/graph.py` | 6 | V4.3-2, V4.3-4, V4.3-5 | 11 | #11 | Draft |
+| F2008 | 생성 | 근거 표시 | [SPEC-F2008](mvp/SPEC-F2008-evidence-display.md) | `rag/citations.py` | 5 | V4.3-3, V4.3-4, V4.3-6 | 12 | #12 | Draft |
+| F2009 | UI | 항목 선택 및 질의응답 | [SPEC-F2009](mvp/SPEC-F2009-movie-select-chat.md) | `ui/streamlit_app.py` | 5 | V4.4-1 | 13 | #13 | Draft |
+| F2010 | 서비스 | 도메인 특화 기능 | [SPEC-F2010](mvp/SPEC-F2010-domain-features.md) | `services/guide.py`, `factcheck.py` | 7 | V4.4-3 | 17 | #17 | Draft |
+| F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | #16 | Draft |
+| F2012 | UI | 진행 상태 및 안내 | [SPEC-F2012](mvp/SPEC-F2012-progress-notices.md) | `core/messages.py`, `services/health.py` | 6 | V4.4-4, V4.4-5, V4.4-6 | 14 | #14 | Draft |
+| NF2001 | 성능 | 응답 시간 | [SPEC-NF2001](mvp/SPEC-NF2001-response-time.md) | `services/qa.py` | 4 | V4.7-1 | 18 | #18 | Draft |
+| NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 7 | V4.2-3, V4.7-2 | 8 | #8 | Draft |
+| NF2003 | 보안 | API 키 관리 | [SPEC-NF2003](mvp/SPEC-NF2003-api-key-management.md) | `config.py`, `providers.py` | 5 | V4.7-3 | 2 | #2 | Draft |
+| NF2004 | 보안 | 내부 정보 비노출 | [SPEC-NF2004](mvp/SPEC-NF2004-no-internal-exposure.md) | `ui/`, `core/messages.py` | 5 | V4.7-4 | 15 | #15 | Draft |
+| NF2005 | 확장성 | 모듈 분리 | [SPEC-NF2005](mvp/SPEC-NF2005-module-separation.md) | 골격 · `tests/` · CI | 6 | V4.7-5 | **1** | #1 | Done |
+| NF2006 | 품질 | 외부 API 예절 | [SPEC-NF2006](mvp/SPEC-NF2006-external-api-etiquette.md) | `data/wiki_api.py` | 7 | V4.7-6 | 5 | #5 | Draft |
+| NF2007 | 법 · 윤리 | 출처와 이용 조건 | [SPEC-NF2007](mvp/SPEC-NF2007-source-license.md) | `README.md`, `ui/` | 5 | V4.7-7 | 19 | #19 | Draft |
 
 **심화 (MVP와 분리)**
 
 | 요구사항 | 분류 | 이름 | SPEC | 주 모듈 | AC 수 | 4장 검증 항목 | 구현 순서 | 이슈 | 상태 |
 |---|---|---|---|---|---|---|---|---|---|
-| F2013 | UI | 프론트엔드 직접 구현 | [SPEC-F2013](advanced/SPEC-F2013-web-frontend.md) | `api/`, `web/` | 6 | V4.5-1 | 23 | — | Draft |
-| F2014 | 검색 | MMR 검색 적용 | [SPEC-F2014](advanced/SPEC-F2014-mmr-search.md) | `rag/retriever.py` | 5 | V4.5-2 | 20 | — | Draft |
-| F2015 | 품질 | RAG 전후 품질 비교 | [SPEC-F2015](advanced/SPEC-F2015-rag-comparison.md) | `scripts/compare_rag.py` | 5 | V4.5-3, V4.6-1~4 | 21 | — | Draft |
-| F2016 | 수집 | 여러 문서 출처 결합 | [SPEC-F2016](advanced/SPEC-F2016-multi-source-pdf.md) | `data/pdf_source.py` | 6 | V4.5-4 | 22 | — | Draft |
+| F2013 | UI | 프론트엔드 직접 구현 | [SPEC-F2013](advanced/SPEC-F2013-web-frontend.md) | `api/`, `web/` | 6 | V4.5-1 | 23 | #23 | Draft |
+| F2014 | 검색 | MMR 검색 적용 | [SPEC-F2014](advanced/SPEC-F2014-mmr-search.md) | `rag/retriever.py` | 5 | V4.5-2 | 20 | #20 | Draft |
+| F2015 | 품질 | RAG 전후 품질 비교 | [SPEC-F2015](advanced/SPEC-F2015-rag-comparison.md) | `scripts/compare_rag.py` | 5 | V4.5-3, V4.6-1~4 | 21 | #21 | Draft |
+| F2016 | 수집 | 여러 문서 출처 결합 | [SPEC-F2016](advanced/SPEC-F2016-multi-source-pdf.md) | `data/pdf_source.py` | 6 | V4.5-4 | 22 | #22 | Draft |
 
 **확장**: 아직 없음. [extensions/README.md](extensions/README.md)의 규칙으로 추가한다.
 

@@ -8,10 +8,11 @@ prd.pdf
 rag_project_briefing.html
 
 # 제공 데이터 팩 · 실행 중 생성 데이터 (NF2007: 원본 재배포 안 함)
+# 패키지 이름과 겹치는 data · logs · reports는 루트로 고정한다 (movielab/data/ 보호)
 영화도메인_데이터_배포용/
-data/
-logs/
-reports/
+/data/
+/logs/
+/reports/
 
 # 제출 파일
 *.zip

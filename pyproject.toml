@@ -1,0 +1,27 @@
+[project]
+name = "movielab"
+version = "0.1.0"
+description = "한국어 위키백과를 근거로 영화 질문에 답하는 RAG 서비스"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+addopts = "-m 'not live' --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "live: 실제 GMS · 위키백과를 호출한다. CI에서 실행하지 않는다",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+include = ["*.py", "*.pyi"]
+extend-exclude = ["영화도메인_데이터_배포용"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["movielab", "scripts", "tests"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/fixtures/**" = ["E501"]
