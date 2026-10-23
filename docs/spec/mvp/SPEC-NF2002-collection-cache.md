@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **NF2002** 수집 캐시 (성능) |
 | 구분 | MVP (비기능) |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/collect/manifest.py`, `movielab/collect/collector.py` |
 | 선행 SPEC | SPEC-F2004 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #8 |
 
 ## 1. 요구사항 원문
 
@@ -34,7 +34,7 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
 | 질문 | `normalize(question) in questions[movie_id]` | P1 호출 생략, 저장된 검색어 사용. 그 검색어가 모두 `keywords`에 있으면 **수집 전체 생략** → 진행 상태 `cache_hit` |
 | 검색어 | `normalize(q) in keywords[movie_id]` | 그 검색어의 소스 검색 생략 |
 | 문서 | `page_id in page_ids[movie_id]` | 본문 수집 · 색인 생략 (`already_collected`) |
-| 항목 자체 문서 | `page_ids`에 `is_item_doc` 문서가 이미 있음 | 제목 조회 생략 |
+| 항목 자체 문서 | 매니페스트의 `item_doc_page_id`가 있음 | 제목 조회 생략, 그 문서를 이미 수집한 것으로 본다 |
 
 - `normalize`: 앞뒤 공백 제거, 연속 공백 1칸, 소문자화, 유니코드 NFC.
 - 검색어는 **검색을 실제로 마친 뒤에만** `keywords`에 기록한다. 검색 호출이 실패한 검색어는 기록하지 않는다(다음에 다시 시도).
@@ -46,7 +46,9 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
 - 쓰기는 임시 파일에 쓴 뒤 `os.replace`로 바꾼다(중간에 끊겨도 깨진 JSON이 남지 않음).
 - 파일이 없으면 빈 매니페스트로 시작한다. JSON이 깨져 있으면 `manifest.json.broken-<시각>`으로 옮겨 두고 빈 매니페스트로 시작하며 경고 로그를 남긴다.
 - 매니페스트와 Chroma가 어긋나는 경우(사용자가 `data/chroma`만 지운 경우)를 위해 `scripts.collect --reset-cache [--movie-id]`로 캐시를 지울 수 있다.
-  또한 질문 캐시 적중이지만 `wiki_docs`에 그 영화 청크가 0개면 캐시를 믿지 않고 다시 수집한다.
+  또한 질문 캐시 적중이지만 `wiki_docs`에 그 영화 청크가 0개면 캐시를 믿지 않고 다시 수집한다. 청크 수는 `Collector`에 주입한 `chunk_counter(item_id)`로 확인한다(색인기는 F2005에서 연결 — 주입되지 않으면 이 확인을 건너뛴다).
+- 매니페스트 형식에 `item_doc_page_id`(항목 자체 문서의 page_id)를 더한다.
+- 질문 캐시 적중으로 수집 전체를 생략하면 `CollectReport.notices`에 `CACHE_HIT`를 남기고 진행 상태 `cache_hit` → `done`만 보낸다.
 
 ### 3.4 인터페이스
 
