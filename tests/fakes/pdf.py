@@ -1,4 +1,6 @@
-"""테스트 중에 합성 PDF를 바이트로 만든다 (SPEC-F2016 §2.3.1). 바이너리 픽스처를 저장소에 넣지 않는다.
+"""테스트 중에 합성 PDF를 바이트로 만든다 (SPEC-F2016 §2.3.1).
+
+바이너리 픽스처를 저장소에 넣지 않는다.
 
 표준 Type1 글꼴(Helvetica)만 쓰므로 ASCII 텍스트만 넣는다. 쪽마다 줄 목록을 받는다(빈 목록 = 빈 쪽).
 """
@@ -41,9 +43,7 @@ def make_pdf(pages: list[list[str]]) -> bytes:
             ).encode()
         )
         stream = _content(lines)
-        objects.append(
-            f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream"
-        )
+        objects.append(f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream")
     out = bytearray(b"%PDF-1.4\n")
     offsets = []
     for number, body in enumerate(objects, start=1):
@@ -53,7 +53,9 @@ def make_pdf(pages: list[list[str]]) -> bytes:
     out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
     for offset in offsets:
         out += f"{offset:010d} 00000 n \n".encode()
-    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    )
     return bytes(out)
 
 

@@ -15,6 +15,20 @@ EVIDENCE_LIST_HEADER = "근거:"
 EVIDENCE_LIST_LINE = "[근거 {n}] {source_type} · {title}{score}"
 EVIDENCE_LIST_SCORE = " · 점수 {score:.3f}"
 
+# PDF 근거 (SPEC-F2016 §2.4) — 출처 유형 라벨과 제목 형식 `제목 (파일명, p.쪽)`
+PDF_SOURCE_LABEL = "PDF"
+PDF_EVIDENCE_TITLE = "{title} ({file}, p.{page})"
+
+
+def evidence_title(evidence: Any) -> str:
+    """근거 목록 · 프롬프트에 보일 제목. PDF 근거는 파일명과 쪽 번호를 붙인다."""
+    if getattr(evidence, "file", None) and getattr(evidence, "page", None) is not None:
+        return PDF_EVIDENCE_TITLE.format(
+            title=evidence.title, file=evidence.file, page=evidence.page
+        )
+    return str(evidence.title)
+
+
 # 근거로 답할 수 없을 때 답변이 그대로 써야 하는 문장 (SPEC-F2007 §3.3)
 NOT_FOUND = "제공된 문서에서 확인되지 않습니다."
 
@@ -108,6 +122,14 @@ TEMPLATES: dict[str, str] = {
         "(컬렉션 전체 {total_chunks}개)"
     ),
     "REINDEX_FAILED": "색인하지 못한 문서 {failed}건 — 로그(logs/)를 확인하고 다시 실행하세요.",
+    "PDF_MANIFEST_MISSING": (
+        "PDF 매니페스트가 없습니다: {path}. data/pdf/에 PDF를 두고 pdf_manifest.json에 기록하세요 "
+        "(예시: docs/verification/pdf_manifest.example.json)."
+    ),
+    "PDF_MANIFEST_INVALID": "PDF 매니페스트 형식이 올바르지 않습니다: {path}",
+    "PDF_FILE_MISSING": "PDF 파일이 없어 건너뜁니다: {file}",
+    "PDF_REPORT": "{file}: 쪽 {pages}개 · 청크 {chunks}개 색인 (건너뛴 쪽: {skipped})",
+    "PDF_TOTAL": "PDF 색인 완료: 문서 {documents}건 · 청크 {chunks}개 (컬렉션 전체 {total}개)",
     "REINDEX_REMOVED": "저장 원문이 없는 문서 {removed}건의 청크를 지웠습니다.",
     "REINDEX_OVERRIDE_NOTICE": (
         "설정 파일과 다른 청크 값으로 색인했습니다. 이후 수집되는 문서는 설정 값으로 색인되어 "

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from movielab.core.domain import DomainProfile
-from movielab.core.messages import NOT_FOUND
+from movielab.core.messages import NOT_FOUND, evidence_title
 from movielab.core.types import Evidence
 
 # P1 검색어 추출 (SPEC-F2003)
@@ -104,7 +104,7 @@ def format_context(evidences: list[Evidence]) -> str:
     본문 안의 `[근거` 표기는 `(근거`로 바꾼다 — 모델이 없는 근거 번호를 인용하지 않게.
     """
     return "\n\n".join(
-        f"[근거 {e.n}] ({e.source_type}) {_neutralize(e.title)}\n{_neutralize(e.text)}"
+        f"[근거 {e.n}] ({e.source_type}) {_neutralize(evidence_title(e))}\n{_neutralize(e.text)}"
         for e in evidences
     )
 

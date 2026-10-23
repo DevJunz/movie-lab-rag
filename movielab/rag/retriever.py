@@ -16,6 +16,7 @@ from langchain_core.documents import Document
 
 from movielab.core.errors import IndexEmptyError, ItemNotIndexedError
 from movielab.core.types import ITEM_KEY, Evidence, RetrievalResult
+from movielab.rag.pdf_search import add_pdf_evidences, search_pdf
 
 
 def _text_key(text: str) -> str:
@@ -85,6 +86,7 @@ class Retriever:
         top_k: int | None = None,
         meta_title: Callable[[dict[str, Any]], str] | None = None,
         search_type: str | None = None,
+        pdf_top_k: int | None = None,
     ) -> None:
         """`store`: VectorStore(F2002) — rag는 index를 import 하지 않으므로 구조로만 쓴다.
 
@@ -104,6 +106,9 @@ class Retriever:
             raise ValueError(f"search_type은 similarity 또는 mmr이어야 한다: {self.search_type!r}")
         self.fetch_k = retrieval.mmr_fetch_k
         self.lambda_mult = retrieval.mmr_lambda
+        # PDF 근거 (F2016): 0이면 PDF를 검색하지 않는다
+        self.pdf_collection = settings.collections.pdf
+        self.pdf_top_k = settings.retrieval.pdf_top_k if pdf_top_k is None else pdf_top_k
 
     def _meta(self, item_id: str) -> list[Evidence]:
         docs = self.store.get_by_ids(self.meta_collection, [item_id])
@@ -151,5 +156,7 @@ class Retriever:
         item_id = str(item_id)
         meta = self._meta(item_id)
         evidences = self._merged(item_id, query, meta)
+        pdf = search_pdf(self.store, self.pdf_collection, item_id, query, self.pdf_top_k)
+        evidences = add_pdf_evidences(evidences, len(meta), pdf, merge_evidences)
         # 중복 제거 뒤 남은 외부 근거로 판단한다 (메타와 같은 본문뿐이면 '없음')
         return RetrievalResult(evidences=evidences, no_external=len(evidences) == len(meta))

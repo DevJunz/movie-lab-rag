@@ -13,3 +13,5 @@ streamlit==1.62.0
 requests==2.34.2
 python-dotenv==1.2.3
 typing-extensions==4.16.0
+# 명세서 미지정 — SPEC-F2016(A-12)에서 고정
+pypdf==6.21.2

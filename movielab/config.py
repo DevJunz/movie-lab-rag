@@ -153,6 +153,7 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("search_type", lambda v: v in ("similarity", "mmr")),
         ("mmr_fetch_k", _int_at_least(1)),
         ("mmr_lambda", lambda v: _is_number(v) and 0 <= v <= 1),
+        ("pdf_top_k", _int_at_least(0)),  # SPEC-F2016 (0이면 PDF 검색 안 함)
     ],
     "collect": [  # SPEC-F2003 · F2004
         ("source", lambda v: v in ("api", "bundle", "auto")),
@@ -175,6 +176,10 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
     ],
     "ui": [  # SPEC-F2008
         ("evidence_preview_chars", _int_at_least(1)),
+    ],
+    "pdf": [  # SPEC-F2016 (A-12)
+        ("min_page_chars", _int_at_least(0)),
+        ("repeat_line_min_pages", _int_at_least(2)),
     ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),

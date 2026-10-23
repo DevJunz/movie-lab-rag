@@ -21,11 +21,14 @@ from movielab.collect.query_extractor import QueryExtractor
 from movielab.collect.selector import CandidateSelector
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
+from movielab.core.types import PdfIndexReport
 from movielab.data.domain_movie import MOVIE_PROFILE
+from movielab.data.pdf_source import extract_pages, load_pdf_manifest
 from movielab.data.raw_store import RawStore
 from movielab.data.wiki_api import WikiApiSource, WikiHttpClient, shared_throttle
 from movielab.data.wiki_bundle import WikiBundleSource
 from movielab.index.doc_indexer import DocIndexer
+from movielab.index.pdf_indexer import PdfIndexer
 from movielab.index.store import VectorStore
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
@@ -137,10 +140,54 @@ class Services:
         """위키 문서 색인기 (F2005). 인자를 주면 청크 값을 이번 실행만 덮어쓴다."""
         return DocIndexer(self.store, source_type=self.profile.doc_source_label, **chunking)
 
-    def retriever(self, top_k: int | None = None, search_type: str | None = None) -> Retriever:
-        """근거 검색기 (F2006 · F2014). 인자를 주면 이번 검색만 설정 값을 덮어쓴다."""
+    def pdf_indexer(self) -> PdfIndexer:
+        """PDF 색인기 (F2016). 쪽 단위 청킹 값은 설정 `chunking.pdf_*`."""
+        return PdfIndexer(self.store)
+
+    def index_pdfs(self) -> list[PdfIndexReport]:
+        """매니페스트의 PDF를 모두 색인한다 (F2016 `scripts.index_pdf`).
+
+        매니페스트가 없으면 `FileNotFoundError`, 형식 오류는 `ValueError`. 없는 PDF 파일은 건너뛴다.
+        """
+        entries = load_pdf_manifest(self.settings.path("pdf_manifest"))
+        pdf = self.settings.pdf
+        indexer = self.pdf_indexer()
+        self.store.ensure_embeddings()  # 키가 없으면 여기서 안내 오류
+        reports: list[PdfIndexReport] = []
+        for entry in entries:
+            path = self.settings.path("pdf_dir") / entry.file
+            if not path.is_file():
+                reports.append(PdfIndexReport(file=entry.file, missing=True))
+                continue
+            text = extract_pages(
+                path,
+                min_page_chars=pdf.min_page_chars,
+                repeat_line_min_pages=pdf.repeat_line_min_pages,
+            )
+            chunks = indexer.index_pdf(entry, text.pages)
+            reports.append(
+                PdfIndexReport(
+                    file=entry.file,
+                    pages=len(text.pages),
+                    chunks=chunks,
+                    skipped_pages=text.skipped_pages,
+                )
+            )
+        return reports
+
+    def retriever(
+        self,
+        top_k: int | None = None,
+        search_type: str | None = None,
+        pdf_top_k: int | None = None,
+    ) -> Retriever:
+        """근거 검색기 (F2006 · F2014 · F2016). 인자를 주면 이번 검색만 설정 값을 덮어쓴다."""
         return Retriever(
-            self.store, top_k=top_k, meta_title=self.profile.meta_title, search_type=search_type
+            self.store,
+            top_k=top_k,
+            meta_title=self.profile.meta_title,
+            search_type=search_type,
+            pdf_top_k=pdf_top_k,
         )
 
     def rag_graph(self, *, llm: Any = None, top_k: int | None = None) -> Any:
