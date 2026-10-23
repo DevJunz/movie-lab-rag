@@ -15,6 +15,7 @@ from movielab.core.errors import ItemNotFoundError
 from movielab.core.types import AnswerResult
 from movielab.rag.citations import select_cited
 from movielab.rag.graph import is_not_found
+from movielab.services.pipeline import run_graph
 
 Progress = Callable[[str, dict[str, Any]], None]
 
@@ -38,25 +39,6 @@ class QAService:
         self.graph = graph
         self.clock = clock
 
-    def _run_graph(self, state: dict[str, Any], on_progress: Progress | None) -> dict[str, Any]:
-        """그래프를 노드 단위로 돌려 `retrieve` → `generate` 단계를 알린다 (F2012).
-
-        그래프 노드는 두 개 그대로다 (F2007).
-        """
-
-        def notify(stage: str) -> None:
-            if on_progress is not None:
-                on_progress(stage, {})
-
-        notify("retrieve")
-        result = dict(state)
-        for update in self.graph.stream(state, stream_mode="updates"):
-            for node, values in update.items():
-                result.update(values or {})
-                if node == "retrieve":
-                    notify("generate")
-        return result
-
     def ask(
         self, movie_id: str, question: str, on_progress: Progress | None = None
     ) -> AnswerResult:
@@ -66,8 +48,8 @@ class QAService:
             raise ItemNotFoundError(f"항목 없음: {movie_id}")
         report = self.collector.collect(item, question, on_progress)
         collected = self.clock()
-        state = self._run_graph(
-            {"movie_id": item.item_id, "question": question, "task": "qa"}, on_progress
+        state = run_graph(
+            self.graph, {"movie_id": item.item_id, "question": question, "task": "qa"}, on_progress
         )
         answer, evidences = state["answer"], state["contexts"]
         cited = select_cited(answer, evidences)
