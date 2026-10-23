@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2001** 항목 메타데이터 적재 (데이터 · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/data/movies.py`, `movielab/data/domain_movie.py` |
 | 선행 SPEC | SPEC-NF2005, SPEC-NF2003 |
 | 관련 ISSUE | #3 |
@@ -115,7 +115,7 @@ class Catalog:
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.1-3 색인 텍스트 1건 | `--show 157336` 출력 캡처 | `docs/verification/screenshots/V4.1-3_index_text.png` |
+| V4.1-3 색인 텍스트 1건 | `--show 157336` 출력 저장 (줄거리는 TMDB 원문 재배포를 피하려고 앞부분만) | `docs/verification/evidence/V4.1-3_index_text.txt` |
 
 ## 8. 범위 밖
 

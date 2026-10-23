@@ -14,7 +14,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 
 | 요구사항 | 분류 | 이름 | SPEC | 주 모듈 | AC 수 | 4장 검증 항목 | 구현 순서 | 이슈 | 상태 |
 |---|---|---|---|---|---|---|---|---|---|
-| F2001 | 데이터 | 항목 메타데이터 적재 | [SPEC-F2001](mvp/SPEC-F2001-movie-metadata-load.md) | `data/movies.py` | 6 | V4.1-1, V4.1-3 | 3 | #3 | In Progress |
+| F2001 | 데이터 | 항목 메타데이터 적재 | [SPEC-F2001](mvp/SPEC-F2001-movie-metadata-load.md) | `data/movies.py` | 6 | V4.1-1, V4.1-3 | 3 | #3 | Done |
 | F2002 | 색인 | 메타데이터 색인(RAG 1) | [SPEC-F2002](mvp/SPEC-F2002-metadata-index.md) | `index/meta_indexer.py` | 6 | V4.1-1, V4.1-2 | 4 | #4 | Draft |
 | F2003 | 프롬프트 | 검색어 추출(프롬프트 1) | [SPEC-F2003](mvp/SPEC-F2003-query-extraction.md) | `collect/query_extractor.py` | 6 | V4.2-1, V4.2-4 | 6 | #6 | Draft |
 | F2004 | 수집 | 외부 문서 수집(프롬프트 2) | [SPEC-F2004](mvp/SPEC-F2004-document-collection.md) | `collect/`, `data/wiki_*.py` | 11 | V4.2-2, V4.2-3, V4.2-4, V4.4-4 | 7 | #7 | Draft |

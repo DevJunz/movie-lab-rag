@@ -1,0 +1,9 @@
+$ python -m scripts.index_meta --show 157336
+제목: 인터스텔라 (2014)
+원제: Interstellar
+장르: 모험, 드라마, SF
+감독: 크리스토퍼 놀란
+출연: 매튜 매커너히, 앤 해서웨이, 마이클 케인, 제시카 차스테인, 케이시 애플렉
+제작 국가: United Kingdom, United States of America
+원어: en (해외 영화)
+줄거리: 세계 각국의 정부와 경제가 완 …(이하 생략: TMDB 원문 재배포 방지)
