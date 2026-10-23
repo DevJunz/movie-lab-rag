@@ -52,7 +52,7 @@ F2004 세부 조건 "◆ 이미 수집한 검색어는 다시 수집하지 않�
 - 파일이 없으면 빈 매니페스트로 시작한다. JSON이 깨져 있으면 `manifest.json.broken-<시각>`으로 옮겨 두고 빈 매니페스트로 시작하며 경고 로그를 남긴다.
 - 캐시를 지우는 명령: `python -m scripts.collect --reset-cache [--movie-id ID]` (LLM · 키 없이 동작, `Services.manifest`).
 - 매니페스트와 Chroma가 어긋나는 경우(사용자가 `data/chroma`만 지운 경우)를 위해 `scripts.collect --reset-cache [--movie-id]`로 캐시를 지울 수 있다.
-  또한 질문 캐시 적중이지만 `wiki_docs`에 그 영화 청크가 0개면 캐시를 믿지 않고 다시 수집한다. 청크 수는 `Collector`에 주입한 `chunk_counter(item_id)`로 확인한다(색인기는 F2005에서 연결 — 주입되지 않으면 이 확인을 건너뛴다).
+  또한 질문 캐시 적중이지만 `wiki_docs`에 그 영화 청크가 0개면 캐시를 믿지 않고 다시 수집한다. 청크 유무는 `Collector`에 주입한 `has_chunks(item_id)`로 확인한다(색인기는 F2005에서 연결 — 주입되지 않으면 이 확인을 건너뛴다).
 - 매니페스트 형식에 `item_doc_page_id`(항목 자체 문서의 page_id)를 더한다.
 - 질문 캐시 적중으로 수집 전체를 생략하면 `CollectReport.notices`에 `CACHE_HIT`를 남기고 `source_used = "cache"`(01-architecture §4.4의 값 목록에 추가), 진행 상태 `cache_hit` → `done`만 보낸다.
 
