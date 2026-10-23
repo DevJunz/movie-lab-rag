@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **NF2007** 출처와 이용 조건 (법 · 윤리) |
 | 구분 | MVP (비기능) |
-| 상태 | Draft |
-| 담당 모듈 | `README.md`(데이터 출처 절), `movielab/ui/streamlit_app.py`(출처 고지), `movielab/rag/citations.py`(근거 라이선스 표시), `tests/unit/test_license_docs.py` |
+| 상태 | In Progress |
+| 담당 모듈 | `README.md`(데이터 출처 절), `movielab/data/domain_movie.py`(고지 문구), `movielab/index/doc_indexer.py` · `movielab/rag/retriever.py`(라이선스 메타데이터), `tests/unit/test_license_docs.py`, `tests/integration/test_source_license.py`. 화면 표시는 SPEC-F2008 · F2009가 담당 |
 | 선행 SPEC | SPEC-F2008 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #19 |
 
 ## 1. 요구사항 원문
 
@@ -56,17 +56,19 @@
 
 | ID | 수준 | 시나리오 | 기대 결과 | AC | 위치 |
 |---|---|---|---|---|---|
-| TC-NF2007-01 | 단위 | README의 `## 데이터 출처와 이용 조건` 절 검사 | `TMDB`, `CC BY-SA 4.0`, `ko.wikipedia.org`, 고지 문구 존재 | 01 | `tests/unit/test_license_docs.py` |
-| TC-NF2007-02 | 통합 | 근거 표시 렌더링(F2008 테스트와 공유) | 위키 근거마다 라이선스 문자열 | 02 | `tests/integration/test_ui_answer.py` |
-| TC-NF2007-03 | 통합 | 색인 후 모든 `wiki_docs` 메타데이터 | `url` · `license` 빈 값 없음 | 03 | `tests/integration/test_doc_index.py` |
-| TC-NF2007-04 | 통합 | `AppTest` 첫 화면 | 사이드바 출처 고지 문구 | 04 | `tests/integration/test_ui_chat.py` |
+| TC-NF2007-01 | 단위 | README의 `## 데이터 출처와 이용 조건` 절 검사 | `TMDB`, `CC BY-SA 4.0`, 라이선스 URL, `ko.wikipedia.org`, TMDB 고지 문구, 2차 저작물 · 원본 미포함 문구 존재 | 01 | `tests/unit/test_license_docs.py` |
+| TC-NF2007-02 | 통합 | 위키 청크를 색인하고 검색한 근거(`Evidence`) | 위키 근거마다 제목 · 원문 링크 · `license`(`CC BY-SA 4.0`) 빈 값 없음 | 02 | `tests/integration/test_source_license.py` |
+| TC-NF2007-03 | 통합 | 합성 문서 묶음 픽스처 전체를 색인한 뒤 모든 `wiki_docs` 메타데이터 | `url` · `license` · `source` · `collected_at` 빈 값 없음 | 03 | `tests/integration/test_source_license.py` |
+| TC-NF2007-04 | 단위 | 영화 `DomainProfile.attribution_notice` | `TMDB`, `한국어 위키백과`, `CC BY-SA 4.0`, 요약 고지 문구 포함 | 04 | `tests/unit/test_license_docs.py` |
 | TC-NF2007-05 | 단위 | 픽스처 파일에 `ko.wikipedia.org/wiki/` 실제 URL과 긴 원문 없음 (합성 표식 `[합성]` 포함) | 통과 | 05 | `tests/unit/test_license_docs.py` |
+
+> **범위 조정 (착수 시)**: 근거 목록의 라이선스 렌더링(AC-02 화면 부분)과 사이드바 고지(AC-04 화면 부분)는 Streamlit 앱이 필요하다. 앱은 SPEC-F2008(근거 표시) · SPEC-F2009(질의응답 화면)에서 만들어지며, 그 SPEC의 UI 테스트(`tests/integration/test_ui_answer.py`, `test_ui_chat.py`)가 화면을 검사한다. 이 SPEC은 화면이 쓰는 원천 데이터(근거의 `license` · `url`, 프로필의 `attribution_notice`)를 검사한다.
 
 ## 6. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.7-7 | README 해당 절 + 근거 표시 화면 | 검증 결과 문서 |
+| V4.7-7 | README 해당 절 + 테스트 결과 (화면 캡처는 F2008 · F2009 증빙) | `docs/verification/evidence/V4.7-7_source_license.txt` |
 
 ## 7. 범위 밖
 
