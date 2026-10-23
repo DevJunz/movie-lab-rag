@@ -13,6 +13,7 @@ from movielab import providers
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
 from movielab.data.domain_movie import MOVIE_PROFILE
+from movielab.services.catalog import Catalog
 
 
 class Services:
@@ -30,6 +31,12 @@ class Services:
         self.http = http  # 실제 HTTP 세션은 SPEC-NF2006에서 만든다
         self._llm = llm
         self._embeddings = embeddings
+        self.catalog = Catalog(lambda: self._load_items())
+
+    def _load_items(self) -> Any:
+        if self.profile.load_items is None:
+            raise ValueError("DomainProfile.load_items가 없다")
+        return self.profile.load_items(self.settings)
 
     @property
     def llm(self) -> Any:

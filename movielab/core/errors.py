@@ -13,3 +13,15 @@ class MissingApiKeyError(MovieLabUserError):
     """GMS API 키 또는 주소가 설정되지 않았다."""
 
     code = "API_KEY_MISSING"
+
+
+class DataNotFoundError(MovieLabUserError):
+    """항목 메타데이터 파일이 없다 (제공 데이터 팩 미설치 등)."""
+
+    code = "DATA_MISSING"
+
+
+class DataFormatError(MovieLabUserError):
+    """항목 메타데이터 파일의 형식이 잘못되었다 (JSON 오류, 배열이 아님)."""
+
+    code = "DATA_INVALID"

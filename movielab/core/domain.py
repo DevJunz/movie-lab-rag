@@ -33,6 +33,7 @@ class DomainProfile:
     attribution_notice: str
     disclaimer: str | None = None
     # 텍스트 생성 · 항목 문서 · 조건 탐색 규칙 — 해당 SPEC(F2001 · F2003 · F2004 · F2011)에서 채운다
+    load_items: Callable[..., Any] | None = None  # (settings) -> LoadResult
     to_index_text: Callable[..., str] | None = None
     item_card: Callable[..., str] | None = None
     item_doc_queries: Callable[..., list[str]] | None = None

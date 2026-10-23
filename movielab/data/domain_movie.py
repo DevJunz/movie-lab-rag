@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from movielab.core.domain import DomainProfile
+from movielab.data import movies
 
 MOVIE_PROFILE = DomainProfile(
     item_label="영화",
@@ -16,4 +17,6 @@ MOVIE_PROFILE = DomainProfile(
         "답변은 문서를 바탕으로 생성한 요약이며 원문과 다를 수 있습니다."
     ),
     disclaimer=None,  # 영화는 위험 도메인이 아니다 (A-16)
+    load_items=movies.load_items_for,
+    to_index_text=movies.to_index_text,
 )

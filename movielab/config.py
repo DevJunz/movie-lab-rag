@@ -11,6 +11,8 @@ from typing import Any
 
 from dotenv import dotenv_values
 
+from movielab.core.errors import MovieLabUserError
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SETTINGS_PATH = REPO_ROOT / "config" / "settings.json"
 SETTINGS_ENV = "MOVIELAB_SETTINGS"
@@ -18,8 +20,10 @@ DOTENV_PATH = REPO_ROOT / ".env"
 MODEL_ENV = {"chat": "MOVIELAB_CHAT_MODEL", "embedding": "MOVIELAB_EMBED_MODEL"}
 
 
-class SettingsError(ValueError):
+class SettingsError(MovieLabUserError, ValueError):
     """설정 파일이 없거나 값이 잘못되었다."""
+
+    code = "SETTINGS_INVALID"
 
 
 def read_env() -> dict[str, str]:

@@ -1,0 +1,44 @@
+"""사용자에게 보이는 안내 문구 (F2012, NF2004). 문구는 코드 대신 여기서만 가져온다.
+
+문구는 템플릿이다. `{item_label}` 같은 자리표시자는 DomainProfile 라벨로 채운다.
+화면 · 스크립트에는 이 문구만 보이고, 예외 메시지 · traceback은 로그에만 남긴다.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Mapping
+from typing import Any
+
+TEMPLATES: dict[str, str] = {
+    "API_KEY_MISSING": (
+        "GMS API 키가 설정되지 않았습니다. .env 파일에 GMS_API_KEY와 GMS_BASE_URL을 "
+        "설정한 뒤 다시 실행하세요."
+    ),
+    "DATA_MISSING": (
+        "{item_label} 데이터 파일을 찾을 수 없습니다. 제공 데이터 팩을 저장소 루트에 두었는지, "
+        "config/settings.json의 paths.movies 경로를 확인하세요."
+    ),
+    "DATA_INVALID": (
+        "{item_label} 데이터 파일의 형식이 올바르지 않습니다. JSON 배열인지 확인하세요."
+    ),
+    "SETTINGS_INVALID": (
+        "설정 파일을 읽을 수 없습니다. config/settings.json(또는 MOVIELAB_SETTINGS가 "
+        "가리키는 파일)의 형식과 값을 확인하세요."
+    ),
+    "SOURCE_UNAVAILABLE": "외부 문서 출처에 연결할 수 없습니다. 잠시 후 다시 시도하세요.",
+    "ITEM_NOT_FOUND": "ID {item_id}인 {item_label}을(를) 찾을 수 없습니다.",
+    "GENERIC_ERROR": "처리 중 문제가 발생했습니다. 잠시 후 다시 시도하세요.",
+}
+
+DEFAULT_LABELS = {"item_label": "항목"}
+_PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def render(code: str, labels: Mapping[str, str] | None = None, **values: Any) -> str:
+    """안내 코드에 맞는 문구. 모르는 코드는 일반 오류 문구로 바꾼다."""
+    template = TEMPLATES.get(code, TEMPLATES["GENERIC_ERROR"])
+    mapping = {**DEFAULT_LABELS, **(labels or {}), **values}
+    return _PLACEHOLDER.sub(
+        lambda m: str(mapping[m.group(1)]) if m.group(1) in mapping else m.group(0), template
+    )
