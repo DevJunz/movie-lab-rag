@@ -143,6 +143,14 @@ class Evidence:
 
 
 @dataclass(frozen=True)
+class CitedResult:
+    """답변에 실제로 인용된 근거 (F2008). `cited`는 번호 오름차순, 번호는 원래 번호 그대로."""
+
+    cited: list[Evidence]
+    uncited: bool
+
+
+@dataclass(frozen=True)
 class RetrievalResult:
     evidences: list[Evidence]
     no_external: bool = False
