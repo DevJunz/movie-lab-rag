@@ -22,7 +22,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 | F2006 | 검색 | 근거 검색 및 병합 | [SPEC-F2006](mvp/SPEC-F2006-retrieve-merge.md) | `rag/retriever.py` | 9 | V4.3-1, V4.3-4, V4.4-5 | 10 | #10 | Done |
 | F2007 | 생성 | 근거 기반 답변 생성(프롬프트 3) | [SPEC-F2007](mvp/SPEC-F2007-grounded-generation.md) | `rag/graph.py` | 6 | V4.3-2, V4.3-4, V4.3-5 | 11 | #11 | Done |
 | F2008 | 생성 | 근거 표시 | [SPEC-F2008](mvp/SPEC-F2008-evidence-display.md) | `rag/citations.py` | 5 | V4.3-3, V4.3-4, V4.3-6 | 12 | #12 | Done |
-| F2009 | UI | 항목 선택 및 질의응답 | [SPEC-F2009](mvp/SPEC-F2009-movie-select-chat.md) | `ui/streamlit_app.py` | 5 | V4.4-1 | 13 | #13 | In Progress |
+| F2009 | UI | 항목 선택 및 질의응답 | [SPEC-F2009](mvp/SPEC-F2009-movie-select-chat.md) | `ui/streamlit_app.py` | 5 | V4.4-1 | 13 | #13 | Done |
 | F2010 | 서비스 | 도메인 특화 기능 | [SPEC-F2010](mvp/SPEC-F2010-domain-features.md) | `services/guide.py`, `factcheck.py` | 7 | V4.4-3 | 17 | #17 | Draft |
 | F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | #16 | Draft |
 | F2012 | UI | 진행 상태 및 안내 | [SPEC-F2012](mvp/SPEC-F2012-progress-notices.md) | `core/messages.py`, `services/health.py` | 6 | V4.4-4, V4.4-5, V4.4-6 | 14 | #14 | Draft |

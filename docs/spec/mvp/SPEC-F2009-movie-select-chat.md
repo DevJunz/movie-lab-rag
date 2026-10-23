@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2009** 항목 선택 및 질의응답 (UI · 필수) |
 | 구분 | MVP |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/ui/streamlit_app.py`, `movielab/services/qa.py`, `movielab/core/types.py`(`AnswerResult`), `movielab/container.py`(`Services.qa`) |
 | 선행 SPEC | SPEC-F2008 |
 | 관련 ISSUE | #13 |
@@ -107,7 +107,7 @@ class QAService:
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.4-1 | 영화 전환 전후 화면 2장 | `docs/verification/screenshots/V4.4-1_history_*.png` |
+| V4.4-1 | 실제 서비스로 화면 함수(`main`)를 `AppTest`로 실행해 인터스텔라 → 명량 → 인터스텔라 전환 전후 대화 기록 (브라우저 캡처는 수동 단계로 추가) | `docs/verification/evidence/V4.4-1_history.txt` |
 
 ## 8. 범위 밖
 
