@@ -93,13 +93,13 @@ def test_tc_f2006_07_empty_meta_index(tmp_settings):
     assert error.value.code == "INDEX_EMPTY"
 
 
-def test_tc_f2006_07_item_not_indexed(services):
+def test_tc_f2006_10_item_not_indexed(services):
     with pytest.raises(ItemNotIndexedError) as error:
         services.retriever().retrieve("없는영화", "블랙홀")
     assert error.value.code == "ITEM_NOT_INDEXED"
 
 
-def test_tc_f2006_mmr_not_allowed_yet(tmp_settings, tmp_path):
+def test_tc_f2006_09_search_type_and_top_k_validated(tmp_settings, tmp_path):
     import json
 
     from movielab.config import SettingsError, load_settings
@@ -110,3 +110,28 @@ def test_tc_f2006_mmr_not_allowed_yet(tmp_settings, tmp_path):
     path.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(SettingsError):
         load_settings(path)
+    from movielab.rag.retriever import Retriever
+
+    store = build_services(tmp_settings, embeddings=FakeEmbeddings()).store
+    with pytest.raises(ValueError):
+        Retriever(store, top_k=0)
+
+
+def test_tc_f2006_11_no_external_after_dedup(services):
+    from langchain_core.documents import Document
+
+    meta_text = services.store.get_by_ids("movie_meta", ["157336"])[0].page_content
+    copy = Document(
+        page_content=meta_text,
+        metadata={
+            "movie_id": "157336",
+            "page_id": "1",
+            "title": "같은 본문",
+            "source_kind": "wiki",
+        },
+        id="157336:1:0",
+    )
+    services.store.upsert("wiki_docs", [copy])
+    result = services.retriever().retrieve("157336", "블랙홀")
+    assert len(result.evidences) == 1
+    assert result.no_external is True  # 중복 제거 뒤 외부 근거가 없다

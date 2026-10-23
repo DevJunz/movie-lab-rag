@@ -104,3 +104,11 @@ def test_tc_f2004_06_disambiguation_never_item_doc(movies_small_path):
     item = _items(movies_small_path)["1255"]
     dis = _cand("괴물 (동음이의)", "괴물 (영화)", "다음을 가리킨다", disambiguation=True)
     assert MOVIE_PROFILE.pick_item_doc(item, [dis]) is None
+
+
+def test_tc_f2006_13_meta_title():
+    from movielab.rag.retriever import default_meta_title
+
+    meta = {"title": "인터스텔라", "year": 2014}
+    assert MOVIE_PROFILE.meta_title(meta) == "인터스텔라 (2014)"
+    assert default_meta_title(meta) == "인터스텔라"

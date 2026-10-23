@@ -368,3 +368,31 @@ def test_tc_f2006_08_show_evidence_with_top_k(tmp_settings, monkeypatch, capsys)
     lines = [ln for ln in out.splitlines() if ln.startswith("[근거 ")]
     assert lines[0].startswith("[근거 1] 영화 메타데이터 · 인터스텔라 (2014)")
     assert len(lines) == 3 and "위키백과" in lines[1] and "점수" in lines[1]
+
+
+def test_tc_f2006_10_show_evidence_empty_index_guidance(tmp_settings, monkeypatch, capsys):
+    from movielab.container import build_services
+    from scripts import collect
+    from tests.fakes import FakeChatModel, FakeEmbeddings, pick_titles
+
+    tmp_settings.raw["collect"]["source"] = "bundle"
+    llm = FakeChatModel(rules={"검색어 추출": '["블랙홀"]', "후보 선별": pick_titles("블랙홀")})
+    emb = FakeEmbeddings()
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    monkeypatch.setattr(
+        collect, "build_services", lambda s: build_services(s, llm=llm, embeddings=emb)
+    )
+    argv = ["--movie-id", "157336", "--question", "블랙홀", "--source", "bundle"]
+    assert collect.main([*argv, "--show-evidence"]) == 1  # 메타 색인이 비어 있다
+    out = capsys.readouterr().out
+    assert "scripts.index_meta" in out
+    assert "잠시 후 다시 시도" not in out
+
+
+@pytest.mark.parametrize("extra", [["--dry-run", "--show-evidence"], ["--top-k", "2"]])
+def test_tc_f2006_12_evidence_flag_combinations_rejected(extra, capsys):
+    from scripts import collect
+
+    with pytest.raises(SystemExit) as exc:
+        collect.main(["--movie-id", "157336", "--question", "블랙홀", *extra])
+    assert exc.value.code == 2
