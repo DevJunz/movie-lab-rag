@@ -186,6 +186,10 @@ _RULES: dict[str, list[tuple[str, Callable[[Any], bool]]]] = {
         ("min_page_chars", _int_at_least(0)),
         ("repeat_line_min_pages", _int_at_least(2)),
     ],
+    "explore": [  # SPEC-F2011 (A-11)
+        ("candidates", _int_at_least(1)),
+        ("max_results", _int_at_least(1)),
+    ],
     "wiki": [  # SPEC-NF2006
         ("max_retries", _int_at_least(0)),
         ("maxlag", _int_at_least(0)),

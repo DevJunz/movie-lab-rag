@@ -116,3 +116,41 @@ def build_answer_prompt(profile: DomainProfile, evidences: list[Evidence], quest
         context=format_context(evidences),
         question=question,
     )
+
+
+# E1 조건 해석 (SPEC-F2011 §3.2) — 필드 설명은 DomainProfile.explore_filter_spec
+EXPLORE_PARSE = """[작업: 조건 해석]
+너는 {expert_role}이다. 사용자의 {item_label} 탐색 조건을 해석하라.
+출력은 JSON 객체 하나만:
+{"semantic_query": "의미 검색에 쓸 문장", 아래 필드들}
+{filter_spec}
+조건: {condition}"""
+
+
+def build_explore_parse_prompt(profile: DomainProfile, condition: str) -> str:
+    return profile.render(
+        EXPLORE_PARSE,
+        filter_spec=profile.explore_filter_spec,
+        condition=condition,
+    )
+
+
+# E2 조건 선별 (SPEC-F2011 §3.2)
+EXPLORE_SELECT = """[작업: 조건 선별]
+너는 {expert_role}이다. 아래 후보 중 조건에 **모두** 맞는 {item_label}만 고른다.
+애매하면 고르지 않는다.
+조건의 요소(배경 · 장르 · 대상 등)를 하나씩 후보 정보와 대조하고,
+하나라도 후보 정보로 확인되지 않으면 고르지 않는다.
+선정 이유는 후보 줄에 실제로 있는 정보만 쓴다.
+조건: {condition}
+후보:
+{candidate_lines}
+출력은 JSON 배열 하나만:
+[{"movie_id": "후보 줄의 id= 뒤 값", "reason": "후보 정보에 근거한 한 문장"}]
+맞는 것이 없으면 []."""
+
+
+def build_explore_select_prompt(
+    profile: DomainProfile, condition: str, candidate_lines: str
+) -> str:
+    return profile.render(EXPLORE_SELECT, condition=condition, candidate_lines=candidate_lines)

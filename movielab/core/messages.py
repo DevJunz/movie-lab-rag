@@ -35,6 +35,7 @@ NOT_FOUND = "제공된 문서에서 확인되지 않습니다."
 # 질의응답 화면 (SPEC-F2009)
 APP_TITLE = "Movie Lab"
 MENU_ASK = "질문하기"
+MENU_EXPLORE = "조건 탐색"
 SELECT_ITEM_LABEL = "{item_label} 선택"
 SELECT_ITEM_FIRST = "{item_label}를 먼저 선택하세요."
 ASK_PLACEHOLDER = "{item_name}에 대해 질문하세요"
@@ -57,6 +58,9 @@ PROGRESS = {
     "generate": "답변을 작성하는 중…",
     "done": "완료 — 수집한 문서: {titles} (버린 문서 {rejected}건)",
     "done_none": "완료 — 새로 수집한 문서 없음 (버린 문서 {rejected}건)",
+    "explore_parse": "조건을 해석하는 중…",
+    "explore_search": "후보를 찾는 중…",
+    "explore_select": "조건에 맞는 {item_label}를 고르는 중…",
 }
 STATUS_RUNNING = "문서를 확인하고 답변을 준비하는 중…"
 STATUS_DONE = "완료 ({seconds:.1f}초)"
@@ -65,6 +69,14 @@ COLLECT_DETAIL_QUERIES = "검색어: {queries}"
 COLLECT_DETAIL_INDEXED = "색인한 문서: {titles}"
 COLLECT_DETAIL_REJECTED = "버린 문서: {items}"
 NONE_MARK = "없음"
+
+# 조건 탐색 화면 (SPEC-F2011)
+EXPLORE_INPUT_LABEL = "찾고 싶은 {item_label}의 조건"
+EXPLORE_PLACEHOLDER = "예: 1990년대 한국 스릴러, 우주를 배경으로 한 가족 {item_label}"
+EXPLORE_BUTTON = "찾기"
+EXPLORE_SUMMARY = "후보 {candidates}건 중 조건에 맞는 {count}건"
+EXPLORE_REASON = "선정 이유: {reason}"
+EXPLORE_ASK_BUTTON = "이 {item_label}로 질문하기"
 
 # 근거 목록 (SPEC-F2008 §3.3)
 EVIDENCE_HEADER = "근거"
@@ -109,6 +121,7 @@ TEMPLATES: dict[str, str] = {
     "NO_EXTERNAL_DOCS": (
         "관련 {doc_source_label} 문서를 찾지 못했습니다. {meta_source_label}만으로 답합니다."
     ),
+    "EXPLORE_EMPTY": "조건에 맞는 {item_label}를 찾지 못했습니다. 조건을 바꿔 보세요.",
     "SOURCE_FALLBACK": (
         "{doc_source_label}에 연결할 수 없어 미리 수집된 문서 묶음을 사용했습니다."
     ),

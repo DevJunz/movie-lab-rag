@@ -24,7 +24,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 | F2008 | 생성 | 근거 표시 | [SPEC-F2008](mvp/SPEC-F2008-evidence-display.md) | `rag/citations.py` | 5 | V4.3-3, V4.3-4, V4.3-6 | 12 | #12 | Done |
 | F2009 | UI | 항목 선택 및 질의응답 | [SPEC-F2009](mvp/SPEC-F2009-movie-select-chat.md) | `ui/streamlit_app.py` | 5 | V4.4-1 | 13 | #13 | Done |
 | F2010 | 서비스 | 도메인 특화 기능 | [SPEC-F2010](mvp/SPEC-F2010-domain-features.md) | `services/guide.py`, `factcheck.py` | 7 | V4.4-3 | 17 | #17 | Draft |
-| F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | #16 | Draft |
+| F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | #16 | Done |
 | F2012 | UI | 진행 상태 및 안내 | [SPEC-F2012](mvp/SPEC-F2012-progress-notices.md) | `core/messages.py`, `services/health.py` | 6 | V4.4-4, V4.4-5, V4.4-6 | 14 | #14 | Done |
 | NF2001 | 성능 | 응답 시간 | [SPEC-NF2001](mvp/SPEC-NF2001-response-time.md) | `services/qa.py` | 4 | V4.7-1 | 18 | #18 | Draft |
 | NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 8 | V4.2-3, V4.7-2 | 8 | #8, #33 | Done |

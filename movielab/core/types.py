@@ -163,6 +163,22 @@ class CitedResult:
 
 
 @dataclass(frozen=True)
+class ExploreItem:
+    """조건 탐색 결과 하나 — 항목과 선정 이유 (F2011)."""
+
+    item: ItemRecord
+    reason: str
+
+
+@dataclass(frozen=True)
+class ExploreResult:
+    condition: str
+    parsed: dict[str, Any]
+    candidates: int  # 의미 검색 후보 수
+    items: list[ExploreItem] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class AnswerResult:
     """질문 하나의 결과 (F2009 `QAService.ask`).
 

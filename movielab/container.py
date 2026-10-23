@@ -33,6 +33,7 @@ from movielab.index.store import VectorStore
 from movielab.rag.graph import build_graph
 from movielab.rag.retriever import Retriever
 from movielab.services.catalog import Catalog
+from movielab.services.explore import ExploreService
 from movielab.services.health import HealthStatus
 from movielab.services.health import check as check_health
 from movielab.services.qa import QAService
@@ -227,6 +228,11 @@ class Services:
         if self._qa is None:
             self._qa = QAService(self.catalog, self.collector, self.rag_graph())
         return self._qa
+
+    @property
+    def explore(self) -> ExploreService:
+        """조건 기반 탐색 (F2011)."""
+        return ExploreService(self.catalog, self.store, self.llm, self.profile, self.settings)
 
     def health(self) -> HealthStatus:
         """시작 점검 (F2012) — 키 유무 · 색인 건수. 키 없이도 동작한다."""

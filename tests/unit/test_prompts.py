@@ -59,3 +59,16 @@ def test_tc_f2007_12_citation_variants_neutralized():
     for marker in ("[근거 7]", "[ 근거 3]", "［근거 4", "【근거 5"):
         assert marker not in block
     assert "[근거 2] (위키백과) 제목 (근거 7]" in block
+
+
+def test_tc_f2011_09_explore_prompts():
+    from movielab.prompts import build_explore_parse_prompt, build_explore_select_prompt
+
+    parse = build_explore_parse_prompt(MOVIE_PROFILE, "1990년대 한국 스릴러")
+    assert parse.startswith("[작업: 조건 해석]")
+    assert "1990년대 한국 스릴러" in parse and "year_min" in parse and "korean_only" in parse
+    select = build_explore_select_prompt(
+        MOVIE_PROFILE, "1990년대 한국 스릴러", "[0] id=900001 | 쉬리 (1999) / …"
+    )
+    assert select.startswith("[작업: 조건 선별]")
+    assert "[0] id=900001 | 쉬리 (1999)" in select and "모두" in select
