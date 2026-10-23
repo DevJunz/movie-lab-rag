@@ -32,7 +32,7 @@
 | 1. 조건 해석 (E1) | 자연어 조건 → `{semantic_query, year_min, year_max, korean_only}`. 파싱 실패 시 `{semantic_query: 조건 원문, 나머지 null}` |
 | 2. 메타데이터 필터 | 해석한 값 중 **확실히 구조화된 조건**(연도 범위, 한국 영화 여부)은 Chroma `where`로 강제한다: `year >= year_min`, `year <= year_max`, `original_language == "ko"`. 변환은 `DomainProfile.explore_where(parsed)`가 맡는다(영화 필드 이름은 `data/`에만 둔다, NF2005) |
 | 3. 의미 검색 | `movie_meta`에서 `semantic_query`로 `explore.candidates`(20)편 검색 (2의 필터 적용) |
-| 4. 조건 선별 (E2) | 후보를 `[번호] id=… | DomainProfile.item_card(항목, collect.card_overview_chars)` 줄로 보여 주고 조건에 맞는 영화만 `[{movie_id, reason}]`으로 받는다 |
+| 4. 조건 선별 (E2) | 후보를 `- id=… | DomainProfile.item_card(항목, collect.card_overview_chars)` 줄로 보여 주고 조건에 맞는 영화만 `[{movie_id, reason}]`으로 받는다. 줄에 순번을 붙이지 않는다 — 실제 모델이 순번을 `movie_id`로 돌려준 일이 있어(§7 관찰) `id=` 값만 쓰게 한다 |
 | 5. 검증 | 후보에 없는 `movie_id`는 버린다(목록 밖 영화 생성 방지). 2의 필터(`where`)를 후보 메타데이터에 다시 적용한다 — `$and` · `$gte` · `$lte` · `$eq`를 해석하는 도메인 무관 검사기(`services/explore.matches_where`). 같은 영화는 한 번만. 최대 `explore.max_results`(10)편 |
 | 6. 표시 | 카드: 제목 (연도) · 요약 줄(`DomainProfile.item_caption`, F2009) · 선정 이유 · 메타 링크 · `이 영화로 질문하기` 버튼 |
 
@@ -67,9 +67,9 @@
 너는 {expert_role}이다. 아래 후보 중 조건에 **모두** 맞는 영화만 고른다. 애매하면 고르지 않는다.
 조건: {condition}
 후보 (각 줄은 DomainProfile.item_card):
-[0] id=496243 | 기생충 (2019) / 장르: 코미디, 스릴러, 드라마 / 감독: 봉준호 / 줄거리(앞부분): …
+- id=496243 | 기생충 (2019) / 장르: 코미디, 스릴러, 드라마 / 감독: 봉준호 / 줄거리(앞부분): …
 …
-출력은 JSON 배열 하나만: [{"movie_id": "…", "reason": "후보 정보에 근거한 한 문장"}]
+출력은 JSON 배열 하나만: [{"movie_id": "후보 줄의 id= 뒤 값", "reason": "후보 정보에 근거한 한 문장"}]
 ```
 
 ### 3.3 카드 → 대화 연결
