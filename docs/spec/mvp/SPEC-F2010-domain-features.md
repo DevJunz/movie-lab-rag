@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2010** 도메인 특화 기능 (서비스 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
-| 담당 모듈 | `movielab/services/guide.py`, `movielab/services/factcheck.py`, `movielab/prompts.py`(G1, C1), `movielab/rag/graph.py` |
+| 상태 | In Progress |
+| 담당 모듈 | `movielab/services/guide.py`, `movielab/services/factcheck.py`, `movielab/prompts.py`(G1, C1), `movielab/container.py`(그래프 프롬프트 표), `movielab/ui/pages/guide.py`, `movielab/ui/pages/factcheck.py` |
 | 선행 SPEC | SPEC-F2008, SPEC-F2009 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #17 |
 
 ## 1. 요구사항 원문
 
@@ -30,13 +30,15 @@
 
 ### 3.1 관람 가이드 (`GuideService.generate(movie_id, on_progress)`)
 
-1. 수집: 질문 대신 고정 문장 `"{제목} ({연도}) 관람 가이드: 제작 배경, 원작 · 실제 사건, 주요 개념, 감독과 출연진"`으로 SPEC-F2004 수집을 실행한다 (캐시 규칙 동일).
-2. 그래프: `task="guide"`, `question` = 위 문장. Top-k는 `retrieval.top_k`의 2배(가이드는 여러 측면을 다루므로).
+1. 수집: 질문 대신 고정 문장 `"{제목 (연도)} 관람 가이드: 제작 배경, 원작 · 실제 사건, 주요 개념, 감독과 출연진"`(`messages.GUIDE_REQUEST`, 제목은 `ItemRecord.display_name`)으로
+   SPEC-F2004 수집을 실행한다 (캐시 규칙 동일).
+2. 그래프: `task="guide"`, `question` = 위 문장. Top-k는 `retrieval.top_k`의 2배(가이드는 여러 측면을 다루므로) — `Services.rag_graph(top_k=…)`로 만든다.
+   그래프의 작업 → 프롬프트 표에 `guide`(G1) · `factcheck`(C1)를 container가 더한다(SPEC-F2007 §3.3).
 3. 프롬프트 G1:
 
 ```text
 [작업: 관람 가이드]
-너는 {assistant_role}이다. 아래 근거만 사용해 '{제목} ({연도})' 관람 가이드를 쓴다.
+너는 {assistant_role}이다. 아래 근거만 사용해 다음 요청에 맞는 관람 가이드를 쓴다: {question}
 형식(소제목 고정, 근거가 없는 소제목은 "문서에서 확인되지 않습니다"라고 쓴다):
 ## 한 줄 소개
 ## 알고 보면 좋은 배경
@@ -45,7 +47,8 @@
 근거: {근거 블록}
 ```
 
-4. 결과: `GuideResult{markdown, evidences, cited, uncited}` → 화면에 마크다운 + 근거 목록(F2008).
+4. 결과: `GuideResult{markdown, evidences, cited, uncited, collect}` → 화면에 마크다운 + 근거 목록(F2008).
+   소제목 3개 중 빠진 것이 있으면 그 소제목과 "문서에서 확인되지 않습니다"를 코드가 채운다(AC-02 — 형식은 코드로 보장).
 
 ### 3.2 사실 여부 판정 (`FactCheckService.check(movie_id, claim, on_progress)`)
 
@@ -69,13 +72,17 @@
    - `verdict`가 세 라벨이 아니면 `확인 불가`.
    - `citations`는 `reason`의 `[근거 n]`과 합친 뒤 범위 밖 번호를 버린다.
    - `verdict`가 `사실` · `거짓`인데 유효한 인용이 0개 → **`확인 불가`로 낮춘다**(근거 없는 판정 금지).
-5. 결과: `FactCheckResult{verdict, reason, evidences, cited}` → 화면에 판정 배지 + 이유 + 근거 목록.
+5. 결과: `FactCheckResult{claim, verdict, reason, evidences, cited, collect}` → 화면에 판정 배지 + 이유 + 근거 목록.
+   판정 라벨 · 해석 실패 이유 문구는 `core/messages`(`VERDICTS`, `FACTCHECK_UNPARSED`)에 둔다.
+   `reason`의 인용 번호는 검색된 근거 번호 그대로이므로 근거 목록(F2008 `select_cited`)과 번호가 맞는다.
 
 ### 3.3 화면
 
 - 메뉴 `관람 가이드`: 선택한 영화 기준 `가이드 만들기` 버튼 → 진행 상태(F2012) → 결과.
 - 메뉴 `사실 판정`: 주장 입력창 + `판정하기` 버튼 → 진행 상태 → 배지(`사실` 초록 / `거짓` 빨강 / `확인 불가` 회색) + 이유 + 근거.
-- 두 결과 모두 영화별로 마지막 결과를 `session_state`에 보관한다(영화 전환 시 섞이지 않음).
+- 두 결과 모두 영화별로 마지막 결과를 `session_state`(`guide_results[movie_id]`, `factcheck_results[movie_id]`)에 보관한다(영화 전환 시 섞이지 않음).
+- 영화를 고르지 않았으면 버튼 · 입력을 비활성화하고 F2009와 같은 안내를 보인다. 메타 색인이 비면 비활성화(F2012).
+- 진행 상태 상자 · 오류 안내는 질의응답과 같은 방식(F2012 · NF2004)이고 공용 도우미(`ui/components/status.run_with_status`)를 쓴다.
 
 ## 4. 가정
 
@@ -109,13 +116,15 @@
 | TC-F2010-07 | 통합 | `AppTest`: 사실 판정 화면 | 배지 + 이유 + 근거 목록 표시 | 04 | `tests/integration/test_ui_features.py` |
 | TC-F2010-08 | 통합 | `AppTest`: 관람 가이드 화면 | 마크다운 + 근거 목록 표시 | 01 | 〃 |
 | TC-F2010-09 | live | 실제 GMS: 명량 "조선 수군의 배는 12척이었다" | `사실` 또는 `거짓`이면 인용 ≥ 1 | 07 | `tests/live/test_live_features.py` |
+| TC-F2010-11 | 단위 | G1 · C1 프롬프트 | 머리표 · 고정 소제목 3개 · 라벨 3종 · 근거 블록 · 요청/주장 포함 | 02, 03, 06 | `tests/unit/test_prompts.py` |
+| TC-F2010-12 | 단위 | 가이드 응답에 소제목 하나가 빠짐 / 영화 미선택 화면 | 빠진 소제목과 확인 불가 문장이 채워짐 / 버튼 비활성 · 안내 | 02 | `tests/unit/test_guide.py`, `tests/integration/test_ui_features.py` |
 | TC-F2010-10 | 수동 | 인터스텔라 관람 가이드 · 명량 사실 판정 화면 | 근거가 함께 보이는 캡처 | 01, 04 | 스크린샷 |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.4-3 | 관람 가이드 · 사실 판정 결과 화면 | `docs/verification/screenshots/V4.4-3_guide.png`, `V4.4-3_factcheck.png` |
+| V4.4-3 | 실제 색인 · GMS로 인터스텔라 관람 가이드와 명량 사실 판정(주장 2개) 결과 · 근거 목록 (화면 캡처는 수동 단계) | `docs/verification/evidence/V4.4-3_features.txt` |
 
 ## 8. 범위 밖
 
