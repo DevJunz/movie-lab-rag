@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SETTINGS_PATH = REPO_ROOT / "config" / "settings.json"
@@ -21,8 +22,18 @@ class SettingsError(ValueError):
     """설정 파일이 없거나 값이 잘못되었다."""
 
 
-def _env(name: str) -> str | None:
-    value = os.environ.get(name, "").strip()
+def read_env() -> dict[str, str]:
+    """`.env` 값과 환경변수를 합친다. 같은 이름이면 환경변수가 이긴다.
+
+    `os.environ`은 바꾸지 않는다 (테스트 사이 누출 방지, 실행 중 `.env` 수정 반영).
+    """
+    merged = {k: v for k, v in dotenv_values(DOTENV_PATH).items() if v is not None}
+    merged.update({k: v for k, v in os.environ.items() if v.strip()})
+    return merged
+
+
+def _get(env: Mapping[str, str], name: str) -> str | None:
+    value = (env.get(name) or "").strip()
     return value or None
 
 
@@ -35,8 +46,8 @@ class Secrets:
     wiki_contact: str | None = None
 
     @classmethod
-    def from_env(cls) -> Secrets:
-        return cls(_env("GMS_API_KEY"), _env("GMS_BASE_URL"), _env("WIKI_CONTACT"))
+    def from_env(cls, env: Mapping[str, str]) -> Secrets:
+        return cls(_get(env, "GMS_API_KEY"), _get(env, "GMS_BASE_URL"), _get(env, "WIKI_CONTACT"))
 
     @property
     def has_gms(self) -> bool:
@@ -104,9 +115,9 @@ def load_settings(path: str | Path | None = None) -> Settings:
     """설정 파일과 비밀 값을 읽는다.
 
     설정 파일: 인자 → 환경변수 `MOVIELAB_SETTINGS` → 기본 파일 순.
-    비밀 값: `.env`를 읽되 이미 설정된 환경변수는 덮어쓰지 않는다.
+    비밀 값: 부를 때마다 `.env`를 읽고 환경변수와 합친다(환경변수 우선, `os.environ`은 그대로).
     """
-    load_dotenv(DOTENV_PATH, override=False)
+    env = read_env()
     chosen = Path(path or os.environ.get(SETTINGS_ENV) or DEFAULT_SETTINGS_PATH)
     try:
         raw = json.loads(chosen.read_text(encoding="utf-8"))
@@ -115,7 +126,7 @@ def load_settings(path: str | Path | None = None) -> Settings:
     except json.JSONDecodeError as exc:
         raise SettingsError(f"설정 파일 형식 오류: {chosen} ({exc.msg})") from exc
     for key, env_name in MODEL_ENV.items():
-        override = _env(env_name)
+        override = _get(env, env_name)
         if override:
             raw.setdefault("models", {})[key] = override
-    return Settings(raw, chosen, Secrets.from_env())
+    return Settings(raw, chosen, Secrets.from_env(env))
