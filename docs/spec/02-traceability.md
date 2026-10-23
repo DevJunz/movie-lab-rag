@@ -18,7 +18,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 | F2002 | 색인 | 메타데이터 색인(RAG 1) | [SPEC-F2002](mvp/SPEC-F2002-metadata-index.md) | `index/meta_indexer.py` | 8 | V4.1-1, V4.1-2 | 4 | #4 | Done |
 | F2003 | 프롬프트 | 검색어 추출(프롬프트 1) | [SPEC-F2003](mvp/SPEC-F2003-query-extraction.md) | `collect/query_extractor.py` | 6 | V4.2-1, V4.2-4 | 6 | #6 | Done |
 | F2004 | 수집 | 외부 문서 수집(프롬프트 2) | [SPEC-F2004](mvp/SPEC-F2004-document-collection.md) | `collect/`, `data/wiki_*.py` | 11 | V4.2-2, V4.2-3, V4.2-4, V4.4-4 | 7 | #7 | Done |
-| F2005 | 색인 | 외부 문서 색인(RAG 2) | [SPEC-F2005](mvp/SPEC-F2005-document-index.md) | `index/doc_indexer.py` | 7 | V4.2-5 | 9 | #9 | Done |
+| F2005 | 색인 | 외부 문서 색인(RAG 2) | [SPEC-F2005](mvp/SPEC-F2005-document-index.md) | `index/doc_indexer.py` | 17 | V4.2-5 | 9 | #9 | Done |
 | F2006 | 검색 | 근거 검색 및 병합 | [SPEC-F2006](mvp/SPEC-F2006-retrieve-merge.md) | `rag/retriever.py` | 7 | V4.3-1, V4.3-4, V4.4-5 | 10 | #10 | Draft |
 | F2007 | 생성 | 근거 기반 답변 생성(프롬프트 3) | [SPEC-F2007](mvp/SPEC-F2007-grounded-generation.md) | `rag/graph.py` | 6 | V4.3-2, V4.3-4, V4.3-5 | 11 | #11 | Draft |
 | F2008 | 생성 | 근거 표시 | [SPEC-F2008](mvp/SPEC-F2008-evidence-display.md) | `rag/citations.py` | 5 | V4.3-3, V4.3-4, V4.3-6 | 12 | #12 | Draft |

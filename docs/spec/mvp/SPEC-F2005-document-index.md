@@ -49,21 +49,28 @@
   - 청크 크기를 바꿔 청크 수가 줄어도 높은 순번의 옛 청크가 남지 않는다 (AC-06).
   - 임베딩(쓰기) 단계에서 실패하면 옛 청크가 그대로 남는다 — 문서가 색인에서 사라지지 않는다 (AC-09).
   - 본문이 비어 청크가 0개면 `ValueError`로 실패시킨다. 옛 청크는 지우지 않는다 (AC-14).
+    수집기(F2004)는 길이 규칙을 면제받는 항목 자체 문서라도 본문이 비어 있으면 `too_short`로 버린다 —
+    저장 · 색인하지 않으므로 같은 질문의 캐시 적중과 재색인이 빈 문서 때문에 실패하지 않는다 (AC-17).
   - 임베딩 인증 오류(`openai.AuthenticationError` · `PermissionDeniedError`)는 `index_document`가 `InvalidApiKeyError`로 바꾼다 —
     수집기(F2004, `MovieLabUserError`는 다시 던진다)와 재색인 모두 키 안내 문구를 보여 준다 (AC-13).
 - `scripts.reindex_docs`는 `data/raw/wiki/`의 저장 원문으로 `wiki_docs`를 다시 만든다(외부 호출 없음).
   - `--chunk-size`, `--chunk-overlap` 인자는 **설정 파일 값을 일시적으로 덮어쓰는 실험용**이다.
     덮어쓴 결과에도 설정과 같은 검증 규칙(`config.chunking_ok(size, overlap)`: `size ≥ 1`, `0 ≤ overlap < size`)을 적용하고,
     어기면 색인 전에 인자 오류(`REINDEX_BAD_CHUNKING`, 종료 코드 2)로 끝낸다 (AC-10).
-  - `services.indexing.reindex_documents`는 시작 전에 임베딩(키)을 준비한다 — 키가 없으면 `MissingApiKeyError`로 바로 끝난다.
+  - `services.indexing.reindex_documents`는 다시 색인할 원문이 있으면 시작 전에 임베딩(키)을 준비한다 — 키가 없으면
+    `MissingApiKeyError`로 바로 끝난다. 원문이 0건이면(고아 정리만) 키 없이 동작한다.
     문서별로 실패를 격리한다: 안내 오류(`MovieLabUserError`, 잘못된 키 포함)는 즉시 중단하고, 그 밖의 오류는
     `settings.indexing.retries`번까지 `retry_wait_sec` 간격으로 다시 시도한 뒤(A-21) 실패 문서 수로 집계하고 다음 문서로 넘어간다 (AC-11, AC-15).
-    다시 해도 같은 결과인 `ValueError`(빈 본문 등)는 재시도하지 않는다.
+    재시도 분류는 메타 색인(F2002)과 같다: `meta_indexer.UNRECOVERABLE`(잘못된 요청 · 빈 본문 `ValueError` · `TypeError` 등)은
+    재시도하지 않고, 그중 응답이 잘려 나는 `json.JSONDecodeError`는 일시 오류로 보고 재시도한다.
   - 저장 원문이 없는 `(movie_id, page_id)`의 청크를 지운다. `--movie-id`를 주면 그 영화 범위에서만 지운다.
     원문이 0건이어도 범위 안에 색인된 문서가 있으면 정리를 수행한다. 원문도 색인도 없을 때만 `REINDEX_EMPTY` (AC-12).
     지울 청크 ID를 모아 한 번에 지운다. 청크를 지운 영화는 수집 매니페스트(NF2002)도 그 영화만 초기화한다 —
     지운 문서가 '수집됨'으로 남아 다시 수집되지 않는 일을 막는다 (AC-16).
   - `--movie-id`와 원문의 `movie_id`는 문자열로 비교한다 (원문 JSON에 정수로 저장된 경우에도 같은 영화로 본다).
+    빈 값(`--movie-id ""`)은 주지 않은 것과 같다 (재색인 · 정리 범위가 같아야 한다). `--movie-id`를 주면 그 영화의 원문 파일만 읽는다.
+  - `--chunk-size` · `--chunk-overlap`을 주면 컬렉션이 그 값으로 다시 만들어진다. 이후 수집되는 문서는 설정 값으로 색인되어
+    크기가 섞이므로, 실행 뒤 `REINDEX_OVERRIDE_NOTICE`(인자 없이 다시 실행해 되돌리라는 안내)를 출력한다.
   - 출력: 사용한 값, 색인에 성공한 문서 수, 이번에 색인한 청크 수, 지운 문서 수, 실패 문서 수, 재색인 후 컬렉션 전체 청크 수 (V4.2-5).
   - 예외 원문은 화면에 내보내지 않는다 — 안내 문구만 출력하고 원문은 로그로 (NF2004).
 - 매니페스트(NF2002)의 `chunks`는 **수집 당시 색인한 청크 수의 기록**이다. 재색인은 청크 수를 갱신하지 않는다
@@ -125,6 +132,7 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | AC-F2005-14 | 본문이 빈 문서는 실패로 처리되고 그 문서의 옛 청크는 남는다 | — |
 | AC-F2005-15 | 재색인에서 일시 오류는 설정 횟수만큼 다시 시도한다 (빈 본문 같은 확정 오류는 제외) | — |
 | AC-F2005-16 | 재색인으로 청크를 지운 영화는 다음 질문에서 문서를 다시 수집할 수 있다 (매니페스트 초기화) | — |
+| AC-F2005-17 | 본문이 빈 항목 자체 문서는 저장 · 색인하지 않고, 같은 질문은 다음에 캐시 적중한다 | — |
 
 ## 6. 테스트 케이스
 
@@ -155,6 +163,10 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-23 | 통합 | 첫 시도만 일시 오류인 문서 재색인 (`retries=1`, 대기 0) / 빈 본문 | 성공, `failed == 0`, 임베딩 호출 2회 / 대기 호출 0회 | 15 | 〃 |
 | TC-F2005-24 | 통합 | 원문을 지운 문서가 있는 영화를 매니페스트와 함께 재색인 | 그 영화 매니페스트 초기화, 다른 영화 매니페스트는 유지 | 16 | 〃 |
 | TC-F2005-25 | 통합 | 원문 JSON의 `movie_id`가 정수인 상태에서 `reindex_docs --movie-id 157336` | 그 문서를 재색인, 청크 삭제 없음 | 12 | `tests/integration/test_scripts.py` |
+| TC-F2005-27 | 통합 | 재색인 중 `JSONDecodeError` 한 번 / `openai.BadRequestError` | 재시도해 성공 / 재시도 없이 실패 1 | 15 | `tests/integration/test_doc_index.py` |
+| TC-F2005-28 | 통합 | 키 없는 설정 · 원문 0건 · 고아 청크만 있음 | 키 오류 없이 고아 정리 | 12 | 〃 |
+| TC-F2005-29 | 통합 | 본문이 빈 항목 자체 문서로 같은 질문 2회 | `too_short`로 버려짐, 두 번째는 캐시 적중 | 17 | `tests/integration/test_collect_index.py` |
+| TC-F2005-30 | 통합 | `reindex_docs --movie-id ""` / `--chunk-size 500 --chunk-overlap 100` | 전체 범위로 재색인 · 정리 / 되돌리기 안내 출력 | 12, 05 | `tests/integration/test_scripts.py` |
 | TC-F2005-26 | 통합 | 문서가 하나도 색인되지 않은 영화(P2가 아무것도 안 고름)에 같은 질문 2회 | 두 번째는 캐시 적중 (청크가 없어도 '색인된 문서' 기록이 없으면 캐시를 비우지 않음) | 08 | `tests/integration/test_collect_index.py` |
 
 ## 7. 증빙
