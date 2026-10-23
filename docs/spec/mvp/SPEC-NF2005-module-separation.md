@@ -99,9 +99,12 @@
 | TC-NF2005-02 | 단위 | import 규칙 검사 | 위반 0 | 02 | 〃 |
 | TC-NF2005-03 | 단위 | 금지 단어 검사 (`data/` 밖) | 0건 | 03 | 〃 |
 | TC-NF2005-04 | 단위 | 규칙 검사기에 위반 예제 코드 입력 | 위반 검출 (검사기 자체 검증) | 02 | 〃 |
-| TC-NF2005-05 | 통합 | "도서" 테스트 프로필로 P1 · P3 프롬프트 생성 | 프롬프트에 "도서" 역할, "영화" 없음 | 04 | `tests/integration/test_domain_swap.py` |
-| TC-NF2005-06 | 단위 | live 마커 없는 테스트에서 `socket.create_connection` | 예외 | 05 | `tests/unit/test_network_guard.py` |
+| TC-NF2005-05 | 통합 | "도서" 테스트 프로필로 `DomainProfile.render` 문구 생성. **F2003 · F2007 구현 PR에서 P1 · P3 프롬프트 검사를 이 파일에 추가한다** | 문구에 "도서" 역할, "영화" 없음 | 04 | `tests/integration/test_domain_swap.py` |
+| TC-NF2005-06 | 단위 | live 마커 없는 테스트에서 `socket.create_connection` (루프백은 허용 — Windows의 `socketpair`가 루프백 연결을 쓴다) | 외부 주소는 예외, 루프백은 통과 | 05 | `tests/unit/test_network_guard.py` |
 | TC-NF2005-07 | CI | 이 PR의 Actions 실행 | 린트 · 테스트 통과 | 06 | GitHub Actions |
+| TC-NF2005-08 | 단위 | 가짜 객체 동작: `FakeChatModel` 작업 분기 · 기록 · 예외, `FakeEmbeddings` 결정성 · 유사도 순서, `FakeHttpSession` 응답 순서 · 기록, `FakeClock` | 정의대로 동작 | 06 | `tests/unit/test_fakes.py` |
+| TC-NF2005-09 | 단위 | `load_settings()` 기본 파일 · `MOVIELAB_SETTINGS` 지정 파일 · `tmp_settings` 픽스처 | 값 · 경로가 정확, 임시 경로는 `tmp_path` 아래 | 06 | `tests/unit/test_config.py` |
+| TC-NF2005-10 | 단위 | `build_services(..., llm=가짜, embeddings=가짜, profile=도서)` | 주입한 객체를 그대로 담는다 | 04 | `tests/unit/test_container.py` |
 
 ## 7. 증빙
 
