@@ -36,3 +36,13 @@ def test_tc_nf2005_05_render_keeps_json_braces_and_unknown_placeholders():
     assert '{"verdict": "사실", "citations": [1]}' in text
     assert "{unknown}" in text
     assert text.startswith("[작업: 사실 판정]\n도서 주장.")
+
+
+def test_tc_nf2005_05_query_prompt_uses_book_profile():
+    from movielab.prompts import build_query_prompt
+
+    prompt = build_query_prompt(
+        BOOK_PROFILE, item_card="데미안 (1919)", question="작가는?", min_queries=3, max_queries=5
+    )
+    assert "도서 큐레이터" in prompt and "도서: 데미안 (1919)" in prompt
+    assert "영화" not in prompt
