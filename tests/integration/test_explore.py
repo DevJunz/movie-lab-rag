@@ -45,6 +45,7 @@ def test_tc_f2011_02_structured_filter_enforced(tmp_settings):
         assert 1990 <= meta["year"] <= 1999 and meta["original_language"] == "ko"
     selection_prompt = services.llm.prompts_for("조건 선별")[0]
     assert "id=900001" in selection_prompt and "id=496243" not in selection_prompt  # 후보부터 필터
+    assert "- id=900001 | " in selection_prompt and "[0]" not in selection_prompt  # 순번 없이 id만
 
 
 @pytest.mark.parametrize(
