@@ -29,6 +29,19 @@ def meta_title(metadata: dict) -> str:
     return f"{title} ({year})" if year else str(title)
 
 
+def item_caption(item: ItemRecord) -> str:
+    """사이드바 한 줄 요약 `장르 · 감독 … · n분` (SPEC-F2009). 정보 없는 항목은 뺀다."""
+    meta = item.metadata
+    parts = []
+    if meta.get("genres") and meta["genres"] != movies.UNKNOWN:
+        parts.append(str(meta["genres"]))
+    if meta.get("director") and meta["director"] != movies.UNKNOWN:
+        parts.append(f"감독 {meta['director']}")
+    if meta.get("runtime"):
+        parts.append(f"{meta['runtime']}분")
+    return " · ".join(parts)
+
+
 def item_doc_queries(item: ItemRecord) -> list[str]:
     """영화 자체를 다룬 위키백과 문서의 제목 후보. 동명 작품 표제 형식이 먼저 (SPEC-F2003 §3.2)."""
     return [f"{item.title} ({item.year}년 영화)", f"{item.title} (영화)", item.title]
@@ -79,6 +92,7 @@ MOVIE_PROFILE = DomainProfile(
     to_index_text=movies.to_index_text,
     item_card=item_card,
     meta_title=meta_title,
+    item_caption=item_caption,
     item_doc_queries=item_doc_queries,
     pick_item_doc=pick_item_doc,
 )
