@@ -1,0 +1,27 @@
+# V4.5-4 (SPEC-F2016) 출처 종류가 섞인 근거 목록 — 합성 데이터 실행 기록
+# 생성: tests/fakes/pdf.py 합성 PDF + FakeEmbeddings + tests/fixtures/movies_small.json (외부 호출 없음)
+# 실제 PDF · GMS 임베딩 실행과 화면 캡처(V4.5-4_multi_source.png, TC-F2016-07)는 수동 단계로 남아 있다.
+
+== extract_pages (반복 머리말 제거 · 텍스트 없는 쪽 건너뜀) ==
+p.1: 'Intro page about the synthetic report and its purpose here.'
+p.3: 'black hole event horizon box office report page with numbers.'
+p.4: 'unrelated audience survey numbers and tables for testing.'
+skipped: [2]
+
+== index_pdfs ==
+PdfIndexReport(file='synth.pdf', pages=3, chunks=3, skipped_pages=[2], missing=False)
+chunk ids: ['157336:pdf:synth:1:0', '157336:pdf:synth:3:0', '157336:pdf:synth:4:0']
+
+== 위키만 (pdf_top_k=0), 질문: black hole event horizon ==
+근거:
+[근거 1] 영화 메타데이터 · 인터스텔라 (2014)
+[근거 2] 위키백과 · 합성 위키 1 · 점수 0.784
+[근거 3] 위키백과 · 합성 위키 2 · 점수 0.286
+
+== 위키 + PDF (pdf_top_k=2) ==
+근거:
+[근거 1] 영화 메타데이터 · 인터스텔라 (2014)
+[근거 2] 위키백과 · 합성 위키 1 · 점수 0.784
+[근거 3] PDF · 합성 보고서 (synth.pdf, p.3) · 점수 0.696
+[근거 4] 위키백과 · 합성 위키 2 · 점수 0.286
+[근거 5] PDF · 합성 보고서 (synth.pdf, p.1) · 점수 0.261

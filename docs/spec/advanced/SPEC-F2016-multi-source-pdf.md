@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2016** 여러 문서 출처 결합 (수집 · 심화) |
 | 구분 | 심화 |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/data/pdf_source.py`(매니페스트 · 쪽별 추출), `movielab/index/pdf_indexer.py`(PDF 청킹 · 색인), `movielab/rag/pdf_search.py`(PDF 검색 · 점수 순 결합), `movielab/rag/retriever.py`(결합 호출만), `movielab/core/messages.py`(근거 표시), `scripts/index_pdf.py` |
 | 선행 SPEC | SPEC-F2005, SPEC-F2006, SPEC-F2008 |
 | 관련 ISSUE | #22 |
@@ -117,7 +117,8 @@ P3 근거 블록의 출처 유형 라벨도 `PDF`로 붙는다(F2007).
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
-| V4.5-4 | 출처 종류가 섞인 근거 목록 화면 | `docs/verification/screenshots/V4.5-4_multi_source.png` |
+| V4.5-4 | 출처 종류가 섞인 근거 목록 (합성 데이터 실행 기록) | `docs/verification/evidence/V4.5-4_multi_source.txt` |
+| V4.5-4 | 출처 종류가 섞인 근거 목록 화면 — 실제 PDF로 수동 캡처 (TC-F2016-07, 화면 F2009/F2013 이후) | `docs/verification/screenshots/V4.5-4_multi_source.png` |
 
 ## 7. 범위 밖
 

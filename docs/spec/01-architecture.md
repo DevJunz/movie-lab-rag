@@ -38,7 +38,7 @@ typing-extensions==4.16.0
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 pydantic==2.13.5
-pypdf            # F2016. 명세서에 버전 지정 없음 → SPEC-F2016 구현 PR에서 고정
+pypdf==6.21.2    # F2016. 명세서에 버전 지정 없음 → SPEC-F2016(A-12)에서 고정
 ```
 
 개발용 `requirements-dev.txt`: `pytest`, `ruff` (버전은 SPEC-NF2005 PR에서 고정, 가정 A-13).
@@ -323,11 +323,13 @@ Chroma 메타데이터 값은 `str` · `int` · `float` · `bool`만 쓴다. 목
     "raw_dir": "data/raw",
     "manifest": "data/manifest.json",
     "pdf_dir": "data/pdf",
+    "pdf_manifest": "data/pdf/pdf_manifest.json",
     "log_file": "logs/movielab.log"
   },
   "models": {"chat": "gpt-4o-mini", "embedding": "text-embedding-3-small", "temperature": 0, "timeout_sec": 60},
   "collections": {"meta": "movie_meta", "docs": "wiki_docs", "pdf": "pdf_docs"},
   "chunking": {"chunk_size": 1000, "chunk_overlap": 200, "pdf_chunk_size": 800, "pdf_chunk_overlap": 100},
+  "pdf": {"min_page_chars": 50, "repeat_line_min_pages": 3},
   "retrieval": {"top_k": 4, "search_type": "similarity", "mmr_fetch_k": 20, "mmr_lambda": 0.5, "pdf_top_k": 2},
   "indexing": {"batch_size": 100, "retries": 1, "retry_wait_sec": 2.0},
   "cache": {"lock_timeout_sec": 10.0, "lock_poll_sec": 0.01, "io_retries": 4, "io_retry_wait_sec": 0.05},
