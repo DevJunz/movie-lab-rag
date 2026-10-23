@@ -1,0 +1,105 @@
+"""movies.json 로드와 영화 1편 → 색인 텍스트 1개 구성 (SPEC-F2001)."""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from movielab.core.errors import DataNotFoundError
+from movielab.core.types import ItemRecord, LoadResult
+
+logger = logging.getLogger(__name__)
+
+REQUIRED_FIELDS = ("movie_id", "title", "year", "overview")
+UNKNOWN = "정보 없음"
+META_SOURCE_TYPE = "영화 메타데이터"
+
+
+def _join(values: Any) -> str:
+    if isinstance(values, (list, tuple)):
+        cleaned = [str(v).strip() for v in values if str(v).strip()]
+        return ", ".join(cleaned) if cleaned else UNKNOWN
+    text = str(values or "").strip()
+    return text or UNKNOWN
+
+
+def _language_line(code: str) -> str:
+    code = (code or "").strip() or UNKNOWN
+    return f"{code} (한국 영화)" if code == "ko" else f"{code} (해외 영화)"
+
+
+def to_index_text(movie: dict[str, Any]) -> str:
+    """사용자가 영화를 찾을 단서를 한 텍스트로 묶는다. 평점 · 상영 시간은 넣지 않는다."""
+    lines = [
+        ("제목", f"{movie['title']} ({movie['year']})"),
+        ("원제", _join(movie.get("original_title"))),
+        ("장르", _join(movie.get("genres"))),
+        ("감독", _join(movie.get("director"))),
+        ("출연", _join(movie.get("cast"))),
+        ("제작 국가", _join(movie.get("production_countries"))),
+        ("원어", _language_line(movie.get("original_language", ""))),
+        ("줄거리", str(movie["overview"]).strip()),
+    ]
+    return "\n".join(f"{label}: {value}" for label, value in lines)
+
+
+def to_item_record(movie: dict[str, Any]) -> ItemRecord:
+    movie_id = str(movie["movie_id"]).strip()
+    year = int(movie["year"])
+    url = str(movie.get("tmdb_url") or "")
+    metadata: dict[str, Any] = {
+        "movie_id": movie_id,
+        "title": str(movie["title"]),
+        "original_title": str(movie.get("original_title") or ""),
+        "year": year,
+        "genres": _join(movie.get("genres")),
+        "director": _join(movie.get("director")),
+        "cast": _join(movie.get("cast")),
+        "original_language": str(movie.get("original_language") or ""),
+        "runtime": int(movie.get("runtime") or 0),
+        "vote_average": float(movie.get("vote_average") or 0.0),
+        "url": url,
+        "source_kind": "meta",
+        "source_type": META_SOURCE_TYPE,
+    }
+    return ItemRecord(
+        item_id=movie_id,
+        title=str(movie["title"]),
+        year=year,
+        index_text=to_index_text(movie),
+        metadata=metadata,
+        url=url,
+    )
+
+
+def load_movies(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise DataNotFoundError(f"영화 데이터 파일이 없다: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _missing(movie: dict[str, Any]) -> list[str]:
+    return [name for name in REQUIRED_FIELDS if movie.get(name) in (None, "", [])]
+
+
+def load_items(path: Path) -> LoadResult:
+    """필수 필드가 빠진 원소와 중복 ID는 건너뛰고 경고한다. 파일 순서를 유지한다."""
+    items: list[ItemRecord] = []
+    seen: set[str] = set()
+    skipped = 0
+    for index, movie in enumerate(load_movies(path)):
+        missing = _missing(movie)
+        if missing:
+            logger.warning("영화 %d번 원소 건너뜀: 필수 필드 없음 %s", index, missing)
+            skipped += 1
+            continue
+        record = to_item_record(movie)
+        if record.item_id in seen:
+            logger.warning("중복 movie_id %s 건너뜀 (첫 번째만 사용)", record.item_id)
+            skipped += 1
+            continue
+        seen.add(record.item_id)
+        items.append(record)
+    return LoadResult(items=items, skipped=skipped)

@@ -12,7 +12,9 @@ from typing import Any
 from movielab import providers
 from movielab.config import Settings
 from movielab.core.domain import DomainProfile
+from movielab.data import movies
 from movielab.data.domain_movie import MOVIE_PROFILE
+from movielab.services.catalog import Catalog
 
 
 class Services:
@@ -30,6 +32,7 @@ class Services:
         self.http = http  # 실제 HTTP 세션은 SPEC-NF2006에서 만든다
         self._llm = llm
         self._embeddings = embeddings
+        self.catalog = Catalog(lambda: movies.load_items(settings.path("movies")))
 
     @property
     def llm(self) -> Any:
