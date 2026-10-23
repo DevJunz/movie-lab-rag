@@ -99,3 +99,50 @@ def test_tc_f2001_01_fixture_loads(movies_small_path: Path):
     result = load_items(movies_small_path)
     assert len(result.items) == 12 and result.skipped == 0
     assert "감독: 정보 없음" in next(i for i in result.items if i.item_id == "1084390").index_text
+
+
+def test_tc_f2001_11_null_and_blank_values_become_unknown():
+    text = to_index_text(_movie(director=[None, "  "], cast=None))
+    assert "감독: 정보 없음" in text.splitlines()
+    assert "출연: 정보 없음" in text.splitlines()
+
+
+def test_tc_f2001_11_language_normalized():
+    assert "원어: ko (한국 영화)" in to_index_text(_movie(original_language="KO"))
+    assert "원어: 정보 없음" in to_index_text(_movie(original_language=None))
+    movie = _movie()
+    del movie["original_language"]
+    assert "원어: 정보 없음" in to_index_text(movie)
+
+
+def test_tc_f2001_11_bad_values_skipped_not_fatal(tmp_path: Path):
+    movies = [
+        _movie(movie_id="1"),
+        _movie(movie_id="2", title="   "),
+        _movie(movie_id="3", year="미상"),
+        _movie(movie_id="4", runtime="169분"),
+        _movie(movie_id="5", vote_average="높음"),
+        _movie(movie_id="6", year=2014.0),
+    ]
+    path = tmp_path / "movies.json"
+    path.write_text(json.dumps(movies, ensure_ascii=False), encoding="utf-8")
+    result = load_items(path)
+    assert [item.item_id for item in result.items] == ["1", "6"]
+    assert result.skipped == 4
+    six = result.items[1]
+    assert six.year == 2014 and six.index_text.startswith("제목: 인터스텔라 (2014)\n")
+
+
+def test_tc_f2001_12_non_array_json_is_format_error(tmp_path: Path):
+    import pytest
+
+    from movielab.core.errors import DataFormatError
+
+    path = tmp_path / "movies.json"
+    path.write_text('{"movie_id": "1"}', encoding="utf-8")
+    with pytest.raises(DataFormatError) as error:
+        load_items(path)
+    assert error.value.code == "DATA_INVALID"
+    path.write_text("[{깨진 json", encoding="utf-8")
+    with pytest.raises(DataFormatError):
+        load_items(path)

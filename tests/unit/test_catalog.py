@@ -34,3 +34,17 @@ def test_tc_f2001_09_container_wires_movie_loader(tmp_settings):
     catalog = build_services(tmp_settings).catalog
     assert len(catalog.items()) == 12
     assert catalog.get("157336").title == "인터스텔라"
+
+
+def test_tc_f2001_09_container_uses_profile_loader(tmp_settings):
+    import dataclasses
+
+    from movielab.container import build_services
+    from tests.fakes import BOOK_PROFILE
+
+    def book_loader(settings):
+        return LoadResult(items=[_record("b1")], skipped=0)
+
+    profile = dataclasses.replace(BOOK_PROFILE, load_items=book_loader)
+    catalog = build_services(tmp_settings, profile=profile).catalog
+    assert [item.item_id for item in catalog.items()] == ["b1"]
