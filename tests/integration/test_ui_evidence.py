@@ -21,14 +21,14 @@ def _evidence(n: int, *, meta: bool = False) -> Evidence:
     )
 
 
-def _app(result, profile):
+def _app(result, profile, preview_chars):
     from movielab.ui.components.evidence import render_evidence
 
-    render_evidence(result, profile)
+    render_evidence(result, profile, preview_chars=preview_chars)
 
 
 def _run(result: CitedResult) -> AppTest:
-    at = AppTest.from_function(_app, args=(result, MOVIE_PROFILE))
+    at = AppTest.from_function(_app, args=(result, MOVIE_PROFILE, 200))
     at.run()
     assert not at.exception
     return at
@@ -49,6 +49,8 @@ def test_tc_f2008_06_only_cited_with_link_type_license():
     assert "TMDB" in text and "원문" in text
     assert text.count("CC BY-SA 4.0") == 1  # 라이선스는 위키백과 근거에만
     assert len(at.expander) == 2  # 근거마다 본문 미리보기
+    previews = [m.value for e in at.expander for m in e.markdown]
+    assert previews and all(len(p) <= 201 for p in previews)  # 200자 + 줄임표
     assert not at.info
 
 
