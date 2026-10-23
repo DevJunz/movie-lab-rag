@@ -333,6 +333,7 @@ Chroma 메타데이터 값은 `str` · `int` · `float` · `bool`만 쓴다. 목
   "retrieval": {"top_k": 4, "search_type": "similarity", "mmr_fetch_k": 20, "mmr_lambda": 0.5, "pdf_top_k": 2},
   "indexing": {"batch_size": 100, "retries": 1, "retry_wait_sec": 2.0},
   "cache": {"lock_timeout_sec": 10.0, "lock_poll_sec": 0.01, "io_retries": 4, "io_retry_wait_sec": 0.05},
+  "logging": {"max_bytes": 1048576, "backup_count": 3, "level": "INFO"},
   "collect": {"source": "auto", "min_queries": 3, "max_queries": 5, "search_limit": 5, "max_selected_docs": 5, "min_doc_chars": 200},
   "wiki": {"api_url": "https://ko.wikipedia.org/w/api.php", "min_interval_sec": 1.0, "max_retries": 3,
            "backoff_base_sec": 1.0, "timeout_sec": 10, "maxlag": 5, "app_name": "MovieLab", "app_version": "0.1"},

@@ -17,6 +17,7 @@ from movielab.config import load_settings
 from movielab.container import build_services
 from movielab.core import messages
 from movielab.core.errors import MovieLabUserError
+from movielab.core.logs import configure_from_settings
 from scripts.index_meta import configure_stdout, positive_int
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     labels = None
     try:
         settings = load_settings()
+        configure_from_settings(settings)
         if args.source:
             settings.raw["collect"]["source"] = args.source
         services = build_services(settings)

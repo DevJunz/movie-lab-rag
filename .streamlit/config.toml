@@ -1,0 +1,3 @@
+# SPEC-NF2004: 브라우저에 예외 종류 · 메시지 · traceback을 보이지 않는다
+[client]
+showErrorDetails = "none"
