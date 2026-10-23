@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **NF2003** API 키 관리 (보안) |
 | 구분 | MVP (비기능) |
-| 상태 | Draft |
+| 상태 | Done |
 | 담당 모듈 | `movielab/config.py`, `movielab/providers.py`, `.env.example`, `.gitignore`, `tests/unit/test_secrets.py` |
 | 선행 SPEC | SPEC-NF2005 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #2 |
 
 ## 1. 요구사항 원문
 
@@ -21,9 +21,13 @@ GMS 키와 주소, 위키백과 연락처는 `.env`에만 둔다. 저장소에�
 
 ### 3.1 로드
 
-- `python-dotenv`의 `load_dotenv()`는 **`movielab.config.load_settings()` 안에서 한 번만** 부른다. 이미 설정된 환경변수를 덮어쓰지 않는다(`override=False`).
+- `.env`는 `movielab.config.load_settings()`가 `python-dotenv`의 `dotenv_values()`로 **부를 때마다 읽는다.** `os.environ`에는 쓰지 않는다. 같은 이름이 환경변수에도 있으면 **환경변수가 이긴다**(덮어쓰지 않음).
+  → 앱 실행 중 `.env`를 고치고 다시 실행(rerun)하면 반영되고(F2012 키 안내 후 복구), 테스트 사이에 값이 새지 않는다.
 - 비밀 값은 `Settings.secrets`(`gms_api_key`, `gms_base_url`, `wiki_contact`)로만 꺼낸다. `__repr__` · 로그 출력 시 `***`로 가린다.
 - `providers.make_chat_model(settings)` · `make_embeddings(settings)`는 키가 없으면 `MissingApiKeyError`를 던진다(F2012 안내로 연결).
+- `container.build_services()`는 키가 없어도 **실패하지 않는다.** 실제 `llm` · `embeddings`는 처음 쓸 때 만든다 — 키가 없을 때 앱이 시작되어 안내 화면을 띄울 수 있어야 하기 때문이다(F2012).
+- 테스트는 개발자 PC의 실제 `.env`를 읽지 않는다. `tests/conftest.py`가 `.env` 경로(`movielab.config.DOTENV_PATH`)를 없는 임시 경로로 바꾼다. **단, `live` 테스트는 격리하지 않는다**(실제 키가 필요).
+- 임베딩 모델도 `timeout_sec`을 적용하고, `check_embedding_ctx_length=False`로 둔다(토큰 계산용 파일을 외부에서 내려받지 않고, OpenAI 호환 프록시에 문자열을 그대로 보낸다).
 
 ### 3.2 저장소 보호
 
@@ -49,12 +53,14 @@ LANGSMITH_API_KEY=
 
 | 검사 | 기준 |
 |---|---|
-| 키 패턴 | `sk-[A-Za-z0-9_-]{20,}`, `(?i)(api[_-]?key\|secret\|token)\s*[:=]\s*["'][^"'\s]{16,}["']` 가 소스 · 문서 · 설정에 없음 |
+| 키 패턴 | ① `sk-[A-Za-z0-9_-]{20,}` ② 따옴표 값 `(?i)(api[_-]?key\|secret\|token)\s*[:=]\s*["'][^"'\s]{16,}["']` ③ `.env` 형식 줄 `^(export )?<…API_KEY\|SECRET\|TOKEN…>=<20자 이상 값>` 이 소스 · 문서 · 설정에 없음 |
 | `.env` 추적 금지 | 추적 파일에 `.env`가 없음 |
 | `.gitignore` | `.env`, `/data/`, `영화도메인_데이터_배포용/`, `prd.pdf` 항목이 있음 |
 | `.env.example` | 모든 값이 비어 있거나 `false` |
 
-- 예외 목록(테스트 코드의 가짜 키 `sk-test…` 등)은 `tests/unit/test_secrets.py` 안에 명시적으로 둔다.
+- 예외: 값이 `sk-test`로 **시작하는** 가짜 키만 허용한다(포함이 아니라 접두어). 예외 목록은 검사기 `tests/secret_scan.py`에 둔다.
+- 검출 결과에는 파일 · 줄 번호 · 패턴 종류만 출력한다. **찾은 값은 출력하지 않는다**(공개 CI 로그 노출 방지).
+- Git이 없을 때(제출 zip을 푼 경우 등)는 `.env` · `.env.*`(`.env.example` 제외) · 가상환경 · 캐시 · 데이터 · 대외비 파일을 건너뛴다.
 
 ## 4. 가정
 
@@ -81,6 +87,11 @@ LANGSMITH_API_KEY=
 | TC-NF2003-03 | 단위 | `repr(settings)`, 로그 레코드 | 키 원문 없음, `***` 있음 | 04 | `tests/unit/test_config.py` |
 | TC-NF2003-04 | 단위 | 저장소 스캔 | 키 패턴 0건, `.env` 미추적, `.gitignore` 항목 존재 | 02, 05 | `tests/unit/test_secrets.py` |
 | TC-NF2003-05 | 단위 | 스캐너에 `sk-` 키가 든 임시 파일을 넣음 | 검출됨 (스캐너 자체 검증) | 02 | 〃 |
+| TC-NF2003-07 | 단위 | 임시 `.env` 파일로 `load_settings` / 같은 변수가 이미 환경에 있음 | 파일 값을 읽음 / 환경 값을 덮어쓰지 않음 | 01 | `tests/unit/test_config.py` |
+| TC-NF2003-08 | 단위 | 키 없이 `build_services()` 후 `services.llm` 접근 | 생성은 성공, 접근 시 `MissingApiKeyError` | 03 | `tests/unit/test_container.py` |
+| TC-NF2003-09 | 단위 | `load_settings()` 전후 `os.environ` 비교 / 호출 사이에 `.env` 내용 변경 | 환경 불변 / 바뀐 값 반영 | 01 | `tests/unit/test_config.py` |
+| TC-NF2003-10 | 단위 | 검사기: 따옴표 없는 `.env` 줄, `live-sk-test-…` 값, 출력 문자열, Git 없는 폴더의 `.env` | 검출 / 검출 / 값 미포함 / 건너뜀 | 02 | `tests/unit/test_secrets.py` |
+| TC-NF2003-11 | live | `.env`가 있는 환경에서 `pytest -m live` | live 테스트가 실제 키를 본다 | 01 | `tests/live/test_live_env.py` |
 | TC-NF2003-06 | 수동 | 제출 zip 목록 확인 | `.env` · `data/` · 데이터 팩 없음 | 05 | 제출 전 점검 |
 
 ## 7. 증빙
