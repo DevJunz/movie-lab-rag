@@ -427,3 +427,13 @@ def test_tc_f2007_08_show_graph_without_key(tmp_settings, monkeypatch, capsys):
     assert show_graph.main([]) == 0
     out = capsys.readouterr().out
     assert "retrieve" in out and "generate" in out and "__start__" in out
+
+
+def test_tc_f2007_12_show_graph_does_not_open_chroma(tmp_settings, monkeypatch, capsys):
+    from scripts import show_graph
+
+    monkeypatch.setenv("MOVIELAB_SETTINGS", str(tmp_settings.source))
+    assert show_graph.main([]) == 0
+    out = capsys.readouterr().out
+    assert "retrieve" in out and "generate" in out
+    assert not tmp_settings.path("chroma_dir").exists()

@@ -5,20 +5,10 @@ from __future__ import annotations
 import pytest
 
 from movielab.core.messages import NOT_FOUND
-from movielab.core.types import Evidence, RetrievalResult
+from movielab.core.types import Evidence
 from movielab.data.domain_movie import MOVIE_PROFILE
 from movielab.rag.graph import build_graph, is_not_found
-from tests.fakes import FakeChatModel
-
-
-class FakeRetriever:
-    def __init__(self, evidences):
-        self.evidences = evidences
-        self.calls = []
-
-    def retrieve(self, item_id, query):
-        self.calls.append((item_id, query))
-        return RetrievalResult(evidences=self.evidences, no_external=len(self.evidences) == 1)
+from tests.fakes import FakeChatModel, FakeRetriever
 
 
 def _evidences():
@@ -62,7 +52,11 @@ def test_tc_f2007_09_not_found_tolerates_quotes_and_period():
     assert is_not_found(f'"{NOT_FOUND}"')
     assert is_not_found(f"“{NOT_FOUND}”")
     assert is_not_found(core)
+    assert is_not_found(f"**{NOT_FOUND}**")
     assert not is_not_found(f'"{NOT_FOUND}" 다만 블랙홀은 천체다 [근거 2]')
+    assert not is_not_found(
+        f"{NOT_FOUND} 다만 블랙홀은 무거운 천체입니다."
+    )  # 인용 없어도 덧붙이면 거짓
 
 
 def test_tc_f2007_10_unknown_task_rejected_before_retrieval():
@@ -84,3 +78,29 @@ def test_tc_f2007_10_prompts_injected_not_global():
     default = build_graph(retriever, FakeChatModel(), MOVIE_PROFILE)
     with pytest.raises(ValueError):  # 주입이 다른 그래프로 새지 않는다
         default.invoke({"movie_id": "157336", "question": "q", "task": "시험"})
+
+
+def test_tc_f2007_12_injected_prompts_extend_defaults():
+    llm = FakeChatModel(rules={"답변 생성": "[합성] 답 [근거 1]"})
+    guide = {"guide": lambda profile, evidences, question: "[작업: 가이드] " + question}
+    graph = build_graph(FakeRetriever(_evidences()), llm, MOVIE_PROFILE, prompts=guide)
+    state = graph.invoke({"movie_id": "157336", "question": "q", "task": "qa"})
+    assert state["answer"] == "[합성] 답 [근거 1]"  # 기본 qa가 그대로 남는다
+    assert state["not_found"] is False
+
+
+def test_tc_f2007_12_block_list_content_joined():
+    from langchain_core.messages import AIMessage
+
+    class BlockLLM:
+        def invoke(self, prompt):
+            return AIMessage(
+                content=[
+                    {"type": "text", "text": "[합성] 앞 "},
+                    {"type": "text", "text": "뒤 [근거 1]"},
+                ]
+            )
+
+    graph = build_graph(FakeRetriever(_evidences()), BlockLLM(), MOVIE_PROFILE)
+    state = graph.invoke({"movie_id": "157336", "question": "q", "task": "qa"})
+    assert state["answer"] == "[합성] 앞 뒤 [근거 1]"

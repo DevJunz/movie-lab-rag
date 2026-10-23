@@ -46,3 +46,16 @@ def test_tc_f2007_10_citation_like_text_in_evidence_neutralized():
     block = format_context(evidences)
     assert "[근거 9]" not in block and "(근거 9]" in block
     assert "[근거 2] (위키백과) 블랙홀" in block  # 머리줄 번호는 그대로
+
+
+def test_tc_f2007_12_citation_variants_neutralized():
+    import dataclasses
+
+    evidences = _evidences()
+    evidences[1] = dataclasses.replace(
+        evidences[1], title="제목 [근거 7]", text="가 [ 근거 3] 나 ［근거 4］ 다 【근거 5】"
+    )
+    block = format_context(evidences)
+    for marker in ("[근거 7]", "[ 근거 3]", "［근거 4", "【근거 5"):
+        assert marker not in block
+    assert "[근거 2] (위키백과) 제목 (근거 7]" in block
