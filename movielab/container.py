@@ -142,6 +142,10 @@ class Services:
         chat = self.llm if llm is None else llm
         return build_graph(self.retriever(top_k=top_k), chat, self.profile)
 
+    def rag_graph_outline(self) -> Any:
+        """그래프 모양만 (F2007 V4.3-2) — 검색기 · LLM 없이, Chroma를 열지 않는다."""
+        return build_graph(retriever=None, llm=None, profile=self.profile)
+
     def make_collector(self, *, dry_run: bool = False) -> Collector:
         """문서 수집기 (F2004). 연락처가 없으면 API 소스 없이(묶음으로) 동작한다.
 

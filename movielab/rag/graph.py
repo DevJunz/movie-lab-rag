@@ -30,7 +30,7 @@ PromptBuilder = Callable[[DomainProfile, list[Evidence], str], str]
 DEFAULT_PROMPTS: Mapping[str, PromptBuilder] = {"qa": build_answer_prompt}
 
 _CITATION = re.compile(r"\[근거\s*\d")
-_QUOTES = "\"'“”‘’「」『』"
+_QUOTES = "\"'“”‘’「」『』*"  # 앞뒤 따옴표 · 강조 표시
 
 
 class RAGState(TypedDict, total=False):
@@ -40,15 +40,26 @@ class RAGState(TypedDict, total=False):
     contexts: list[Evidence]  # retrieve가 채움
     no_external: bool  # 외부 근거가 하나도 없음 (F2006 → F2012 안내)
     answer: str  # generate가 채움 (factcheck은 JSON 문자열)
+    not_found: bool  # generate가 채움 — 답 전체가 '확인되지 않음' 문장 (AC-F2007-04)
 
 
 def is_not_found(answer: str) -> bool:
-    """답이 `NOT_FOUND` 문장으로 시작하고 인용이 하나도 없으면 '확인되지 않음' 답이다.
+    """답 **전체**가 `NOT_FOUND` 문장이면 '확인되지 않음' 답이다 (규칙 3: 다른 말 없이).
 
-    공백을 정규화하고 앞뒤 따옴표를 뗀다. 끝 마침표는 있어도 없어도 된다.
+    공백을 정규화하고 앞뒤 따옴표 · 강조 표시를 뗀다. 끝 마침표는 있어도 없어도 된다.
     """
-    text = " ".join(answer.split()).strip(_QUOTES + " ")
-    return text.startswith(NOT_FOUND.rstrip(".")) and not _CITATION.search(text)
+    text = " ".join(answer.split()).strip(_QUOTES + " ").rstrip(".").strip(_QUOTES + " ")
+    return text == NOT_FOUND.rstrip(".") and not _CITATION.search(text)
+
+
+def _text_of(content: Any) -> str:
+    """LLM 응답 내용 — 문자열이면 그대로, 블록 목록이면 텍스트 블록만 이어 붙인다."""
+    if isinstance(content, list):
+        parts = [
+            block.get("text", "") if isinstance(block, dict) else str(block) for block in content
+        ]
+        return "".join(parts)
+    return str(content)
 
 
 def build_graph(
@@ -61,7 +72,7 @@ def build_graph(
 
     `prompts`는 작업 → 프롬프트 생성 함수 표 (기본 `DEFAULT_PROMPTS`).
     """
-    table = dict(DEFAULT_PROMPTS if prompts is None else prompts)
+    table = {**DEFAULT_PROMPTS, **(prompts or {})}  # 기본 표에 더한다
 
     def builder_for(state: RAGState) -> PromptBuilder:
         task = state.get("task", "qa")
@@ -77,7 +88,8 @@ def build_graph(
     def generate(state: RAGState) -> dict[str, Any]:
         prompt = builder_for(state)(profile, state["contexts"], state["question"])
         logger.debug("%s 프롬프트:\n%s", state.get("task", "qa"), prompt)
-        return {"answer": str(llm.invoke(prompt).content)}
+        answer = _text_of(llm.invoke(prompt).content)
+        return {"answer": answer, "not_found": is_not_found(answer)}
 
     graph = StateGraph(RAGState)
     graph.add_node("retrieve", retrieve)

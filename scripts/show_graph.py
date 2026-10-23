@@ -15,8 +15,8 @@ from scripts.index_meta import configure_stdout
 def main(argv: list[str] | None = None) -> int:
     configure_stdout()
     services = build_services(load_settings())
-    # 구조만 그리므로 LLM · 임베딩은 만들지 않는다 (키 없이 실행 가능)
-    graph = services.rag_graph(llm=object())
+    # 구조만 그리므로 검색기 · LLM을 만들지 않는다 (키 없이, Chroma를 열지 않고 실행)
+    graph = services.rag_graph_outline()
     print(graph.get_graph().draw_mermaid())
     return 0
 

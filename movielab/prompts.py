@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import re
+
 from movielab.core.domain import DomainProfile
 from movielab.core.messages import NOT_FOUND
 from movielab.core.types import Evidence
@@ -88,13 +90,21 @@ ANSWER_GENERATION = """[작업: 답변 생성]
 질문: {question}"""
 
 
+# 인용 비슷한 표기: [근거 · [ 근거 · ［근거 · 【근거
+_CITATION_LIKE = re.compile(r"[\[［【]\s*근거")
+
+
+def _neutralize(text: str) -> str:
+    return _CITATION_LIKE.sub("(근거", text)
+
+
 def format_context(evidences: list[Evidence]) -> str:
     """`[근거 n] (출처 유형) 제목` 머리줄 + 본문. 번호는 Evidence.n을 그대로 쓴다.
 
     본문 안의 `[근거` 표기는 `(근거`로 바꾼다 — 모델이 없는 근거 번호를 인용하지 않게.
     """
     return "\n\n".join(
-        f"[근거 {e.n}] ({e.source_type}) {e.title}\n{e.text.replace('[근거', '(근거')}"
+        f"[근거 {e.n}] ({e.source_type}) {_neutralize(e.title)}\n{_neutralize(e.text)}"
         for e in evidences
     )
 
