@@ -27,7 +27,7 @@ MVP는 명세서의 필수 기능 12개와 비기능 7개에 **SPEC 하나씩** 
 | F2011 | 서비스 | 조건 기반 항목 탐색 | [SPEC-F2011](mvp/SPEC-F2011-condition-explore.md) | `services/explore.py` | 6 | V4.4-2 | 16 | #16 | Draft |
 | F2012 | UI | 진행 상태 및 안내 | [SPEC-F2012](mvp/SPEC-F2012-progress-notices.md) | `core/messages.py`, `services/health.py` | 6 | V4.4-4, V4.4-5, V4.4-6 | 14 | #14 | Draft |
 | NF2001 | 성능 | 응답 시간 | [SPEC-NF2001](mvp/SPEC-NF2001-response-time.md) | `services/qa.py` | 4 | V4.7-1 | 18 | #18 | Draft |
-| NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 7 | V4.2-3, V4.7-2 | 8 | #8 | Draft |
+| NF2002 | 성능 | 수집 캐시 | [SPEC-NF2002](mvp/SPEC-NF2002-collection-cache.md) | `collect/manifest.py` | 7 | V4.2-3, V4.7-2 | 8 | #8 | Done |
 | NF2003 | 보안 | API 키 관리 | [SPEC-NF2003](mvp/SPEC-NF2003-api-key-management.md) | `config.py`, `providers.py` | 5 | V4.7-3 | 2 | #2 | Done |
 | NF2004 | 보안 | 내부 정보 비노출 | [SPEC-NF2004](mvp/SPEC-NF2004-no-internal-exposure.md) | `ui/`, `core/messages.py` | 5 | V4.7-4 | 15 | #15 | Draft |
 | NF2005 | 확장성 | 모듈 분리 | [SPEC-NF2005](mvp/SPEC-NF2005-module-separation.md) | 골격 · `tests/` · CI | 6 | V4.7-5 | **1** | #1 | Done |

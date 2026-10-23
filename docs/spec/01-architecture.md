@@ -240,7 +240,7 @@ API로 수집한 문서도 `data/raw/wiki/`에 **같은 필드**로 저장한다
 | `ItemRecord` | `item_id`, `title`, `year`, `index_text`, `metadata: dict`, `url` | F2001 → F2002 |
 | `Candidate` | `page_id: str`, `title`, `snippet`, `size`, `query`, `is_item_doc: bool` | F2004 |
 | `SourceDocument` | 4.2 필드 전부 + `source_kind`(`wiki`/`pdf`), `license` | F2004 → F2005 |
-| `CollectReport` | `queries`, `cached_queries`, `candidates`, `selected`, `rejected`(사유 포함), `indexed_titles`, `source_used`(`api`/`bundle`), `notices` | F2004, F2012, V4.2 |
+| `CollectReport` | `queries`, `cached_queries`, `candidates`, `selected`, `rejected`(사유 포함), `indexed_titles`, `source_used`(`api`/`bundle`/`cache`), `notices` | F2004, F2012, V4.2 |
 | `Evidence` | `n`(근거 번호), `chunk_id`, `source_kind`(`meta`/`wiki`/`pdf`), `source_type`(표시용 라벨), `title`, `url`, `license`, `text`, `score`, `page`(PDF) | F2006~F2008 |
 | `AnswerResult` | `answer`, `evidences`, `cited`, `uncited: bool`, `not_found: bool`, `collect: CollectReport`, `notices`, `timings` | F2007~F2009, F2012 |
 
