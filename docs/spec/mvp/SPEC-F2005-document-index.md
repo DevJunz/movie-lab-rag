@@ -82,7 +82,8 @@
 
 ### 3.4 연결
 
-- `Collector`(F2004)의 `indexer`로 `DocIndexer.index_document`를, `has_chunks`(NF2002)로 `VectorStore.has_where(docs, {"movie_id": …})`를 container에서 연결한다.
+- `Collector`(F2004)의 `indexer`로 `DocIndexer.index_document`를, `indexed_pages`(NF2002 색인 확인)로 `DocIndexer.page_ids(movie_id)`를 container에서 연결한다.
+  매니페스트의 문서 기록과 실제 색인을 문서 단위로 대조한다 — 일부 문서 청크만 사라져도 감지한다 (AC-18).
   `has_where`는 `limit=1`로 한 건만 확인한다 — 질문마다 그 영화의 청크 ID 전체를 읽지 않는다 (AC-08).
 - 계층 규칙상 `scripts.reindex_docs`는 `services/indexing.reindex_documents(documents, indexer)`를 쓰고, 저장 원문은 `Services.raw_store`(container)에서 얻는다.
 - 설정 검증: `chunk_size`는 1 이상 정수, `chunk_overlap`은 0 이상 정수이고 `chunk_size`보다 작아야 한다(PDF 값도 같은 규칙). 어기면 `SettingsError`.
@@ -136,6 +137,7 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | AC-F2005-14 | 본문이 빈 문서는 실패로 처리되고 그 문서의 옛 청크는 남는다 | — |
 | AC-F2005-15 | 재색인에서 일시 오류는 설정 횟수만큼 다시 시도한다 (빈 본문 같은 확정 오류는 제외) | — |
 | AC-F2005-16 | 재색인으로 청크를 지운 영화는 다음 질문에서 문서를 다시 수집할 수 있다 (매니페스트 초기화) | — |
+| AC-F2005-18 | 매니페스트에 기록된 문서 중 하나라도 색인에 청크가 없으면 그 영화 캐시를 믿지 않고 다시 수집한다 | V4.2-3 |
 | AC-F2005-17 | 본문이 빈 항목 자체 문서는 저장 · 색인하지 않고, 같은 질문은 다음에 캐시 적중한다 | — |
 
 ## 6. 테스트 케이스
@@ -173,6 +175,8 @@ python -m scripts.reindex_docs [--movie-id 157336] [--chunk-size 500 --chunk-ove
 | TC-F2005-30 | 통합 | `reindex_docs --movie-id ""` / `--chunk-size 500 --chunk-overlap 100` | 전체 범위로 재색인 · 정리 / 되돌리기 안내 출력 | 12, 05 | `tests/integration/test_scripts.py` |
 | TC-F2005-31 | 통합 | 원문 3건 중 1건 JSON이 깨진 상태로 전체 재색인 | 나머지 2건 재색인, 깨진 문서 청크 유지, `failed == 1` | 11, 12 | `tests/integration/test_scripts.py` |
 | TC-F2005-32 | 통합 | `batch_size=2` 설정에서 청크 5개 문서 색인 | `upsert` 3번, 청크 5개 | 01 | `tests/integration/test_doc_index.py` |
+| TC-F2005-33 | 통합 | 문서 2건을 수집 · 색인한 뒤 한 문서의 청크만 지우고 같은 질문 | 캐시 적중 없이 다시 수집, 지운 문서 다시 색인 | 18 | `tests/integration/test_collect_index.py` |
+| TC-F2005-34 | 통합 | 매니페스트 초기화가 실패(잠금)한 뒤, 잠금이 풀린 다음 질문 | 옛 기록으로 적중하지 않고 초기화 후 다시 수집 | 18 | 〃 |
 | TC-F2005-26 | 통합 | 문서가 하나도 색인되지 않은 영화(P2가 아무것도 안 고름)에 같은 질문 2회 | 두 번째는 캐시 적중 (청크가 없어도 '색인된 문서' 기록이 없으면 캐시를 비우지 않음) | 08 | `tests/integration/test_collect_index.py` |
 
 ## 7. 증빙
