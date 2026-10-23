@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2013** 프론트엔드 직접 구현 (UI · 심화) |
 | 구분 | 심화 |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/api/server.py`, `movielab/api/schemas.py`, `web/index.html`, `web/app.js`, `web/style.css` |
 | 선행 SPEC | MVP 전체 (특히 F2009~F2012, NF2004) |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #23 |
 
 ## 1. 요구사항 원문
 
@@ -23,6 +23,10 @@
 - Streamlit 화면(MVP)은 그대로 둔다. 웹 화면은 **같은 `services`를 쓰는 두 번째 UI**다. RAG 파이프라인 코드는 바꾸지 않는다.
 - 서버: FastAPI(`fastapi==0.141.1`, `uvicorn[standard]==0.52.4`, `pydantic==2.13.5`). 정적 파일 `web/`을 `/`에서 제공한다.
 - 화면: 프레임워크 없는 HTML · CSS · JS(ES 모듈). 빌드 단계 없음. 외부 CDN을 쓰지 않는다.
+- 의존성: 위 세 개는 `requirements-advanced.txt`(01-architecture §1). 테스트의 `fastapi.testclient.TestClient`가 요구하는 `httpx==0.28.1`은 `requirements-dev.txt`에 더한다(A-26). CI는 세 파일을 모두 설치한다.
+- 서버 조립: `create_app(services)`가 앱을 만든다. 서비스는 주입받고(테스트는 가짜 서비스), 실제 실행 `python -m movielab.api.server`만 `container.build_services`를 쓴다. 기본 주소 `127.0.0.1:8000`(로컬 전용, A-27).
+- 입력 길이 상한 1,000자는 `settings.ui.max_input_chars`, 영화 검색 기본 건수 50은 `settings.ui.movie_search_limit`에서 읽는다.
+- 진행 단계 문구는 Streamlit과 같은 `messages.PROGRESS`를 쓴다(공용 함수 `messages.progress_text`).
 
 ## 3. API 명세 (요청 · 응답 형식)
 
@@ -54,8 +58,22 @@
 }
 ```
 
+```jsonc
+// GuideResponse
+{"markdown": "## 제작 배경 …", "citations": [...], "uncited": false, "notices": [...]}
+// FactCheckResponse
+{"claim": "…", "verdict": "사실" | "거짓" | "확인 불가", "reason": "…", "citations": [...], "notices": [...]}
+// ExploreResponse
+{"items": [...], "candidates": 20, "message": "조건에 맞는 영화를 찾지 못했습니다 …" | null}
+```
+
+- `citations`는 답변에 실제로 인용된 근거만(F2008). `notices`는 수집 안내(`SOURCE_FALLBACK`)와 외부 근거 없음(`NO_EXTERNAL_DOCS`)을 `messages`의 문구로 담는다.
+- 스트림: 시작 전 검사(키 · 색인 · 입력)에 걸리면 스트림 없이 아래 오류 응답을 준다. 스트림 도중 실패하면 마지막 줄로 `{"type":"error","error":{code,message}}`를 보낸다.
+
 **오류 응답** (NF2004): HTTP 상태 + `{"error": {"code": "API_KEY_MISSING" | "INDEX_EMPTY" | "ITEM_NOT_INDEXED" | "BAD_REQUEST" | "INTERNAL", "message": "<사용자용 문구>"}}`.
 traceback · 예외 메시지 · 프롬프트는 응답에 넣지 않는다. 입력 검증 실패(빈 질문, 1,000자 초과, 없는 `movie_id`)는 400 + `BAD_REQUEST`.
+상태 코드: `API_KEY_MISSING` · `INDEX_EMPTY` 503(키 · 색인이 필요한 경로만, `health` · `movies`는 키 없이 동작), `ITEM_NOT_INDEXED` 409, `INTERNAL` 500.
+위 다섯 코드에 없는 안내 오류(`SOURCE_UNAVAILABLE` 등)는 코드 `INTERNAL`, 문구는 그 안내 오류의 문구로 보낸다(A-28).
 
 ## 4. 화면 명세 (`web/`)
 
@@ -92,14 +110,14 @@ traceback · 예외 메시지 · 프롬프트는 응답에 넣지 않는다. 입
 | TC-F2013-05 | 통합 | `GET /` · `/app.js` · `/style.css` | 200, `index.html`에 질문 입력 · 답변 · 근거 영역 요소 ID 존재 | 01 | 〃 |
 | TC-F2013-06 | 단위 | `GET /openapi.json` | 모든 경로와 스키마 존재 | 02 | 〃 |
 | TC-F2013-07 | 수동 | 브라우저에서 Q1 질문, 휴대폰 너비 확인 | 화면 캡처 | 01, 03 | 스크린샷 |
-| TC-F2013-08 | 수동 | Streamlit과 웹 화면에서 F2009~F2012 기능을 하나씩 실행 | 기능 대응표(기능 · Streamlit · 웹 · 차이)를 검증 결과 문서에 기록 | 06 | `docs/deliverables/03_검증결과.md` |
+| TC-F2013-08 | 수동 | Streamlit과 웹 화면에서 F2009~F2012 기능을 하나씩 실행 | 기능 대응표(기능 · Streamlit · 웹 · 차이)를 검증 결과 문서에 기록 | 06 | `docs/verification/F2013_web_vs_streamlit.md` (제출 시 `03_검증결과.md`로 옮김) |
 
 ## 7. 증빙
 
 | 항목 | 방법 | 저장 위치 |
 |---|---|---|
 | V4.5-1 | 웹 화면에서 질문 · 답변 · 근거 캡처, OpenAPI 화면 | `docs/verification/screenshots/V4.5-1_web*.png` |
-| 필수 구현과 비교 | Streamlit vs 웹 기능 대응표 | `docs/deliverables/03_검증결과.md` |
+| 필수 구현과 비교 | Streamlit vs 웹 기능 대응표 | `docs/verification/F2013_web_vs_streamlit.md` (제출 시 `03_검증결과.md`로 옮김) |
 
 ## 8. 범위 밖
 
