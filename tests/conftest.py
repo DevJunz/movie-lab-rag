@@ -24,6 +24,10 @@ _ISOLATED_ENV = (
     "MOVIELAB_SETTINGS",
     "MOVIELAB_CHAT_MODEL",
     "MOVIELAB_EMBED_MODEL",
+    "LANGCHAIN_TRACING_V2",
+    "LANGSMITH_TRACING_V2",
+    "LANGCHAIN_ENDPOINT",
+    "LANGSMITH_ENDPOINT",
 )
 
 
@@ -65,6 +69,15 @@ def _block_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
     monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    for name in ("gethostbyname", "gethostbyname_ex"):
+        real = getattr(socket, name)
+
+        def guarded(host: str, _real=real, _name=name):  # type: ignore[no-untyped-def]
+            if str(host) not in _LOOPBACK:
+                raise NetworkBlockedError(f"테스트에서 외부 주소 조회 시도({_name}): {host}")
+            return _real(host)
+
+        monkeypatch.setattr(socket, name, guarded)
 
 
 @pytest.fixture(autouse=True)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -83,7 +84,10 @@ def _imported_modules(tree: ast.AST, rel_path: str) -> list[tuple[int, str]]:
                 module = ".".join(base + ([node.module] if node.module else []))
             else:
                 module = node.module or ""
-            found.append((node.lineno, module))
+            if module == PACKAGE:  # `from movielab import data` → movielab.data
+                found += [(node.lineno, f"{PACKAGE}.{alias.name}") for alias in node.names]
+            else:
+                found.append((node.lineno, module))
     return found
 
 
@@ -156,11 +160,13 @@ def python_files() -> list[Path]:
     return files
 
 
-def scan_repo() -> list[Violation]:
+def scan_repo(*checkers: Callable[[str, str], list[Violation]]) -> list[Violation]:
+    """저장소의 모든 소스에 검사기를 돌린다. 파일은 한 번만 읽는다."""
+    checkers = checkers or (check_imports, check_domain_literals)
     violations: list[Violation] = []
     for path in python_files():
         rel = path.relative_to(ROOT).as_posix()
         source = path.read_text(encoding="utf-8")
-        violations += check_imports(source, rel)
-        violations += check_domain_literals(source, rel)
+        for checker in checkers:
+            violations += checker(source, rel)
     return violations

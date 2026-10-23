@@ -24,6 +24,8 @@ class Section:
         self._values = values
 
     def __getattr__(self, key: str) -> Any:
+        if key.startswith("_"):  # copy · pickle이 빈 인스턴스에서 특수 이름을 찾을 때 재귀 방지
+            raise AttributeError(key)
         try:
             value = self._values[key]
         except KeyError:
@@ -42,7 +44,7 @@ class Settings:
         self.source = source
 
     def __getattr__(self, key: str) -> Section:
-        if key in ("raw", "source"):
+        if key.startswith("_") or key in ("raw", "source"):
             raise AttributeError(key)
         try:
             return Section(key, self.raw[key])
