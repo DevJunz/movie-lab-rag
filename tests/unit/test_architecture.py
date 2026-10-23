@@ -73,3 +73,13 @@ def test_tc_nf2005_11_source_files_not_git_ignored():
     assert result.returncode in (0, 1), f"git check-ignore 실패: {result.stderr}"
     ignored = result.stdout.split()
     assert ignored == [], f".gitignore에 걸린 소스 파일: {ignored}"
+
+
+INDEX_TEXT_LABELS = r"^(제목|원제|장르|감독|출연|제작 국가|원어|줄거리): "
+
+
+def test_tc_f2001_08_index_text_labels_only_in_data():
+    checker = archcheck.literal_checker(INDEX_TEXT_LABELS, exempt_data=True)
+    violations = archcheck.scan_repo(checker)
+    assert violations == [], "\n".join(map(str, violations))
+    assert checker('LINE = "감독: 정보 없음"\n', "movielab/rag/x.py")

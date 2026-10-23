@@ -152,6 +152,33 @@ def check_domain_literals(source: str, rel_path: str) -> list[Violation]:
     return violations
 
 
+def literal_checker(
+    pattern: str, *, exempt_data: bool = True
+) -> Callable[[str, str], list[Violation]]:
+    """`movielab/` 문자열 리터럴(docstring 제외)에서 정규식을 찾는 검사기를 만든다."""
+    regex = re.compile(pattern, re.MULTILINE)
+
+    def check(source: str, rel_path: str) -> list[Violation]:
+        if not rel_path.startswith(f"{PACKAGE}/"):
+            return []
+        if exempt_data and rel_path.startswith(f"{PACKAGE}/data/"):
+            return []
+        tree = ast.parse(source)
+        docstrings = _docstring_nodes(tree)
+        return [
+            Violation(
+                rel_path, node.lineno, f"'{regex.search(node.value).group(0)}'은 data/에만 둔다"
+            )
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstrings
+            and regex.search(node.value)
+        ]
+
+    return check
+
+
 def python_files() -> list[Path]:
     files = sorted((ROOT / PACKAGE).rglob("*.py"))
     scripts = ROOT / "scripts"
