@@ -16,10 +16,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from movielab.config import chunking_ok
 from movielab.core.errors import InvalidApiKeyError
-from movielab.core.types import SourceDocument
+from movielab.core.types import ITEM_KEY, SourceDocument
 from movielab.index.store import VectorStore
-
-ITEM_KEY = "movie_id"  # 청크 메타데이터의 항목 ID 키 (검색 필터 · 청크 ID에 쓴다)
 
 
 class DocIndexer:

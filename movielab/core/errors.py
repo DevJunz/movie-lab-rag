@@ -43,3 +43,15 @@ class ExternalSourceUnavailableError(MovieLabUserError):
     """외부 문서 출처(위키백과 API 등)를 쓸 수 없다 — 연락처 없음, 차단, 재시도 소진."""
 
     code = "SOURCE_UNAVAILABLE"
+
+
+class IndexEmptyError(MovieLabUserError):
+    """항목 메타데이터 색인이 비어 있다 — 색인 스크립트를 먼저 실행해야 한다."""
+
+    code = "INDEX_EMPTY"
+
+
+class ItemNotIndexedError(MovieLabUserError):
+    """선택한 항목의 메타 청크가 색인에 없다."""
+
+    code = "ITEM_NOT_INDEXED"
