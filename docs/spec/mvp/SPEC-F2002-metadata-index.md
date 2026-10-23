@@ -4,10 +4,10 @@
 |---|---|
 | 요구사항 | **F2002** 메타데이터 색인(RAG 1) (색인 · 필수) |
 | 구분 | MVP |
-| 상태 | Draft |
+| 상태 | In Progress |
 | 담당 모듈 | `movielab/index/store.py`, `movielab/index/meta_indexer.py`, `scripts/index_meta.py` |
 | 선행 SPEC | SPEC-F2001 |
-| 관련 ISSUE | (생성 후 기입) |
+| 관련 ISSUE | #4 |
 
 ## 1. 요구사항 원문
 
@@ -54,6 +54,9 @@ python -m scripts.index_meta --show 157336  # 색인 텍스트 출력 (F2001)
 python -m scripts.index_meta --count      # 현재 건수만 출력
 ```
 
+- 계층 규칙상 스크립트는 `index`를 직접 부르지 않는다. `services/indexing.py`의 `index_catalog(catalog, store, rebuild=False) -> IndexReport`가 F2001 `Catalog`와 `VectorStore`를 잇는다. 스크립트는 `Services.store` · `Services.catalog`(container)로 얻는다.
+- `VectorStore`는 임베딩을 **처음 필요할 때** 만든다(`embeddings`에 객체 또는 객체를 돌려주는 함수를 받는다). 그래서 `--count` · `--show`는 GMS 키 없이 동작한다.
+- `IndexReport`: `loaded`(로드 원소 수 = 항목 + 건너뜀), `skipped`, `indexed`(색인 후 컬렉션 건수), `failed_batches`(실패 배치 번호), `ok`(= `loaded - skipped == indexed` 이고 실패 배치 없음).
 - 메타데이터 필드는 [01-architecture.md §5.3](../01-architecture.md#53-메타데이터-필드)을 따른다.
 - UI 사이드바는 `services.health`를 통해 `movie_meta` · `wiki_docs` 건수를 표시한다(F2009 화면, F2012 안내와 연결).
 
