@@ -25,8 +25,6 @@ from movielab.core.errors import ExternalSourceUnavailableError
 
 logger = logging.getLogger(__name__)
 
-RETRY_STATUS = {429, 500, 502, 503, 504}
-
 
 class RequestThrottle:
     """직렬화 잠금 + 최소 호출 간격. 같은 API를 쓰는 모든 클라이언트가 하나를 공유한다."""
@@ -53,16 +51,25 @@ class RequestThrottle:
         self._last_start = self.clock()
 
 
-_SHARED: dict[str, RequestThrottle] = {}
+_SHARED: dict[tuple[str, float], RequestThrottle] = {}
 _SHARED_LOCK = threading.Lock()
 
 
 def shared_throttle(api_url: str, min_interval_sec: float) -> RequestThrottle:
     """API 주소별 프로세스 공용 throttle (Streamlit 세션 · 스레드가 여러 개여도 한 줄로)."""
+    key = (api_url, float(min_interval_sec))
     with _SHARED_LOCK:
-        if api_url not in _SHARED:
-            _SHARED[api_url] = RequestThrottle(min_interval_sec)
-        return _SHARED[api_url]
+        if key not in _SHARED:
+            _SHARED[key] = RequestThrottle(min_interval_sec)
+        return _SHARED[key]
+
+
+def _should_retry(status: int) -> bool:
+    return status == 429 or 500 <= status <= 599
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class _Retryable(Exception):
@@ -71,7 +78,9 @@ class _Retryable(Exception):
         self.retry_after = retry_after
 
 
-def parse_retry_after(value: Any, cap: float) -> float | None:
+def parse_retry_after(
+    value: Any, cap: float, now: Callable[[], datetime] = _utc_now
+) -> float | None:
     """초 또는 HTTP 날짜. 음수 · NaN · 무한대 · 해석 불가면 None (백오프를 쓴다)."""
     if value is None:
         return None
@@ -85,7 +94,7 @@ def parse_retry_after(value: Any, cap: float) -> float | None:
             return None
         if when.tzinfo is None:
             when = when.replace(tzinfo=timezone.utc)
-        seconds = (when - datetime.now(timezone.utc)).total_seconds()
+        seconds = (when - now()).total_seconds()
     if not math.isfinite(seconds) or seconds < 0:
         return None
     return min(seconds, cap)
@@ -101,24 +110,35 @@ class WikiHttpClient:
         throttle: RequestThrottle | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        now: Callable[[], datetime] = _utc_now,
     ) -> None:
         self.settings = settings
         self.contact = (contact or "").strip()
         self.session = session
         self.clock = clock
         self.sleep = sleep
+        self.now = now
         self.throttle = throttle or RequestThrottle(
             settings.wiki.min_interval_sec, clock=clock, sleep=sleep
         )
-
-    @property
-    def user_agent(self) -> str:
-        wiki = self.settings.wiki
-        return (
+        wiki = settings.wiki
+        self.user_agent = (
             f"{wiki.app_name}/{wiki.app_version} "
             f"(+{wiki.project_url}; contact: {self.contact}) "
             f"python-requests/{requests.__version__}"
         )
+        self._header_problem = self._check_header(self.user_agent)
+
+    @staticmethod
+    def _check_header(value: str) -> str | None:
+        """HTTP 헤더에 쓸 수 없는 값이면 이유를 돌려준다 (latin-1 밖 문자, 줄바꿈)."""
+        if any(ch in value for ch in ("\r", "\n")):
+            return "줄바꿈 문자"
+        try:
+            value.encode("latin-1")
+        except UnicodeEncodeError:
+            return "latin-1로 표현할 수 없는 문자"
+        return None
 
     def _attempt(self, params: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         """요청 1회. 반환: (로그용 상태, 데이터). 재시도 대상이면 _Retryable."""
@@ -134,8 +154,8 @@ class WikiHttpClient:
         except requests.RequestException as exc:
             raise _Retryable(type(exc).__name__) from exc
         status = response.status_code
-        retry_after = parse_retry_after((response.headers or {}).get("Retry-After"), cap)
-        if status in RETRY_STATUS:
+        retry_after = parse_retry_after((response.headers or {}).get("Retry-After"), cap, self.now)
+        if _should_retry(status):
             raise _Retryable(f"HTTP {status}", retry_after)
         if status == 404:
             return "404", {}
@@ -145,13 +165,15 @@ class WikiHttpClient:
             data = response.json()
         except ValueError as exc:  # 점검 페이지 등 JSON이 아닌 200
             raise _Retryable("HTTP 200 (JSON 아님)") from exc
-        error = data.get("error") if isinstance(data, dict) else None
+        if not isinstance(data, dict):  # [] · null 등 — 정상 응답이 아니다
+            raise _Retryable("HTTP 200 (JSON 객체 아님)")
+        error = data.get("error")
         if error:
-            code = error.get("code")
+            code = error.get("code") if isinstance(error, dict) else str(error)
             if code == "maxlag":
                 raise _Retryable("maxlag", retry_after)
             raise ExternalSourceUnavailableError(f"위키백과 API 오류: {code}")
-        return str(status), data if isinstance(data, dict) else {}
+        return str(status), data
 
     def get(self, params: dict[str, Any]) -> dict[str, Any]:
         """공통 파라미터(format · formatversion · maxlag)를 더해 요청한다."""
@@ -159,6 +181,9 @@ class WikiHttpClient:
             raise ExternalSourceUnavailableError(
                 "WIKI_CONTACT가 없어 위키백과 API를 호출하지 않는다"
             )
+        if self._header_problem:
+            logger.warning("WIKI_CONTACT를 User-Agent에 쓸 수 없다: %s", self._header_problem)
+            raise ExternalSourceUnavailableError(f"User-Agent 오류: {self._header_problem}")
         wiki = self.settings.wiki
         full = {**params, "format": "json", "formatversion": 2, "maxlag": wiki.maxlag}
         action = params.get("action")
