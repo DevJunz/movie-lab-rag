@@ -4,7 +4,7 @@
 |---|---|
 | 요구사항 | **F2014** MMR 검색 적용 (검색 · 심화) |
 | 구분 | 심화 |
-| 상태 | In Progress |
+| 상태 | Done |
 | 담당 모듈 | `movielab/rag/retriever.py`, `scripts/compare_retrieval.py` |
 | 선행 SPEC | SPEC-F2006 |
 | 관련 ISSUE | #20 |
@@ -67,7 +67,7 @@ python -m scripts.compare_retrieval --movie-id 157336 --question "<Q1>" [--top-k
 | TC-F2014-02 | 통합 | MMR 모드 | `evidences[0]`이 메타, 외부 근거 모두 해당 `movie_id` | 04 | 〃 |
 | TC-F2014-03 | 단위 | 설정 `search_type: "mmr"` / 오타 `"mrr"` | 로드 성공 / `SettingsError` | 01 | `tests/unit/test_config.py` |
 | TC-F2014-04 | 통합 | `compare_retrieval` 실행(가짜) | 표 파일 생성, 요약 지표 3종 포함 | 03 | `tests/integration/test_scripts.py` |
-| TC-F2014-06 | live | Q1 · Q2를 similarity / MMR로 검색 | MMR Top-4에 Q1 「인터스텔라」, Q2 「명량해협」 청크 포함 (SPEC-F2007 §7.1 관찰) | 05 | `tests/live/test_live_mmr.py` |
+| TC-F2014-06 | live | Q1 · Q2를 similarity / MMR로 검색 | MMR Top-4에 Q1 「인터스텔라」, Q2 「명량해협」 청크 포함 (SPEC-F2007 §7.1 관찰). Q2는 현재 색인에서 재현되지 않아 `xfail`(§8) | 05 | `tests/live/test_live_mmr.py` |
 | TC-F2014-05 | 수동 | Q1 · Q2 · Q4 비교 실행 | 표와 해석을 설계문서에 기록 | 05 | 문서 |
 
 ## 6. 증빙
@@ -76,6 +76,20 @@ python -m scripts.compare_retrieval --movie-id 157336 --question "<Q1>" [--top-k
 |---|---|---|
 | V4.5-2 | 비교 표 | `docs/verification/retrieval_compare/` + 설계문서 |
 
-## 7. 범위 밖
+## 8. 실제 색인 비교 결과 (TC-F2014-05 · 06, 2026-10-23)
+
+`python -m scripts.compare_retrieval`로 Q1 · Q2 · Q4를 비교했다(`docs/verification/retrieval_compare/`). 외부 근거 Top-4, fetch_k=20, λ=0.5.
+
+| 질문 | 서로 다른 문서 수 (유사도 → MMR) | 근거 쌍 평균 코사인 (유사도 → MMR) | 겹침 | 관찰 |
+|---|---|---|---|---|
+| Q1 인터스텔라 | 1 → 3 | 0.645 → 0.355 | 2 | 유사도는 「블랙홀」 4개. MMR은 「블랙홀 열역학」 · 「인터스텔라」 도입부를 넣는다 |
+| Q2 명량 | 2 → 3 | 0.578 → 0.381 | 1 | MMR은 「임진왜란」 · 「사천 해전」을 넣지만 「명량해협」(유사도 20위)은 빠진다. λ=0.3이면 들어온다 |
+| Q4 오펜하이머 | 2 → 1 | 0.595 → 0.325 | 1 | 같은 「트리니티 (핵 실험)」 문서 안의 다른 문단을 고른다(문서 수는 줄지만 내용은 더 다양) |
+
+- 세 질문 모두 근거 쌍 평균 코사인이 낮아져 내용 겹침이 줄었다(AC-F2014-02). 대신 질문과의 관련도 점수는 낮은 청크가 들어온다.
+- Q2의 「명량해협」은 SPEC-F2007 §7.1 관찰 때와 달리 현재 색인(문서가 늘어 20위로 밀림)에서는 λ=0.5로 Top-4에 들지 않는다. TC-F2014-06의 Q2는 `xfail`로 두고, A-09(λ=0.5) 조정이나 기본값 변경은 사용자 확인 후 별도 변경으로 다룬다.
+- 기본값은 `similarity` 그대로다(§2.1).
+
+## 9. 범위 밖
 
 - 하이브리드(키워드 + 벡터) 검색, 재순위(reranker).
